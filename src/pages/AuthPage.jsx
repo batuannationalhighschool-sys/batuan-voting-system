@@ -18,7 +18,7 @@ export default function AuthPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error, must_change_password } = await signIn(lrn, password);
+    const { error, must_change_password, isAdmin } = await signIn(lrn, password);
     if (error) {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
     } else if (must_change_password) {
@@ -26,7 +26,11 @@ export default function AuthPage() {
       navigate("/change-password");
     } else {
       toast({ title: "Welcome back!" });
-      navigate("/");
+      if (isAdmin) {
+        navigate("/admin");
+      } else {
+        navigate("/");
+      }
     }
     setLoading(false);
   };

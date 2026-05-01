@@ -2,66 +2,77 @@ import { useState } from "react";
 import { Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
-import { useElection } from "@/contexts/ElectionContext";
 import CandidateCard from "@/components/CandidateCard";
 
 export default function Candidates() {
   const [search, setSearch] = useState("");
   const [activePosition, setActivePosition] = useState("all");
-  const { electionType, currentSection } = useElection();
-
-  const isClassroom = electionType === 'classroom';
-  const queryParams = isClassroom && currentSection
-    ? `?type=classroom&section=${encodeURIComponent(currentSection)}`
-    : '?type=sslg';
+  const [activeParty, setActiveParty] = useState("all");
 
   const { data: positions } = useQuery({
-    queryKey: ["positions", electionType, currentSection],
-    queryFn: () => api.get(`/positions${queryParams}`),
+    queryKey: ["positions"],
+    queryFn: () => api.get('/positions'),
   });
 
   const { data: candidates } = useQuery({
-    queryKey: ["candidates", electionType, currentSection],
-    queryFn: () => api.get(`/candidates${queryParams}`),
+    queryKey: ["candidates"],
+    queryFn: () => api.get('/candidates'),
   });
+
+  const partyLists = Array.from(new Set((candidates ?? []).map((c) => c.party_list).filter(Boolean)));
 
   const filtered = (candidates ?? []).filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.party_list.toLowerCase().includes(search.toLowerCase());
     const matchesPosition = activePosition === "all" || c.position_id === activePosition;
-    return matchesSearch && matchesPosition;
+    const matchesParty = activeParty === "all" || c.party_list === activeParty;
+    return matchesSearch && matchesPosition && matchesParty;
   });
-
-  const pageTitle = isClassroom
-    ? `Candidates — ${currentSection || 'Classroom'}`
-    : 'Candidates';
-  const pageDesc = isClassroom
-    ? `Meet the candidates running for classroom officer positions${currentSection ? ` in ${currentSection}` : ''}`
-    : 'Meet the candidates running for SSLG positions';
 
   return (
     <div className="container py-8 md:py-12">
       <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">{pageTitle}</h1>
-        <p className="text-muted-foreground mt-1">{pageDesc}</p>
+        <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">Candidates</h1>
+        <p className="text-muted-foreground mt-1">Meet the candidates running for SSLG positions</p>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 mb-8">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col gap-4 mb-8">
+        <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <input type="text" placeholder="Search candidates..." value={search} onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button onClick={() => setActivePosition("all")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activePosition === "all" ? "gradient-navy text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"}`}>
-            All
-          </button>
-          {(positions ?? []).map((p) => (
-            <button key={p.id} onClick={() => setActivePosition(p.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activePosition === p.id ? "gradient-navy text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"}`}>
-              {p.title}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 sm:max-w-xs">
+            <label htmlFor="position-filter" className="block text-xs font-semibold text-muted-foreground mb-1.5">Position:</label>
+            <select 
+              id="position-filter"
+              value={activePosition} 
+              onChange={(e) => setActivePosition(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
+            >
+              <option value="all">All Positions</option>
+              {(positions ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+          </div>
+
+          {partyLists.length > 0 && (
+            <div className="flex-1 sm:max-w-xs">
+              <label htmlFor="party-filter" className="block text-xs font-semibold text-muted-foreground mb-1.5">Party List:</label>
+              <select 
+                id="party-filter"
+                value={activeParty} 
+                onChange={(e) => setActiveParty(e.target.value)}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring shadow-sm"
+              >
+                <option value="all">All Parties</option>
+                {partyLists.map((party) => (
+                  <option key={party} value={party}>{party}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

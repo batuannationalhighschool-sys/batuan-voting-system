@@ -1,6 +1,6 @@
 -- Batuan Voting System — MySQL Schema
 -- Run this file to create the database and all tables
--- Supports both SSLG and Classroom Officers elections
+-- SSLG Elections only
 
 CREATE DATABASE IF NOT EXISTS batuan_voting CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE batuan_voting;
@@ -32,21 +32,18 @@ CREATE TABLE IF NOT EXISTS profiles (
   student_id VARCHAR(50) DEFAULT NULL,
   grade_level VARCHAR(50) DEFAULT NULL,
   section VARCHAR(50) DEFAULT NULL,
-  has_voted_sslg BOOLEAN NOT NULL DEFAULT FALSE,
-  has_voted_classroom BOOLEAN NOT NULL DEFAULT FALSE,
+  has_voted BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Positions (supports both SSLG and Classroom elections)
+-- Positions
 CREATE TABLE IF NOT EXISTS positions (
   id CHAR(36) PRIMARY KEY,
   title VARCHAR(100) NOT NULL,
   display_order INT NOT NULL DEFAULT 0,
   max_votes INT NOT NULL DEFAULT 1,
-  election_type ENUM('sslg', 'classroom') NOT NULL DEFAULT 'sslg',
-  section VARCHAR(50) DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -60,26 +57,24 @@ CREATE TABLE IF NOT EXISTS candidates (
   party_list VARCHAR(100) NOT NULL,
   motto VARCHAR(200) DEFAULT NULL,
   avatar_url VARCHAR(500) DEFAULT NULL,
-  election_type ENUM('sslg', 'classroom') NOT NULL DEFAULT 'sslg',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE CASCADE
 );
 
--- Votes (unique per voter + candidate — allows multi-votes per position)
+-- Votes (unique per voter + candidate)
 CREATE TABLE IF NOT EXISTS votes (
   id CHAR(36) PRIMARY KEY,
   voter_id CHAR(36) NOT NULL,
   candidate_id CHAR(36) NOT NULL,
   position_id CHAR(36) NOT NULL,
-  election_type ENUM('sslg', 'classroom') NOT NULL DEFAULT 'sslg',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uq_voter_candidate_type (voter_id, candidate_id, election_type),
+  UNIQUE KEY uq_voter_candidate (voter_id, candidate_id),
   FOREIGN KEY (voter_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (candidate_id) REFERENCES candidates(id) ON DELETE CASCADE,
   FOREIGN KEY (position_id) REFERENCES positions(id) ON DELETE CASCADE
 );
 
--- Election settings (per election type, per section for classroom)
+-- Election settings
 CREATE TABLE IF NOT EXISTS election_settings (
   id CHAR(36) PRIMARY KEY,
   name VARCHAR(100) NOT NULL DEFAULT 'SSLG Election 2026',
@@ -88,13 +83,11 @@ CREATE TABLE IF NOT EXISTS election_settings (
   voting_start TIME NOT NULL DEFAULT '08:00:00',
   voting_end TIME NOT NULL DEFAULT '16:00:00',
   status ENUM('upcoming', 'ongoing', 'completed') NOT NULL DEFAULT 'upcoming',
-  election_type ENUM('sslg', 'classroom') NOT NULL DEFAULT 'sslg',
-  section VARCHAR(50) DEFAULT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Vote counts view (includes election_type)
+-- Vote counts view
 CREATE OR REPLACE VIEW vote_counts AS
   SELECT
     c.id AS candidate_id,
@@ -104,7 +97,6 @@ CREATE OR REPLACE VIEW vote_counts AS
     c.grade_level,
     c.section,
     c.motto,
-    c.election_type,
     p.title AS position_title,
     p.display_order,
     COUNT(v.id) AS vote_count
@@ -112,28 +104,28 @@ CREATE OR REPLACE VIEW vote_counts AS
   JOIN positions p ON c.position_id = p.id
   LEFT JOIN votes v ON v.candidate_id = c.id
   GROUP BY c.id, c.name, c.position_id, c.party_list, c.grade_level,
-           c.section, c.motto, c.election_type, p.title, p.display_order;
+           c.section, c.motto, p.title, p.display_order;
 
 -- Seed: default SSLG election settings
-INSERT INTO election_settings (id, name, school_year, election_date, status, election_type)
-VALUES (UUID(), 'SSLG Election 2026', '2025-2026', '2026-03-15', 'ongoing', 'sslg');
+INSERT INTO election_settings (id, name, school_year, election_date, status)
+VALUES (UUID(), 'SSLG Election 2026', '2025-2026', '2026-03-15', 'ongoing');
 
 -- Seed: default SSLG positions
 -- max_votes = 2 for P.I.O. and Peace Officer (voters elect 2 per position)
-INSERT INTO positions (id, title, display_order, max_votes, election_type) VALUES
-  (UUID(), 'President',                  1, 1, 'sslg'),
-  (UUID(), 'Vice President',             2, 1, 'sslg'),
-  (UUID(), 'Secretary',                  3, 1, 'sslg'),
-  (UUID(), 'Treasurer',                  4, 1, 'sslg'),
-  (UUID(), 'Auditor',                    5, 1, 'sslg'),
-  (UUID(), 'Public Information Officer', 6, 2, 'sslg'),
-  (UUID(), 'Peace Officer',              7, 2, 'sslg'),
-  (UUID(), 'Grade 7 Representative',     8, 1, 'sslg'),
-  (UUID(), 'Grade 8 Representative',     9, 1, 'sslg'),
-  (UUID(), 'Grade 9 Representative',    10, 1, 'sslg'),
-  (UUID(), 'Grade 10 Representative',   11, 1, 'sslg'),
-  (UUID(), 'Grade 11 Representative',   12, 1, 'sslg'),
-  (UUID(), 'Grade 12 Representative',   13, 1, 'sslg');
+INSERT INTO positions (id, title, display_order, max_votes) VALUES
+  (UUID(), 'President',                  1, 1),
+  (UUID(), 'Vice President',             2, 1),
+  (UUID(), 'Secretary',                  3, 1),
+  (UUID(), 'Treasurer',                  4, 1),
+  (UUID(), 'Auditor',                    5, 1),
+  (UUID(), 'Public Information Officer', 6, 2),
+  (UUID(), 'Peace Officer',              7, 2),
+  (UUID(), 'Grade 7 Representative',     8, 1),
+  (UUID(), 'Grade 8 Representative',     9, 1),
+  (UUID(), 'Grade 9 Representative',    10, 1),
+  (UUID(), 'Grade 10 Representative',   11, 1),
+  (UUID(), 'Grade 11 Representative',   12, 1),
+  (UUID(), 'Grade 12 Representative',   13, 1);
 
 -- Seed: default admin user (username: admin, password: admin123)
 -- bcrypt hash for 'admin123'

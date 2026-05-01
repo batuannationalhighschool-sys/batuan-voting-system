@@ -1,34 +1,35 @@
-import { Link } from "react-router-dom";
-import { Users, Vote, BarChart3, Calendar, TrendingUp, CheckCircle, LogIn, AlertCircle } from "lucide-react";
+import { useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { Users, Vote, BarChart3, Calendar, TrendingUp, CheckCircle, LogIn, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useElection } from "@/contexts/ElectionContext";
 import StatCard from "@/components/StatCard";
 import schoolSeal from "@/assets/school-seal.jpg";
 
 export default function Index() {
-  const { user } = useAuth();
-  const { electionType, currentSection } = useElection();
+  const { user, isAdmin } = useAuth();
+  const navigate = useNavigate();
 
-  const isClassroom = electionType === 'classroom';
-  const queryParams = isClassroom && currentSection
-    ? `?type=classroom&section=${encodeURIComponent(currentSection)}`
-    : '?type=sslg';
+  useEffect(() => {
+    if (isAdmin) {
+      navigate("/admin");
+    }
+  }, [isAdmin, navigate]);
 
   const { data: settings } = useQuery({
-    queryKey: ["election-settings", electionType, currentSection],
-    queryFn: () => api.get(`/election-settings${queryParams}`),
+    queryKey: ["election-settings"],
+    queryFn: () => api.get('/election-settings'),
   });
 
   const { data: voteCounts } = useQuery({
-    queryKey: ["vote-counts-home", electionType, currentSection],
-    queryFn: () => api.get(`/votes/counts${queryParams}`),
+    queryKey: ["vote-counts-home"],
+    queryFn: () => api.get('/votes/counts'),
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["stats", electionType, currentSection],
-    queryFn: () => api.get(`/stats${queryParams}`),
+    queryKey: ["stats"],
+    queryFn: () => api.get('/stats'),
   });
 
   const profileCount = stats?.voterCount ?? 0;
@@ -46,25 +47,6 @@ export default function Index() {
     completed: "bg-primary/10 text-primary",
   };
 
-  const heroTitle = isClassroom ? 'Classroom Officers' : 'SSLG Election';
-  const heroSubtitle = isClassroom
-    ? currentSection
-      ? `Section ${currentSection} — Classroom Officers Election`
-      : 'Select your section to view classroom election'
-    : 'Batuan National High School — Supreme Student Learner Government Election System';
-
-  // Show message if classroom mode selected but no section
-  if (isClassroom && !currentSection && user) {
-    return (
-      <div className="container py-16 text-center animate-fade-in">
-        <AlertCircle className="w-16 h-16 text-gold mx-auto mb-4" />
-        <h1 className="text-2xl font-display font-bold text-foreground mb-2">No Section Assigned</h1>
-        <p className="text-muted-foreground mb-6">Your profile doesn't have a section assigned. Please contact your admin to set your section before participating in classroom elections.</p>
-        <Link to="/" className="px-6 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold">Back to Dashboard</Link>
-      </div>
-    );
-  }
-
   return (
     <div>
       {/* Hero */}
@@ -74,11 +56,11 @@ export default function Index() {
           <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
             <img src={schoolSeal} alt="Batuan National High School Seal" className="w-24 h-24 md:w-32 md:h-32 mb-6 animate-scale-in rounded-full ring-4 ring-gold/20 object-cover" />
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-extrabold text-primary-foreground leading-tight animate-fade-in">
-              {heroTitle}
-              <span className="block text-gradient-gold mt-1">{isClassroom && currentSection ? currentSection : '2026'}</span>
+              SSLG Election
+              <span className="block text-gradient-gold mt-1">2026</span>
             </h1>
             <p className="text-primary-foreground/70 text-base md:text-lg mt-4 max-w-xl animate-fade-in" style={{ animationDelay: "150ms" }}>
-              {heroSubtitle}
+              Batuan National High School — Supreme Student Learner Government Election System
             </p>
             <p className="text-primary-foreground/50 text-sm mt-1 animate-fade-in" style={{ animationDelay: "200ms" }}>Batuan, Bohol, Philippines</p>
 
@@ -94,7 +76,11 @@ export default function Index() {
 
             <div className="flex flex-wrap gap-3 mt-8 animate-fade-in" style={{ animationDelay: "400ms" }}>
               {user ? (
-                <Link to="/vote" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">Cast Your Vote</Link>
+                isAdmin ? (
+                  <Link to="/admin" className="px-8 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold hover:opacity-90 transition-opacity">Admin Dashboard</Link>
+                ) : (
+                  <Link to="/vote" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">Cast Your Vote</Link>
+                )
               ) : (
                 <Link to="/auth" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity flex items-center gap-2">
                   <LogIn className="w-4 h-4" />
@@ -144,7 +130,10 @@ export default function Index() {
             <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-6">Quick Actions</h2>
             <div className="space-y-3">
               {[
-                { to: user ? "/vote" : "/auth", icon: Vote, label: "Cast Your Vote", desc: "Select your preferred candidates", variant: "gold" },
+                ...(isAdmin 
+                  ? [{ to: "/admin", icon: Settings, label: "Admin Dashboard", desc: "Manage the election system", variant: "gold" }]
+                  : [{ to: user ? "/vote" : "/auth", icon: Vote, label: "Cast Your Vote", desc: "Select your preferred candidates", variant: "gold" }]
+                ),
                 { to: "/candidates", icon: Users, label: "View Candidates", desc: "Know your candidates better", variant: "default" },
                 { to: "/results", icon: BarChart3, label: "Live Results", desc: "See real-time election updates", variant: "default" },
               ].map((action, i) => (

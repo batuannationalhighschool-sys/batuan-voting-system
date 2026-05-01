@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, GraduationCap, School, CheckCircle2 } from "lucide-react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -15,14 +15,7 @@ export default function Admin() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Election type toggle for admin
-  const [adminElectionType, setAdminElectionType] = useState("sslg"); // 'sslg' | 'classroom'
-  const [selectedSection, setSelectedSection] = useState("");
 
-  const isClassroom = adminElectionType === 'classroom';
-  const queryParams = isClassroom && selectedSection
-    ? `?type=classroom&section=${encodeURIComponent(selectedSection)}`
-    : '?type=sslg';
 
   // Add candidate form state
   const [newCandidate, setNewCandidate] = useState({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
@@ -57,13 +50,11 @@ export default function Admin() {
     setEditPhotoPreview(null);
   };
 
-  const { data: positions } = useQuery({ queryKey: ["positions", adminElectionType, selectedSection], queryFn: () => api.get(`/positions${queryParams}`) });
-  const { data: candidates } = useQuery({ queryKey: ["candidates", adminElectionType, selectedSection], queryFn: () => api.get(`/candidates${queryParams}`) });
-  const { data: settings } = useQuery({ queryKey: ["election-settings", adminElectionType, selectedSection], queryFn: () => api.get(`/election-settings${queryParams}`) });
-  const { data: stats } = useQuery({ queryKey: ["admin-stats", adminElectionType, selectedSection], queryFn: () => api.get(`/stats${queryParams}`) });
+  const { data: positions } = useQuery({ queryKey: ["positions"], queryFn: () => api.get('/positions') });
+  const { data: candidates } = useQuery({ queryKey: ["candidates"], queryFn: () => api.get('/candidates') });
+  const { data: settings } = useQuery({ queryKey: ["election-settings"], queryFn: () => api.get('/election-settings') });
+  const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: () => api.get('/stats') });
   const { data: voters } = useQuery({ queryKey: ["voters"], queryFn: () => api.get('/voters'), enabled: isAdmin });
-  const { data: sections } = useQuery({ queryKey: ["sections"], queryFn: () => api.get('/classroom/sections'), enabled: isAdmin });
-  const { data: classroomElections } = useQuery({ queryKey: ["classroom-elections"], queryFn: () => api.get('/classroom/elections'), enabled: isAdmin });
 
   const profileCount = stats?.voterCount ?? 0;
   const votedCount = stats?.votedCount ?? 0;
@@ -71,7 +62,7 @@ export default function Admin() {
 
   const addCandidate = useMutation({
     mutationFn: async () => {
-      if (!newCandidate.name || !newCandidate.position_id || !newCandidate.grade_level || !newCandidate.section || (!isClassroom && !newCandidate.party_list)) throw new Error("All fields required");
+      if (!newCandidate.name || !newCandidate.position_id || !newCandidate.grade_level || !newCandidate.section || !newCandidate.party_list) throw new Error("All fields required");
       const formData = new FormData();
       formData.append('name', newCandidate.name);
       formData.append('position_id', newCandidate.position_id);
@@ -79,13 +70,13 @@ export default function Admin() {
       formData.append('section', newCandidate.section);
       formData.append('party_list', newCandidate.party_list);
       formData.append('motto', newCandidate.motto);
-      formData.append('election_type', adminElectionType);
+
       if (photoFile) formData.append('photo', photoFile);
       await api.upload('/candidates', formData);
     },
     onSuccess: () => {
       toast({ title: "Candidate added!" });
-      setNewCandidate({ name: "", position_id: "", grade_level: "", section: isClassroom ? selectedSection : "", party_list: "", motto: "" });
+      setNewCandidate({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
       setPhotoFile(null);
       setPhotoPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -104,7 +95,7 @@ export default function Admin() {
 
   const updateCandidate = useMutation({
     mutationFn: async () => {
-      if (!editCandidate || !editCandidate.name || !editCandidate.position_id || !editCandidate.grade_level || !editCandidate.section || (!isClassroom && !editCandidate.party_list)) throw new Error("All fields required");
+      if (!editCandidate || !editCandidate.name || !editCandidate.position_id || !editCandidate.grade_level || !editCandidate.section || !editCandidate.party_list) throw new Error("All fields required");
       const formData = new FormData();
       formData.append('name', editCandidate.name);
       formData.append('position_id', editCandidate.position_id);
@@ -112,7 +103,7 @@ export default function Admin() {
       formData.append('section', editCandidate.section);
       formData.append('party_list', editCandidate.party_list);
       formData.append('motto', editCandidate.motto);
-      formData.append('election_type', adminElectionType);
+
       if (editPhotoFile) formData.append('photo', editPhotoFile);
       await api.uploadPut(`/candidates/${editCandidate.id}`, formData);
     },
@@ -153,7 +144,6 @@ export default function Admin() {
       setNewVoter({ lrn: "", full_name: "", grade_level: "", section: "" });
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
-      queryClient.invalidateQueries({ queryKey: ["sections"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -167,7 +157,6 @@ export default function Admin() {
       toast({ title: "Voter updated!" });
       setEditVoter(null);
       queryClient.invalidateQueries({ queryKey: ["voters"] });
-      queryClient.invalidateQueries({ queryKey: ["sections"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -196,20 +185,7 @@ export default function Admin() {
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
-  // Classroom setup mutation
-  const setupClassroom = useMutation({
-    mutationFn: async (section) => {
-      await api.post('/classroom/setup', { section });
-    },
-    onSuccess: (_, section) => {
-      toast({ title: "Classroom election created!", description: `Default positions created for ${section}.` });
-      queryClient.invalidateQueries({ queryKey: ["classroom-elections"] });
-      queryClient.invalidateQueries({ queryKey: ["positions"] });
-      queryClient.invalidateQueries({ queryKey: ["election-settings"] });
-      setSelectedSection(section);
-    },
-    onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
-  });
+
 
   if (!isAdmin) {
     return (
@@ -224,9 +200,8 @@ export default function Admin() {
 
   const tabs = [
     { id: "overview", label: "Overview", icon: BarChart3 },
-    { id: "voters", label: "Voters", icon: GraduationCap },
+    { id: "voters", label: "Voters", icon: Users },
     { id: "candidates", label: "Candidates", icon: Users },
-    { id: "classroom", label: "Classroom", icon: School },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
@@ -238,10 +213,7 @@ export default function Admin() {
     return v.lrn?.toLowerCase().includes(q) || v.full_name?.toLowerCase().includes(q) || v.section?.toLowerCase().includes(q);
   });
 
-  // Sections that don't have classroom elections set up yet
-  const setupSections = (sections ?? []).filter(s => {
-    return !(classroomElections ?? []).some(e => e.section === s);
-  });
+
 
   return (
     <div className="container py-8 md:py-12">
@@ -252,30 +224,7 @@ export default function Admin() {
         <p className="text-muted-foreground mt-1">Manage voters, candidates, election settings, and monitor results</p>
       </div>
 
-      {/* Election Type Toggle (for Overview, Candidates, Settings tabs) */}
-      {(activeTab === "overview" || activeTab === "candidates" || activeTab === "settings") && (
-        <div className="flex flex-wrap items-center gap-3 mb-6">
-          <div className="flex items-center bg-muted rounded-lg p-0.5">
-            <button onClick={() => { setAdminElectionType('sslg'); setSelectedSection(''); }}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all ${adminElectionType === 'sslg' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-              <School className="w-4 h-4" /> SSLG
-            </button>
-            <button onClick={() => setAdminElectionType('classroom')}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium transition-all ${adminElectionType === 'classroom' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>
-              <GraduationCap className="w-4 h-4" /> Classroom
-            </button>
-          </div>
-          {isClassroom && (
-            <select value={selectedSection} onChange={(e) => setSelectedSection(e.target.value)}
-              className="px-4 py-2 rounded-xl bg-card border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring">
-              <option value="">Select Section</option>
-              {(classroomElections ?? []).map(e => (
-                <option key={e.section} value={e.section}>{e.section}</option>
-              ))}
-            </select>
-          )}
-        </div>
-      )}
+
 
       <div className="flex gap-1 p-1 bg-muted rounded-xl mb-8 overflow-x-auto">
         {tabs.map((tab) => (
@@ -294,11 +243,6 @@ export default function Admin() {
             <StatCard icon={BarChart3} label="Turnout" value={`${turnout}%`} delay={200} />
             <StatCard icon={Users} label="Candidates" value={(candidates ?? []).length} variant="navy" delay={300} />
           </div>
-          {isClassroom && !selectedSection && (
-            <div className="bg-card rounded-xl border border-border p-6 shadow-elegant text-center">
-              <p className="text-muted-foreground">Select a section above to view classroom election stats.</p>
-            </div>
-          )}
         </div>
       )}
 
@@ -355,15 +299,10 @@ export default function Admin() {
                       <td className="p-4 text-muted-foreground hidden sm:table-cell">{v.grade_level && v.section ? `${v.grade_level} — ${v.section}` : <span className="text-xs italic">Not set</span>}</td>
                       <td className="p-4 hidden md:table-cell">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          {v.has_voted_sslg ? (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 text-success">SSLG ✓</span>
+                          {v.has_voted ? (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 text-success">Voted ✓</span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">SSLG ✗</span>
-                          )}
-                          {v.has_voted_classroom ? (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-success/15 text-success">Class ✓</span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">Class ✗</span>
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-muted text-muted-foreground">Not voted</span>
                           )}
                           {v.must_change_password ? (
                             <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-gold/15 text-gold">New</span>
@@ -408,12 +347,8 @@ export default function Admin() {
           {/* Add form */}
           <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
             <h3 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2">
-              <Plus className="w-5 h-5 text-gold" /> Add {isClassroom ? 'Classroom' : 'SSLG'} Candidate
+              <Plus className="w-5 h-5 text-gold" /> Add Candidate
             </h3>
-            {isClassroom && !selectedSection && (
-              <p className="text-sm text-muted-foreground mb-4">Please select a section above to manage classroom candidates.</p>
-            )}
-            {(!isClassroom || selectedSection) && (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <input type="text" placeholder="Full Name" value={newCandidate.name} onChange={(e) => setNewCandidate(p => ({ ...p, name: e.target.value }))} maxLength={100}
@@ -425,14 +360,12 @@ export default function Admin() {
                   </select>
                   <input type="text" placeholder="Grade Level" value={newCandidate.grade_level} onChange={(e) => setNewCandidate(p => ({ ...p, grade_level: e.target.value }))} maxLength={50}
                     className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
-                  <input type="text" placeholder="Section" value={isClassroom ? (selectedSection || '') : newCandidate.section}
-                    onChange={(e) => !isClassroom && setNewCandidate(p => ({ ...p, section: e.target.value }))}
-                    readOnly={isClassroom} maxLength={50}
-                    className={`px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${isClassroom ? 'opacity-60' : ''}`} />
-                  {!isClassroom && (
+                  <input type="text" placeholder="Section" value={newCandidate.section}
+                    onChange={(e) => setNewCandidate(p => ({ ...p, section: e.target.value }))}
+                    maxLength={50}
+                    className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
                   <input type="text" placeholder="Party List" value={newCandidate.party_list} onChange={(e) => setNewCandidate(p => ({ ...p, party_list: e.target.value }))} maxLength={100}
                     className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
-                  )}
                   <input type="text" placeholder="Motto (optional)" value={newCandidate.motto} onChange={(e) => setNewCandidate(p => ({ ...p, motto: e.target.value }))} maxLength={200}
                     className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
                 </div>
@@ -462,15 +395,11 @@ export default function Admin() {
                     {!photoPreview && <span className="text-xs text-muted-foreground">Optional — default avatar will be used if no photo is uploaded</span>}
                   </div>
                 </div>
-                <button onClick={() => {
-                  if (isClassroom) newCandidate.section = selectedSection;
-                  addCandidate.mutate();
-                }} disabled={addCandidate.isPending}
+                <button onClick={() => addCandidate.mutate()} disabled={addCandidate.isPending}
                   className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50">
                   <UserPlus className="w-4 h-4" /> Add Candidate
                 </button>
               </>
-            )}
           </div>
 
           {/* Table */}
@@ -481,7 +410,7 @@ export default function Admin() {
                   <tr className="border-b border-border bg-muted/50">
                     <th className="text-left p-4 font-semibold text-foreground">Name</th>
                     <th className="text-left p-4 font-semibold text-foreground">Position</th>
-                    {!isClassroom && <th className="text-left p-4 font-semibold text-foreground hidden sm:table-cell">Party</th>}
+                    <th className="text-left p-4 font-semibold text-foreground hidden sm:table-cell">Party</th>
                     <th className="text-left p-4 font-semibold text-foreground hidden md:table-cell">Section</th>
                     <th className="text-right p-4 font-semibold text-foreground">Actions</th>
                   </tr>
@@ -493,7 +422,7 @@ export default function Admin() {
                       <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                         <td className="p-4 font-medium text-foreground">{c.name}</td>
                         <td className="p-4 text-muted-foreground">{pos?.title}</td>
-                        {!isClassroom && <td className="p-4 text-muted-foreground hidden sm:table-cell">{c.party_list}</td>}
+                        <td className="p-4 text-muted-foreground hidden sm:table-cell">{c.party_list}</td>
                         <td className="p-4 text-muted-foreground hidden md:table-cell">{c.section}</td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -510,7 +439,7 @@ export default function Admin() {
                   })}
                   {(candidates ?? []).length === 0 && (
                     <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">
-                      {isClassroom && !selectedSection ? 'Select a section to view candidates.' : 'No candidates yet. Add one above.'}
+                      No candidates yet. Add one above.
                     </td></tr>
                   )}
                 </tbody>
@@ -520,73 +449,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ── Classroom Tab ── */}
-      {activeTab === "classroom" && (
-        <div className="animate-fade-in space-y-6">
-          <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-            <h3 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2">
-              <School className="w-5 h-5 text-gold" /> Set Up Classroom Election
-            </h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Select a section to create a classroom officers election. This will generate default positions (President, VP, Secretary, etc.) for that section.
-            </p>
-            {setupSections.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {setupSections.map(s => (
-                  <button key={s} onClick={() => setupClassroom.mutate(s)} disabled={setupClassroom.isPending}
-                    className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm font-medium hover:bg-muted transition-colors disabled:opacity-50">
-                    <Plus className="w-4 h-4 text-gold" /> {s}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground italic">
-                {(sections ?? []).length === 0
-                  ? "No sections found. Add voters with sections first."
-                  : "All sections already have classroom elections set up."}
-              </p>
-            )}
-          </div>
 
-          {/* Existing classroom elections */}
-          <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-            <h3 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5 text-gold" /> Classroom Elections
-            </h3>
-            {(classroomElections ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No classroom elections created yet.</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {(classroomElections ?? []).map(e => (
-                  <div key={e.id} className="bg-background rounded-xl border border-border p-4 hover:shadow-elegant transition-shadow">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-semibold text-foreground">{e.section}</h4>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                        e.status === 'ongoing' ? 'bg-success/15 text-success' :
-                        e.status === 'completed' ? 'bg-primary/10 text-primary' :
-                        'bg-muted text-muted-foreground'
-                      }`}>
-                        {e.status}
-                      </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{e.name}</p>
-                    <div className="flex gap-2 mt-3">
-                      <button onClick={() => { setAdminElectionType('classroom'); setSelectedSection(e.section); setActiveTab('candidates'); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-foreground text-xs font-medium hover:bg-muted/80 transition-colors">
-                        <Users className="w-3 h-3" /> Candidates
-                      </button>
-                      <button onClick={() => { setAdminElectionType('classroom'); setSelectedSection(e.section); setActiveTab('settings'); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted text-foreground text-xs font-medium hover:bg-muted/80 transition-colors">
-                        <Settings className="w-3 h-3" /> Settings
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Delete Confirmation Modal (for both candidates and voters) */}
       {deleteTarget && (
@@ -726,10 +589,8 @@ export default function Admin() {
                 <input type="text" placeholder="Section" value={editCandidate.section} onChange={(e) => setEditCandidate(p => ({ ...p, section: e.target.value }))} maxLength={50}
                   className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
               </div>
-              {!isClassroom && (
               <input type="text" placeholder="Party List" value={editCandidate.party_list} onChange={(e) => setEditCandidate(p => ({ ...p, party_list: e.target.value }))} maxLength={100}
                 className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
-              )}
               <input type="text" placeholder="Motto (optional)" value={editCandidate.motto} onChange={(e) => setEditCandidate(p => ({ ...p, motto: e.target.value }))} maxLength={200}
                 className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
               <div className="flex items-center gap-4 pt-1">
@@ -768,17 +629,11 @@ export default function Admin() {
 
       {activeTab === "settings" && (
         <div className="max-w-2xl space-y-6 animate-fade-in">
-          {isClassroom && !selectedSection && (
-            <div className="bg-card rounded-xl border border-border p-6 shadow-elegant text-center">
-              <p className="text-muted-foreground">Select a section above to manage its classroom election settings.</p>
-            </div>
-          )}
-
-          {(!isClassroom || selectedSection) && settings && (
+          {settings && (
             <>
               <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
                 <h3 className="font-display font-bold text-foreground text-lg mb-4">
-                  {isClassroom ? `Classroom Election Control — ${selectedSection}` : 'Election Control'}
+                  Election Control
                 </h3>
                 <p className="text-sm text-muted-foreground mb-4">
                   Current status: <span className="font-semibold text-foreground capitalize">{settings?.status ?? "unknown"}</span>
@@ -812,25 +667,19 @@ export default function Admin() {
                 <h3 className="font-display font-bold text-foreground text-lg mb-4">Election Info</h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">Type</span>
-                    <span className="font-medium text-foreground capitalize">{settings?.election_type}</span>
-                  </div>
-                  {settings?.section && (
-                    <div className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">Section</span>
-                      <span className="font-medium text-foreground">{settings.section}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between py-2">
                     <span className="text-muted-foreground">School Year</span>
                     <span className="font-medium text-foreground">{settings?.school_year}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Election Date</span>
+                    <span className="font-medium text-foreground">{settings?.election_date ? new Date(settings.election_date).toLocaleDateString() : 'TBA'}</span>
                   </div>
                 </div>
               </div>
             </>
           )}
 
-          {(!isClassroom || selectedSection) && !settings && (
+          {!settings && (
             <div className="bg-card rounded-xl border border-border p-6 shadow-elegant text-center">
               <p className="text-muted-foreground">No election settings found.</p>
             </div>

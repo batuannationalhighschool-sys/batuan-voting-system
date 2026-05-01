@@ -22,6 +22,7 @@ export function AuthProvider({ children }) {
       setProfile(data.profile);
       setIsAdmin(data.isAdmin);
       setMustChangePassword(!!data.must_change_password);
+      return data;
     } catch (err) {
       // Token invalid or expired
       localStorage.removeItem('auth_token');
@@ -50,8 +51,8 @@ export function AuthProvider({ children }) {
       localStorage.setItem('auth_token', data.token);
       setUser(data.user);
       setMustChangePassword(!!data.must_change_password);
-      await fetchMe();
-      return { error: null, must_change_password: !!data.must_change_password };
+      const meData = await fetchMe();
+      return { error: null, must_change_password: !!data.must_change_password, isAdmin: !!meData?.isAdmin };
     } catch (err) {
       return { error: { message: err.message } };
     }

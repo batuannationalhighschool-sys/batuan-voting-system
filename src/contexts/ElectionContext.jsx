@@ -1,17 +1,16 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 
 const ElectionContext = createContext(undefined);
 
 export function ElectionProvider({ children }) {
-  const [electionType, setElectionType] = useState("sslg"); // 'sslg' | 'classroom'
   const { profile } = useAuth();
 
-  // For classroom elections, the section is derived from the voter's profile
+  // Section is kept for Grade Representative filtering
   const currentSection = profile?.section || null;
 
   return (
-    <ElectionContext.Provider value={{ electionType, setElectionType, currentSection }}>
+    <ElectionContext.Provider value={{ currentSection }}>
       {children}
     </ElectionContext.Provider>
   );

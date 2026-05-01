@@ -1,64 +1,88 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { BarChart3, Trophy, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
-import { useElection } from "@/contexts/ElectionContext";
 import StatCard from "@/components/StatCard";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Results() {
   const [activePosition, setActivePosition] = useState("all");
-  const { electionType, currentSection } = useElection();
+  const [voterGrade, setVoterGrade] = useState("all");
+  const [voterSection, setVoterSection] = useState("all");
+  const { user, profile, isAdmin } = useAuth();
 
-  const isClassroom = electionType === 'classroom';
-  const queryParams = isClassroom && currentSection
-    ? `?type=classroom&section=${encodeURIComponent(currentSection)}`
-    : '?type=sslg';
+  const gradeLevel = !isAdmin && user ? profile?.grade_level : null;
+  const posQueryParams = gradeLevel
+    ? `?grade_level=${encodeURIComponent(gradeLevel)}`
+    : '';
 
   const { data: positions } = useQuery({
-    queryKey: ["positions", electionType, currentSection],
-    queryFn: () => api.get(`/positions${queryParams}`),
+    queryKey: ["positions", gradeLevel],
+    queryFn: () => api.get(`/positions${posQueryParams}`),
   });
 
+  // Build vote count query params based on voter filters
+  const voteCountParams = useMemo(() => {
+    const p = new URLSearchParams();
+    if (voterGrade !== "all") p.set("voter_grade", voterGrade);
+    if (voterSection !== "all") p.set("voter_section", voterSection);
+    const qs = p.toString();
+    return qs ? `?${qs}` : "";
+  }, [voterGrade, voterSection]);
+
   const { data: voteCounts } = useQuery({
-    queryKey: ["vote-counts", electionType, currentSection],
-    queryFn: () => api.get(`/votes/counts${queryParams}`),
+    queryKey: ["vote-counts", voterGrade, voterSection],
+    queryFn: () => api.get(`/votes/counts${voteCountParams}`),
     refetchInterval: 10000,
   });
 
-  const { data: stats } = useQuery({
-    queryKey: ["stats", electionType, currentSection],
-    queryFn: () => api.get(`/stats${queryParams}`),
+  // Voter groups for dropdown options (grade levels & sections from voter profiles)
+  const { data: voterGroups } = useQuery({
+    queryKey: ["voter-groups"],
+    queryFn: () => api.get('/voters/groups'),
   });
 
-  const totalVotes = (voteCounts ?? []).reduce((sum, vc) => sum + (vc.vote_count ?? 0), 0);
+  const { data: stats } = useQuery({
+    queryKey: ["stats"],
+    queryFn: () => api.get('/stats'),
+  });
+
+  const gradeLevels = voterGroups?.gradeLevels ?? [];
+  const allSections = voterGroups?.sections ?? [];
+
+  // Filter sections to those matching selected grade level
+  const sections = useMemo(() => {
+    if (voterGrade === "all") return allSections.map(s => s.section);
+    return allSections.filter(s => s.grade_level === voterGrade).map(s => s.section);
+  }, [allSections, voterGrade]);
+
+  const handleGradeChange = (val) => {
+    setVoterGrade(val);
+    setVoterSection("all");
+  };
+
   const votedCount = stats?.votedCount ?? 0;
   const profileCount = stats?.voterCount ?? 0;
   const turnout = profileCount && profileCount > 0 ? ((votedCount) / profileCount * 100).toFixed(1) : "0";
 
   const grouped = (positions ?? []).map((pos) => {
-    const posCandidates = (voteCounts ?? []).filter((vc) => vc.position_id === pos.id).sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
+    const posCandidates = (voteCounts ?? [])
+      .filter((vc) => vc.position_id === pos.id)
+      .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
     const totalPosVotes = posCandidates.reduce((sum, c) => sum + (c.vote_count ?? 0), 0);
     return { position: pos, candidates: posCandidates, totalVotes: totalPosVotes };
   });
 
   const filtered = activePosition === "all" ? grouped : grouped.filter((g) => g.position.id === activePosition);
-
-  const pageTitle = isClassroom
-    ? `Results — ${currentSection || 'Classroom'}`
-    : 'Election Results';
-
-  const pageDesc = isClassroom
-    ? `Live results for Classroom Officers Election${currentSection ? ` — ${currentSection}` : ''}`
-    : 'Live results for SSLG Election 2026';
+  const hasVoterFilter = voterGrade !== "all" || voterSection !== "all";
 
   return (
     <div className="container py-8 md:py-12">
       <div className="mb-8">
         <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground flex items-center gap-3">
-          <BarChart3 className="w-8 h-8 text-gold" />
-          {pageTitle}
+          <BarChart3 className="w-8 h-8 text-gold" /> Election Results
         </h1>
-        <p className="text-muted-foreground mt-1">{pageDesc}</p>
+        <p className="text-muted-foreground mt-1">Live results for SSLG Election 2026</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-8">
@@ -67,17 +91,72 @@ export default function Results() {
         <StatCard icon={Trophy} label="Positions" value={(positions ?? []).length} variant="navy" delay={200} />
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-8">
-        <button onClick={() => setActivePosition("all")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activePosition === "all" ? "gradient-navy text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"}`}>
-          All Positions
-        </button>
-        {(positions ?? []).map((p) => (
-          <button key={p.id} onClick={() => setActivePosition(p.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activePosition === p.id ? "gradient-navy text-primary-foreground" : "bg-card border border-border text-muted-foreground hover:text-foreground"}`}>
-            {p.title}
-          </button>
-        ))}
+      {/* Filter Dropdowns */}
+      <div className="bg-card border border-border rounded-xl p-4 mb-8 shadow-elegant">
+        <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Filter Results</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label htmlFor="results-position-filter" className="block text-xs text-muted-foreground mb-1.5">Position</label>
+            <select
+              id="results-position-filter"
+              value={activePosition}
+              onChange={(e) => setActivePosition(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">All Positions</option>
+              {(positions ?? []).map((p) => (
+                <option key={p.id} value={p.id}>{p.title}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="results-grade-filter" className="block text-xs text-muted-foreground mb-1.5">Grade Level <span className="text-gold/70">(by voter)</span></label>
+            <select
+              id="results-grade-filter"
+              value={voterGrade}
+              onChange={(e) => handleGradeChange(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">All Grade Levels</option>
+              {gradeLevels.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label htmlFor="results-section-filter" className="block text-xs text-muted-foreground mb-1.5">Section <span className="text-gold/70">(by voter)</span></label>
+            <select
+              id="results-section-filter"
+              value={voterSection}
+              onChange={(e) => setVoterSection(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            >
+              <option value="all">All Sections</option>
+              {sections.map((s) => (
+                <option key={s} value={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {hasVoterFilter && (
+          <div className="mt-3 flex items-center gap-4">
+            <p className="text-xs text-muted-foreground italic">
+              Showing votes cast by: <span className="text-foreground font-medium">
+                {voterGrade !== "all" ? voterGrade : "All Grades"}
+                {voterSection !== "all" ? ` · ${voterSection}` : ""}
+              </span>
+            </p>
+            <button
+              onClick={() => { setVoterGrade("all"); setVoterSection("all"); setActivePosition("all"); }}
+              className="text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+            >
+              ✕ Clear
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-6">

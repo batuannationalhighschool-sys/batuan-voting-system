@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Menu, X, Home, Users, Vote, BarChart3, Settings, Shield, LogOut, LogIn, School, GraduationCap } from "lucide-react";
+import { Menu, X, Home, Users, Vote, BarChart3, Settings, Shield, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useElection } from "@/contexts/ElectionContext";
 import schoolSeal from "@/assets/school-seal.jpg";
 
 export default function Layout({ children }) {
@@ -11,7 +10,6 @@ export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, profile, mustChangePassword, signOut } = useAuth();
-  const { electionType, setElectionType, currentSection } = useElection();
 
   // Force redirect to change-password if required
   useEffect(() => {
@@ -24,16 +22,12 @@ export default function Layout({ children }) {
   const showNav = !mustChangePassword;
 
   const navItems = [
-    { label: "Dashboard", path: "/", icon: Home },
+    ...(isAdmin ? [] : [{ label: "Dashboard", path: "/", icon: Home }]),
     { label: "Candidates", path: "/candidates", icon: Users },
-    ...(user ? [{ label: "Vote", path: "/vote", icon: Vote }] : []),
+    ...(user && !isAdmin ? [{ label: "Vote", path: "/vote", icon: Vote }] : []),
     { label: "Results", path: "/results", icon: BarChart3 },
     ...(isAdmin ? [{ label: "Admin", path: "/admin", icon: Settings }] : []),
   ];
-
-  const subtitleText = electionType === 'classroom'
-    ? `Classroom Election${currentSection ? ` — ${currentSection}` : ''}`
-    : 'SSLG Election System';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -45,41 +39,13 @@ export default function Layout({ children }) {
               <h1 className="text-sm md:text-base font-display font-bold text-primary-foreground leading-tight">
                 Batuan National High School
               </h1>
-              <p className="text-xs text-gold font-medium tracking-wide">{subtitleText}</p>
+              <p className="text-xs text-gold font-medium tracking-wide">SSLG Election System</p>
             </div>
             <span className="sm:hidden text-sm font-display font-bold text-primary-foreground">BNHS Votes</span>
           </Link>
 
           {showNav && (
             <div className="hidden md:flex items-center gap-1">
-              {/* Election Type Switcher */}
-              {user && (
-                <div className="flex items-center bg-primary-foreground/10 rounded-lg p-0.5 mr-2">
-                  <button
-                    onClick={() => setElectionType('sslg')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      electionType === 'sslg'
-                        ? 'bg-gold text-accent-foreground shadow-sm'
-                        : 'text-primary-foreground/60 hover:text-primary-foreground'
-                    }`}
-                  >
-                    <School className="w-3.5 h-3.5" />
-                    SSLG
-                  </button>
-                  <button
-                    onClick={() => setElectionType('classroom')}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      electionType === 'classroom'
-                        ? 'bg-gold text-accent-foreground shadow-sm'
-                        : 'text-primary-foreground/60 hover:text-primary-foreground'
-                    }`}
-                  >
-                    <GraduationCap className="w-3.5 h-3.5" />
-                    Classroom
-                  </button>
-                </div>
-              )}
-
               <nav className="flex items-center gap-1">
                 {navItems.map((item) => {
                   const active = location.pathname === item.path;
@@ -128,34 +94,6 @@ export default function Layout({ children }) {
 
         {showNav && mobileOpen && (
           <nav className="md:hidden border-t border-primary-foreground/10 pb-4 animate-fade-in">
-            {/* Mobile Election Type Switcher */}
-            {user && (
-              <div className="flex items-center gap-1 mx-4 mt-3 mb-1 p-1 bg-primary-foreground/10 rounded-lg">
-                <button
-                  onClick={() => { setElectionType('sslg'); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                    electionType === 'sslg'
-                      ? 'bg-gold text-accent-foreground shadow-sm'
-                      : 'text-primary-foreground/60'
-                  }`}
-                >
-                  <School className="w-3.5 h-3.5" />
-                  SSLG Election
-                </button>
-                <button
-                  onClick={() => { setElectionType('classroom'); }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-md text-xs font-medium transition-all ${
-                    electionType === 'classroom'
-                      ? 'bg-gold text-accent-foreground shadow-sm'
-                      : 'text-primary-foreground/60'
-                  }`}
-                >
-                  <GraduationCap className="w-3.5 h-3.5" />
-                  Classroom
-                </button>
-              </div>
-            )}
-
             {navItems.map((item) => {
               const active = location.pathname === item.path;
               return (
