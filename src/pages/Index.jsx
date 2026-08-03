@@ -47,6 +47,22 @@ export default function Index() {
     completed: "bg-primary/10 text-primary",
   };
 
+  // ── Derive hero text from settings ──────────────────────────────
+  // Split election name into "SSLG Election" + "2026" by taking the last
+  // whitespace-separated token as the year/suffix and the rest as the label.
+  const electionName  = settings?.name ?? "SSLG Election 2026";
+  const nameParts     = electionName.trim().split(/\s+/);
+  const electionYear  = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+  const electionLabel = nameParts.length > 1 ? nameParts.slice(0, -1).join(" ") : electionName;
+
+  // school_name is stored as the full footer line, e.g.
+  // "Batuan National High School — Batuan, Bohol, Philippines"
+  // Split on " — " to get school name vs. location.
+  const schoolNameFull = settings?.school_name ?? "Batuan National High School — Batuan, Bohol, Philippines";
+  const schoolNameParts = schoolNameFull.split(" — ");
+  const schoolTitle    = schoolNameParts[0]?.trim() ?? "Batuan National High School";
+  const schoolLocation = schoolNameParts[1]?.trim() ?? "Batuan, Bohol, Philippines";
+
   return (
     <div>
       {/* Hero */}
@@ -56,13 +72,13 @@ export default function Index() {
           <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
             <img src={schoolSeal} alt="Batuan National High School Seal" className="w-24 h-24 md:w-32 md:h-32 mb-6 animate-scale-in rounded-full ring-4 ring-gold/20 object-cover" />
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-extrabold text-primary-foreground leading-tight animate-fade-in">
-              SSLG Election
-              <span className="block text-gradient-gold mt-1">2026</span>
+              {electionLabel}
+              <span className="block text-gradient-gold mt-1">{electionYear}</span>
             </h1>
             <p className="text-primary-foreground/70 text-base md:text-lg mt-4 max-w-xl animate-fade-in" style={{ animationDelay: "150ms" }}>
-              Batuan National High School — Supreme Student Learner Government Election System
+              {schoolTitle} — Supreme Student Learner Government Election System
             </p>
-            <p className="text-primary-foreground/50 text-sm mt-1 animate-fade-in" style={{ animationDelay: "200ms" }}>Batuan, Bohol, Philippines</p>
+            <p className="text-primary-foreground/50 text-sm mt-1 animate-fade-in" style={{ animationDelay: "200ms" }}>{schoolLocation}</p>
 
             <div className="flex flex-wrap items-center justify-center gap-3 mt-8 animate-fade-in" style={{ animationDelay: "300ms" }}>
               <span className={`px-4 py-1.5 rounded-full text-sm font-semibold ${statusColors[settings?.status ?? "upcoming"]}`}>
@@ -79,7 +95,9 @@ export default function Index() {
                 isAdmin ? (
                   <Link to="/admin" className="px-8 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold hover:opacity-90 transition-opacity">Admin Dashboard</Link>
                 ) : (
-                  <Link to="/vote" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">Cast Your Vote</Link>
+                  <Link to="/vote" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">
+                    {settings?.status === "upcoming" ? "Election Upcoming" : settings?.status === "completed" ? "Election Completed" : "Cast Your Vote"}
+                  </Link>
                 )
               ) : (
                 <Link to="/auth" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity flex items-center gap-2">

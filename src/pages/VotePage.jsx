@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Vote, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, ShieldAlert } from "lucide-react";
+import { Vote, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, ShieldAlert, Clock, Calendar } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,12 @@ export default function VotePage() {
   const queryParams = gradeLevel
     ? `?grade_level=${encodeURIComponent(gradeLevel)}`
     : '';
+
+  const { data: settings } = useQuery({
+    queryKey: ["election-settings"],
+    queryFn: () => api.get('/election-settings'),
+    refetchInterval: 10000,
+  });
 
   const { data: positions } = useQuery({
     queryKey: ["positions", gradeLevel],
@@ -78,6 +84,83 @@ export default function VotePage() {
         <h1 className="text-2xl font-display font-bold text-foreground mb-2">Admin Access Restricted</h1>
         <p className="text-muted-foreground mb-6">As an administrator, you are not allowed to cast a vote.</p>
         <button onClick={() => navigate("/admin")} className="px-6 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold">Go to Admin Dashboard</button>
+      </div>
+    );
+  }
+
+  // ── Trappings: Check Election Status ────────────────────────────────
+  const electionStatus = settings?.status ?? 'upcoming';
+
+  if (electionStatus === 'upcoming') {
+    const formattedDate = settings?.election_date
+      ? new Date(settings.election_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+      : "TBA";
+    const startTime = settings?.voting_start?.slice(0, 5) || "08:00";
+    const endTime = settings?.voting_end?.slice(0, 5) || "16:00";
+
+    return (
+      <div className="container py-16 text-center animate-fade-in max-w-2xl mx-auto">
+        <div className="w-20 h-20 rounded-full bg-gold/15 flex items-center justify-center mx-auto mb-6 text-gold ring-8 ring-gold/5">
+          <Clock className="w-10 h-10" />
+        </div>
+        <span className="px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border inline-block mb-3">
+          Election Upcoming
+        </span>
+        <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">
+          Voting Is Not Open Yet
+        </h1>
+        <p className="text-muted-foreground text-base mb-8 max-w-md mx-auto">
+          The administrator has set this election as <strong className="text-foreground">Upcoming</strong>. You can cast your vote as soon as the election is triggered by the administrator.
+        </p>
+
+        <div className="bg-card rounded-2xl border border-border p-6 mb-8 shadow-elegant text-left space-y-3">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Scheduled Election Details</p>
+          <div className="flex items-center justify-between text-sm py-1.5 border-b border-border">
+            <span className="text-muted-foreground flex items-center gap-2"><Calendar className="w-4 h-4 text-gold" /> Election Date</span>
+            <span className="font-semibold text-foreground">{formattedDate}</span>
+          </div>
+          <div className="flex items-center justify-between text-sm py-1.5 border-b border-border">
+            <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4 text-gold" /> Scheduled Voting Hours</span>
+            <span className="font-semibold text-foreground">{startTime} — {endTime}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap justify-center gap-4">
+          <button onClick={() => navigate("/candidates")} className="px-6 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">
+            View Candidates
+          </button>
+          <button onClick={() => navigate("/")} className="px-6 py-3 rounded-xl bg-card border border-border text-foreground font-semibold hover:bg-muted transition-colors">
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (electionStatus === 'completed') {
+    return (
+      <div className="container py-16 text-center animate-fade-in max-w-2xl mx-auto">
+        <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6 text-destructive ring-8 ring-destructive/5">
+          <AlertCircle className="w-10 h-10" />
+        </div>
+        <span className="px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30 inline-block mb-3">
+          Election Completed
+        </span>
+        <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">
+          Voting Has Ended
+        </h1>
+        <p className="text-muted-foreground text-base mb-8 max-w-md mx-auto">
+          Voting for <strong className="text-foreground">{settings?.name || "SSLG Election"}</strong> is officially closed. Thank you to everyone who participated!
+        </p>
+
+        <div className="flex flex-wrap justify-center gap-4">
+          <button onClick={() => navigate("/results")} className="px-6 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">
+            View Election Results
+          </button>
+          <button onClick={() => navigate("/candidates")} className="px-6 py-3 rounded-xl bg-card border border-border text-foreground font-semibold hover:bg-muted transition-colors">
+            View Candidates
+          </button>
+        </div>
       </div>
     );
   }

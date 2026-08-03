@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Batuan Voting System — Program Flow</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;padding:40px 20px}
+  h1{text-align:center;font-size:1.6rem;font-weight:800;margin-bottom:6px;background:linear-gradient(135deg,#c9a84c,#f0d878);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+  .subtitle{text-align:center;font-size:.85rem;color:#94a3b8;margin-bottom:40px}
+  .tree{display:flex;flex-direction:column;align-items:center;gap:0;overflow-x:auto;padding-bottom:40px}
+  /* Node styles */
+  .node{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;padding:14px 22px;border-radius:14px;font-size:.82rem;line-height:1.35;min-width:140px;max-width:210px;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+  .node .title{font-weight:700;font-size:.85rem;margin-bottom:2px}
+  .node .desc{font-weight:400;font-size:.72rem;opacity:.75}
+  /* Color variants */
+  .root{background:linear-gradient(135deg,#1e293b,#334155);border:1.5px solid #475569;min-width:260px;max-width:320px;padding:18px 30px}
+  .root .title{font-size:1.05rem}
+  .public{background:linear-gradient(135deg,#166534,#15803d);border:1.5px solid #22c55e}
+  .voter{background:linear-gradient(135deg,#92400e,#b45309);border:1.5px solid #f59e0b}
+  .admin{background:linear-gradient(135deg,#7f1d1d,#991b1b);border:1.5px solid #ef4444}
+  .pub-child{background:#14532d;border:1px solid #22c55e88;font-size:.75rem;padding:10px 14px;min-width:115px;max-width:160px}
+  .vot-child{background:#78350f;border:1px solid #f59e0b88;font-size:.75rem;padding:10px 14px;min-width:115px;max-width:160px}
+  .adm-child{background:#7f1d1d;border:1px solid #ef444488;font-size:.75rem;padding:10px 14px;min-width:115px;max-width:160px}
+  .auth-node{background:linear-gradient(135deg,#1e3a5f,#1e40af);border:1px solid #3b82f6;font-size:.75rem;padding:10px 16px}
+  .process{background:#1e293b;border:1px solid #47556988;font-size:.73rem;padding:10px 14px;min-width:120px;max-width:180px}
+  .db-node{background:linear-gradient(135deg,#312e81,#4338ca);border:1px solid #818cf8;font-size:.75rem;padding:10px 16px}
+  .sched-node{background:linear-gradient(135deg,#134e4a,#0f766e);border:1px solid #2dd4bf;font-size:.75rem;padding:10px 16px}
+  /* Row containers */
+  .row{display:flex;justify-content:center;align-items:flex-start;gap:40px;position:relative}
+  .col{display:flex;flex-direction:column;align-items:center;gap:0}
+  .children{display:flex;justify-content:center;gap:16px;flex-wrap:wrap}
+  .sub-children{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;max-width:520px}
+  /* Connector lines */
+  .vline{width:2px;height:28px;background:#475569}
+  .vline-short{width:2px;height:20px;background:#475569}
+  .hline-group{display:flex;align-items:flex-start;position:relative}
+  .branch-line{position:relative;display:flex;flex-direction:column;align-items:center}
+  /* Horizontal connector bar */
+  .hbar{height:2px;background:#475569;position:relative}
+  /* Section wrapper */
+  .section{display:flex;flex-direction:column;align-items:center;gap:0}
+  .section-group{display:flex;justify-content:center;gap:60px;align-items:flex-start;flex-wrap:wrap}
+  /* Arrow */
+  .arrow{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:8px solid #475569}
+  /* Legend */
+  .legend{margin-top:50px;display:flex;justify-content:center;gap:20px;flex-wrap:wrap}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:.75rem;color:#94a3b8}
+  .legend-dot{width:14px;height:14px;border-radius:4px}
+  /* Backend section */
+  .backend-section{margin-top:50px;border-top:1px dashed #334155;padding-top:40px}
+  .backend-title{text-align:center;font-size:1.1rem;font-weight:700;color:#94a3b8;margin-bottom:30px;letter-spacing:1px;text-transform:uppercase}
+</style>
+</head>
+<body>
+
+<h1>🏛️ Batuan Voting System — Program Flow</h1>
+<p class="subtitle">BNHS SSLG Election System • Complete Hierarchy Diagram</p>
+
+<div class="tree">
+
+  <!-- ROOT -->
+  <div class="node root">
+    <span class="title">Election System</span>
+    <span class="desc">Web Application (React + Express + MySQL)</span>
+  </div>
+  <div class="vline"></div>
+
+  <!-- THREE MAIN BRANCHES -->
+  <div class="section-group">
+
+    <!-- PUBLIC ACCESS -->
+    <div class="section">
+      <div class="node public">
+        <span class="title">Public Access</span>
+        <span class="desc">No login needed</span>
+      </div>
+      <div class="vline-short"></div>
+      <div class="children">
+        <div class="col">
+          <div class="node pub-child">
+            <span class="title">Dashboard</span>
+            <span class="desc">Home stats & election info</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node pub-child">
+            <span class="title">Candidates</span>
+            <span class="desc">Browse all candidates</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node pub-child">
+            <span class="title">Results</span>
+            <span class="desc">Live vote tally</span>
+          </div>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="node auth-node">
+        <span class="title">Sign In (LRN + Password)</span>
+        <span class="desc">Authentication gate</span>
+      </div>
+    </div>
+
+    <!-- VOTER PORTAL -->
+    <div class="section">
+      <div class="node voter">
+        <span class="title">Voter Portal</span>
+        <span class="desc">Logged-in student</span>
+      </div>
+      <div class="vline-short"></div>
+      <div class="children">
+        <div class="col">
+          <div class="node vot-child">
+            <span class="title">Dashboard</span>
+            <span class="desc">Personal home & status</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node vot-child">
+            <span class="title">Vote Page</span>
+            <span class="desc">Cast ballot</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node vot-child">
+            <span class="title">Results</span>
+            <span class="desc">View live data</span>
+          </div>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="sub-children">
+        <div class="node process">
+          <span class="title">Select candidates</span>
+          <span class="desc">Per position, max_votes enforced</span>
+        </div>
+        <div class="node process">
+          <span class="title">Already voted?</span>
+          <span class="desc">Guard screen blocks re-vote</span>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="sub-children">
+        <div class="node process">
+          <span class="title">Grade Rep restriction</span>
+          <span class="desc">Only own grade level</span>
+        </div>
+        <div class="node process">
+          <span class="title">Submit ballot</span>
+          <span class="desc">Transaction → mark voted</span>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="node auth-node">
+        <span class="title">Change Password</span>
+        <span class="desc">Required on first login</span>
+      </div>
+    </div>
+
+    <!-- ADMIN PANEL -->
+    <div class="section">
+      <div class="node admin">
+        <span class="title">Admin Panel</span>
+        <span class="desc">Administrator only</span>
+      </div>
+      <div class="vline-short"></div>
+      <div class="children">
+        <div class="col">
+          <div class="node adm-child">
+            <span class="title">Overview</span>
+            <span class="desc">Stats summary cards</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node adm-child">
+            <span class="title">Voters Tab</span>
+            <span class="desc">Manage voter accounts</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node adm-child">
+            <span class="title">Candidates Tab</span>
+            <span class="desc">Manage entries + photos</span>
+          </div>
+        </div>
+        <div class="col">
+          <div class="node adm-child">
+            <span class="title">Settings Tab</span>
+            <span class="desc">Election control</span>
+          </div>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="sub-children">
+        <div class="node process">
+          <span class="title">Add voter</span>
+          <span class="desc">LRN + details, default PW</span>
+        </div>
+        <div class="node process">
+          <span class="title">Edit / Delete voter</span>
+          <span class="desc">Voter record CRUD</span>
+        </div>
+        <div class="node process">
+          <span class="title">Reset password</span>
+          <span class="desc">Reset to LRN</span>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="sub-children">
+        <div class="node process">
+          <span class="title">Add candidate</span>
+          <span class="desc">Name, position, party, photo</span>
+        </div>
+        <div class="node process">
+          <span class="title">Edit / Delete candidate</span>
+          <span class="desc">Update info & photo</span>
+        </div>
+      </div>
+      <div class="vline-short"></div>
+      <div class="sub-children">
+        <div class="node process">
+          <span class="title">Election status</span>
+          <span class="desc">Upcoming → Ongoing → Completed</span>
+        </div>
+        <div class="node process">
+          <span class="title">Schedule config</span>
+          <span class="desc">Date, start/end time</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BACKEND SECTION -->
+  <div class="backend-section" style="width:100%;max-width:1100px">
+    <div class="backend-title">⚙️ Backend Services</div>
+    <div class="section-group">
+
+      <div class="section">
+        <div class="node auth-node" style="min-width:200px">
+          <span class="title">🔐 Auth Middleware</span>
+          <span class="desc">JWT verification (Bearer token, 7-day expiry)</span>
+        </div>
+        <div class="vline-short"></div>
+        <div class="sub-children">
+          <div class="node process">
+            <span class="title">requireAuth</span>
+            <span class="desc">Verify token & load user</span>
+          </div>
+          <div class="node process">
+            <span class="title">requireAdmin</span>
+            <span class="desc">Check admin role</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="node sched-node" style="min-width:200px">
+          <span class="title">⏱️ Auto-End Scheduler</span>
+          <span class="desc">Runs every 60 seconds</span>
+        </div>
+        <div class="vline-short"></div>
+        <div class="node process">
+          <span class="title">Auto-complete elections</span>
+          <span class="desc">When date + end time is passed</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="node" style="background:linear-gradient(135deg,#4a1942,#6b2fa0);border:1px solid #a855f7;min-width:200px">
+          <span class="title">📁 File Upload</span>
+          <span class="desc">Multer — candidate photos (5MB max)</span>
+        </div>
+        <div class="vline-short"></div>
+        <div class="node process">
+          <span class="title">/uploads/ directory</span>
+          <span class="desc">UUID filenames, static served</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- DATABASE -->
+    <div style="display:flex;flex-direction:column;align-items:center;margin-top:35px">
+      <div class="vline"></div>
+      <div class="node db-node" style="min-width:280px;max-width:360px">
+        <span class="title">🗄️ MySQL Database</span>
+        <span class="desc">batuan_voting (mysql2/promise pool)</span>
+      </div>
+      <div class="vline-short"></div>
+      <div class="children" style="gap:10px">
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">users</span>
+          <span class="desc" style="font-size:.62rem">LRN, password</span>
+        </div>
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">user_roles</span>
+          <span class="desc" style="font-size:.62rem">admin / voter</span>
+        </div>
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">profiles</span>
+          <span class="desc" style="font-size:.62rem">grade, section</span>
+        </div>
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">positions</span>
+          <span class="desc" style="font-size:.62rem">title, max_votes</span>
+        </div>
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">candidates</span>
+          <span class="desc" style="font-size:.62rem">name, party</span>
+        </div>
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">votes</span>
+          <span class="desc" style="font-size:.62rem">voter → candidate</span>
+        </div>
+        <div class="node process" style="min-width:90px;max-width:110px;padding:8px 10px">
+          <span class="title" style="font-size:.7rem">election_settings</span>
+          <span class="desc" style="font-size:.62rem">status, schedule</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- LEGEND -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#15803d"></div> Public Access</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#b45309"></div> Voter Portal</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#991b1b"></div> Admin Panel</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1e40af"></div> Authentication</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#4338ca"></div> Database</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#0f766e"></div> Scheduler</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#1e293b;border:1px solid #475569"></div> Process / Sub-item</div>
+</div>
+
+<p style="text-align:center;margin-top:30px;font-size:.7rem;color:#475569">© 2026 Batuan National High School — SSLG Election System</p>
+
+</body>
+</html>

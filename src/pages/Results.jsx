@@ -1,23 +1,39 @@
-import { useState, useMemo } from "react";
-import { BarChart3, Trophy, TrendingUp } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useState, useMemo, useRef, useEffect } from "react";
+import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer } from "lucide-react";
+import schoolSeal from "@/assets/school-seal.jpg";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import StatCard from "@/components/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Results() {
   const [activePosition, setActivePosition] = useState("all");
   const [voterGrade, setVoterGrade] = useState("all");
   const [voterSection, setVoterSection] = useState("all");
   const { user, profile, isAdmin } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const nameInputRef = useRef(null);
+
+  // Lock default grade filter to student's grade level
+  useEffect(() => {
+    if (user && !isAdmin && profile?.grade_level) {
+      setVoterGrade(profile.grade_level);
+    }
+  }, [user, isAdmin, profile?.grade_level]);
 
   const gradeLevel = !isAdmin && user ? profile?.grade_level : null;
-  const posQueryParams = gradeLevel
-    ? `?grade_level=${encodeURIComponent(gradeLevel)}`
+  const activeGradeFilter = gradeLevel || (voterGrade !== "all" ? voterGrade : null);
+  const posQueryParams = activeGradeFilter
+    ? `?grade_level=${encodeURIComponent(activeGradeFilter)}`
     : '';
 
   const { data: positions } = useQuery({
-    queryKey: ["positions", gradeLevel],
+    queryKey: ["positions", activeGradeFilter],
     queryFn: () => api.get(`/positions${posQueryParams}`),
   });
 
@@ -43,9 +59,48 @@ export default function Results() {
   });
 
   const { data: stats } = useQuery({
-    queryKey: ["stats"],
-    queryFn: () => api.get('/stats'),
+    queryKey: ["stats", voterGrade, voterSection],
+    queryFn: () => api.get(`/stats${voteCountParams}`),
+    refetchInterval: 10000,
   });
+
+  const { data: settings } = useQuery({
+    queryKey: ["election-settings"],
+    queryFn: () => api.get('/election-settings'),
+  });
+
+  // Mutation to save the election name
+  const updateName = useMutation({
+    mutationFn: async (name) => {
+      if (!settings?.id) throw new Error("Election settings not found");
+      await api.put(`/election-settings/${settings.id}`, { name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["election-settings"] });
+      toast({ title: "Election name updated!" });
+      setEditingName(false);
+    },
+    onError: (err) => {
+      toast({ title: "Failed to update name", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleStartEditName = () => {
+    setNameInput(settings?.name ?? "");
+    setEditingName(true);
+    setTimeout(() => nameInputRef.current?.focus(), 50);
+  };
+
+  const handleSaveName = () => {
+    const trimmed = nameInput.trim();
+    if (!trimmed) return;
+    updateName.mutate(trimmed);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") handleSaveName();
+    if (e.key === "Escape") setEditingName(false);
+  };
 
   const gradeLevels = voterGroups?.gradeLevels ?? [];
   const allSections = voterGroups?.sections ?? [];
@@ -76,23 +131,145 @@ export default function Results() {
   const filtered = activePosition === "all" ? grouped : grouped.filter((g) => g.position.id === activePosition);
   const hasVoterFilter = voterGrade !== "all" || voterSection !== "all";
 
+  const electionName = settings?.name ?? "SSLG Election 2026";
+
+  const schoolNameFull = settings?.school_name ?? "Batuan National High School — Batuan, Bohol, Philippines";
+  const schoolNameParts = schoolNameFull.split(" — ");
+  const schoolTitle    = schoolNameParts[0]?.trim() ?? "Batuan National High School";
+  const schoolLocation = schoolNameParts[1]?.trim() ?? "Batuan, Bohol, Philippines";
+
   return (
     <div className="container py-8 md:py-12">
-      <div className="mb-8">
-        <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground flex items-center gap-3">
-          <BarChart3 className="w-8 h-8 text-gold" /> Election Results
-        </h1>
-        <p className="text-muted-foreground mt-1">Live results for SSLG Election 2026</p>
+      <style>{`
+        @media print {
+          body {
+            background: #fff !important;
+            color: #000 !important;
+          }
+          .container {
+            max-width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .bg-card {
+            background: #fff !important;
+            border: 1px solid #cbd5e1 !important;
+            box-shadow: none !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+            margin-bottom: 1.5rem !important;
+          }
+          .gradient-navy {
+            background: #f8fafc !important;
+            border-bottom: 2px solid #000 !important;
+            color: #000 !important;
+          }
+          .gradient-navy h2, .gradient-navy p, .gradient-navy span {
+            color: #000 !important;
+          }
+          .text-gold, .text-primary-foreground, .text-primary-foreground/50 {
+            color: #000 !important;
+          }
+          .gradient-gold {
+            background: #e2e8f0 !important;
+            color: #000 !important;
+          }
+          .bg-muted {
+            background: #f1f5f9 !important;
+            border: 1px solid #cbd5e1 !important;
+          }
+        }
+      `}</style>
+
+      {/* Print-only letterhead / Header */}
+      <div className="hidden print:flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-8">
+        <div className="flex items-center gap-4">
+          <img src={schoolSeal} alt={schoolTitle} className="w-16 h-16 rounded-full object-cover border border-slate-200" />
+          <div>
+            <h2 className="text-xl font-bold font-display text-slate-900 leading-tight">{schoolTitle}</h2>
+            <p className="text-xs text-slate-500 font-medium">{schoolLocation}</p>
+            <p className="text-xs text-slate-400 mt-0.5">Supreme Student Learner Government Election System</p>
+          </div>
+        </div>
+        <div className="text-right text-xs text-slate-500">
+          <p className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-1">Official Results Tally</p>
+          <p>Election: <span className="font-semibold text-slate-800">{electionName}</span></p>
+          <p>Tally Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-8">
+      <div className="flex justify-between items-start flex-wrap gap-4 mb-8">
+        <div>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground flex items-center gap-3">
+            <BarChart3 className="w-8 h-8 text-gold" /> Election Results
+          </h1>
+
+          {/* Subtitle — editable by admin, read-only for everyone else */}
+          <div className="flex items-center gap-2 mt-1">
+            {editingName ? (
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground text-sm">Live results for</span>
+                <input
+                  ref={nameInputRef}
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  maxLength={100}
+                  className="px-2.5 py-1 rounded-lg bg-background border border-ring text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring min-w-[180px]"
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={updateName.isPending}
+                  className="p-1 rounded-md text-success hover:bg-success/10 transition-colors"
+                  title="Save"
+                >
+                  {updateName.isPending
+                    ? <div className="w-4 h-4 border-2 border-success/30 border-t-success rounded-full animate-spin" />
+                    : <Check className="w-4 h-4" />}
+                </button>
+                <button
+                  onClick={() => setEditingName(false)}
+                  className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="Cancel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 group">
+                <p className="text-muted-foreground">Live results for <span className="font-medium text-foreground">{electionName}</span></p>
+                {isAdmin && (
+                  <button
+                    onClick={handleStartEditName}
+                    className="p-1 rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-gold hover:bg-gold/10 transition-all"
+                    title="Edit election name"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {isAdmin && (
+          <button
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity print:hidden"
+          >
+            <Printer className="w-4 h-4" /> Print Results Tally
+          </button>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-8 print:hidden">
         <StatCard icon={TrendingUp} label="Voter Turnout" value={`${turnout}%`} variant="gold" />
-        <StatCard icon={BarChart3} label="Voters Voted" value={votedCount?.toLocaleString() ?? "0"} delay={100} />
+        <StatCard icon={BarChart3} label="Voters Voted" value={profileCount > 0 ? `${votedCount.toLocaleString()} / ${profileCount.toLocaleString()}` : votedCount?.toLocaleString() ?? "0"} delay={100} />
         <StatCard icon={Trophy} label="Positions" value={(positions ?? []).length} variant="navy" delay={200} />
       </div>
 
       {/* Filter Dropdowns */}
-      <div className="bg-card border border-border rounded-xl p-4 mb-8 shadow-elegant">
+      <div className="bg-card border border-border rounded-xl p-4 mb-8 shadow-elegant print:hidden">
         <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Filter Results</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
@@ -116,12 +293,19 @@ export default function Results() {
               id="results-grade-filter"
               value={voterGrade}
               onChange={(e) => handleGradeChange(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              disabled={user && !isAdmin}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              <option value="all">All Grade Levels</option>
-              {gradeLevels.map((g) => (
-                <option key={g} value={g}>{g}</option>
-              ))}
+              {user && !isAdmin ? (
+                <option value={profile?.grade_level}>{profile?.grade_level}</option>
+              ) : (
+                <>
+                  <option value="all">All Grade Levels</option>
+                  {gradeLevels.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </>
+              )}
             </select>
           </div>
 
@@ -202,6 +386,20 @@ export default function Results() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Print-only signature block */}
+      <div className="hidden print:grid grid-cols-2 gap-12 mt-12 pt-8 border-t border-slate-300 text-sm">
+        <div>
+          <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Prepared By:</p>
+          <div className="mt-8 border-b border-slate-400 w-56 h-5"></div>
+          <p className="text-xs font-semibold text-slate-800 mt-1">Election Committee Chairman</p>
+        </div>
+        <div className="text-right flex flex-col items-end">
+          <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Attested By:</p>
+          <div className="mt-8 border-b border-slate-400 w-56 h-5"></div>
+          <p className="text-xs font-semibold text-slate-800 mt-1">School Principal / Admin Representative</p>
+        </div>
       </div>
     </div>
   );

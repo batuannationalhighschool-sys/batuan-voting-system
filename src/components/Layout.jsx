@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, Home, Users, Vote, BarChart3, Settings, Shield, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery } from "@tanstack/react-query";
+import api from "@/api/client";
 import schoolSeal from "@/assets/school-seal.jpg";
 
 export default function Layout({ children }) {
@@ -10,6 +12,28 @@ export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, profile, mustChangePassword, signOut } = useAuth();
+
+  // Fetch election settings for dynamic footer year (shared across all users)
+  const { data: electionSettings } = useQuery({
+    queryKey: ["election-settings"],
+    queryFn: () => api.get("/election-settings"),
+    refetchInterval: 10000,
+  });
+
+  // Derive the copyright year from school_year (e.g. "2025-2026" → "2026")
+  // Fall back to the current year if not set
+  const copyrightYear = (() => {
+    const sy = electionSettings?.school_year;
+    if (!sy) return new Date().getFullYear();
+    const parts = sy.split("-");
+    const last = parseInt(parts[parts.length - 1], 10);
+    return isNaN(last) ? new Date().getFullYear() : last;
+  })();
+
+  // Dynamic footer school name — editable from Admin → Settings → Election Info
+  const footerSchoolName =
+    electionSettings?.school_name ||
+    "Batuan National High School — Batuan, Bohol, Philippines";
 
   // Force redirect to change-password if required
   useEffect(() => {
@@ -31,7 +55,7 @@ export default function Layout({ children }) {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <header className="gradient-navy sticky top-0 z-50 shadow-elegant">
+      <header className="gradient-navy sticky top-0 z-50 shadow-elegant print:hidden">
         <div className="container flex items-center justify-between h-16 md:h-20">
           <Link to="/" className="flex items-center gap-3">
             <img src={schoolSeal} alt="Batuan NHS Seal" className="h-10 w-10 md:h-12 md:w-12 rounded-full ring-2 ring-gold/30 object-cover" />
@@ -123,13 +147,13 @@ export default function Layout({ children }) {
 
       <main className="flex-1">{children}</main>
 
-      <footer className="gradient-navy py-6 mt-auto">
+      <footer className="gradient-navy py-6 mt-auto print:hidden">
         <div className="container text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
             <Shield className="w-4 h-4 text-gold" />
             <span className="text-xs font-semibold text-gold tracking-wider uppercase">Secure & Fair Elections</span>
           </div>
-          <p className="text-xs text-primary-foreground/50">© 2026 Batuan National High School — Batuan, Bohol, Philippines</p>
+          <p className="text-xs text-primary-foreground/50">© {copyrightYear} {footerSchoolName}</p>
         </div>
       </footer>
 

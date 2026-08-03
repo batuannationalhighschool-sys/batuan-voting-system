@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import pool from '../db.js';
+import supabase from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'batuan-voting-secret-key-2026';
 
@@ -21,12 +21,17 @@ export async function requireAuth(req, res, next) {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const [rows] = await pool.query('SELECT id, lrn, full_name, must_change_password FROM users WHERE id = ?', [decoded.id]);
-    if (rows.length === 0) {
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, lrn, full_name, must_change_password')
+      .eq('id', decoded.id)
+      .single();
+
+    if (error || !user) {
       return res.status(401).json({ error: 'User not found' });
     }
 
-    req.user = rows[0];
+    req.user = user;
     next();
   } catch (err) {
     return res.status(401).json({ error: 'Invalid or expired token' });
@@ -35,11 +40,13 @@ export async function requireAuth(req, res, next) {
 
 export async function requireAdmin(req, res, next) {
   try {
-    const [roles] = await pool.query(
-      'SELECT role FROM user_roles WHERE user_id = ? AND role = ?',
-      [req.user.id, 'admin']
-    );
-    if (roles.length === 0) {
+    const { data: roles, error } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', req.user.id)
+      .eq('role', 'admin');
+
+    if (error || !roles || roles.length === 0) {
       return res.status(403).json({ error: 'Admin access required' });
     }
     req.isAdmin = true;
