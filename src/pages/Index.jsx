@@ -57,11 +57,11 @@ export default function Index() {
 
   // school_name is stored as the full footer line, e.g.
   // "Batuan National High School — Batuan, Bohol, Philippines"
-  // Split on " — " to get school name vs. location.
+  // Split on " — " or " - " to get school name vs. location.
   const schoolNameFull = settings?.school_name ?? "Batuan National High School — Batuan, Bohol, Philippines";
-  const schoolNameParts = schoolNameFull.split(" — ");
+  const schoolNameParts = schoolNameFull.split(/\s+[—–-]\s+/);
   const schoolTitle    = schoolNameParts[0]?.trim() ?? "Batuan National High School";
-  const schoolLocation = schoolNameParts[1]?.trim() ?? "Batuan, Bohol, Philippines";
+  const schoolLocation = schoolNameParts.length > 1 ? schoolNameParts.slice(1).join(" — ") : "Batuan, Bohol, Philippines";
 
   return (
     <div>
@@ -70,10 +70,14 @@ export default function Index() {
         <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle at 25% 25%, hsl(45 80% 55%) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
         <div className="container relative">
           <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
-            <img src={schoolSeal} alt="Batuan National High School Seal" className="w-24 h-24 md:w-32 md:h-32 mb-6 animate-scale-in rounded-full ring-4 ring-gold/20 object-cover" />
+            <img 
+              src={schoolSeal} 
+              alt="Batuan National High School Seal" 
+              className="w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 lg:w-60 lg:h-60 mb-8 animate-scale-in rounded-full ring-4 ring-gold/40 shadow-2xl object-cover hover:scale-105 transition-transform duration-300" 
+            />
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-extrabold text-primary-foreground leading-tight animate-fade-in">
-              {electionLabel}
-              <span className="block text-gradient-gold mt-1">{electionYear}</span>
+              {electionLabel}{" "}
+              <span className="inline-block text-gradient-gold ml-2">{electionYear}</span>
             </h1>
             <p className="text-primary-foreground/70 text-base md:text-lg mt-4 max-w-xl animate-fade-in" style={{ animationDelay: "150ms" }}>
               {schoolTitle} — Supreme Student Learner Government Election System

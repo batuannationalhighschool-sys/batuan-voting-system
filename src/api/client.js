@@ -94,6 +94,19 @@ async function handleGet(path) {
     return data;
   }
 
+  if (pathname === '/election-history') {
+    const { data, error } = await supabase.rpc('app_get_election_history');
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  const m = pathname.match(/^\/election-history\/([^/]+)\/results$/);
+  if (m) {
+    const { data, error } = await supabase.rpc('app_get_archived_results', { p_school_year: decodeURIComponent(m[1]) });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
   throw new Error(`Unknown GET route: ${pathname}`);
 }
 
@@ -152,6 +165,12 @@ async function handlePost(path, body) {
     const { data, error } = await supabase.rpc('app_submit_votes', {
       p_token: getToken(), p_votes: body.votes,
     });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/election-history/archive') {
+    const { data, error } = await supabase.rpc('app_archive_election_results', { p_token: getToken() });
     if (error) throw new Error(error.message);
     return data;
   }
@@ -230,8 +249,16 @@ async function handlePatch(path) {
 async function handleDelete(path) {
   const pathname = path.split('?')[0];
 
+  // /election-history/:schoolYear
+  let m = pathname.match(/^\/election-history\/([^/]+)$/);
+  if (m) {
+    const { data, error } = await supabase.rpc('app_delete_election_history', { p_token: getToken(), p_school_year: decodeURIComponent(m[1]) });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
   // /voters/:id/permanent
-  let m = pathname.match(/^\/voters\/([^/]+)\/permanent$/);
+  m = pathname.match(/^\/voters\/([^/]+)\/permanent$/);
   if (m) {
     const { data, error } = await supabase.rpc('app_permanent_delete_voter', { p_token: getToken(), p_id: m[1] });
     if (error) throw new Error(error.message);

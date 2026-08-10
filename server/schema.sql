@@ -339,6 +339,7 @@ DECLARE
   v_user RECORD;
   v_profile RECORD;
   v_is_admin BOOLEAN;
+  v_has_voted_actual BOOLEAN;
 BEGIN
   v_payload := verify_app_token(p_token);
 
@@ -348,12 +349,20 @@ BEGIN
   SELECT full_name, has_voted, grade_level, section INTO v_profile
   FROM profiles WHERE user_id = v_user.id LIMIT 1;
 
+  -- Check if the user has actually cast votes in the active votes table
+  SELECT EXISTS(SELECT 1 FROM votes WHERE voter_id = v_user.id) INTO v_has_voted_actual;
+
+  -- Auto-sync profile has_voted flag if votes were reset/cleared for a new election
+  IF v_profile.full_name IS NOT NULL AND v_profile.has_voted != v_has_voted_actual THEN
+    UPDATE profiles SET has_voted = v_has_voted_actual WHERE user_id = v_user.id;
+  END IF;
+
   SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = v_user.id AND role = 'admin') INTO v_is_admin;
 
   RETURN jsonb_build_object(
     'user', jsonb_build_object('id', v_user.id, 'lrn', v_user.lrn, 'full_name', v_user.full_name),
     'profile', CASE WHEN v_profile.full_name IS NOT NULL THEN jsonb_build_object(
-      'full_name', v_profile.full_name, 'has_voted', v_profile.has_voted,
+      'full_name', v_profile.full_name, 'has_voted', v_has_voted_actual,
       'grade_level', v_profile.grade_level, 'section', v_profile.section
     ) ELSE NULL END,
     'isAdmin', v_is_admin,
@@ -547,12 +556,14 @@ RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
-DECLARE v_admin_id UUID;
+DECLARE 
+  v_admin_id UUID;
 BEGIN
   v_admin_id := require_admin(p_token);
-  UPDATE profiles SET has_voted = false;
-  DELETE FROM votes WHERE id != '00000000-0000-0000-0000-000000000000'::uuid;
-  RETURN jsonb_build_object('success', true, 'message', 'All voters voting status reset successfully');
+
+  UPDATE profiles SET has_voted = false WHERE user_id IS NOT NULL;
+  DELETE FROM votes WHERE id IS NOT NULL;
+  RETURN jsonb_build_object('success', true, 'message', 'All voting statuses reset successfully');
 END;
 $$;
 
@@ -812,11 +823,23 @@ DECLARE
   v_admin_id UUID;
   v_curr_date DATE;
   v_today DATE;
+  v_old_status TEXT;
+  v_new_status TEXT;
+  v_vote_count INT;
 BEGIN
   v_admin_id := require_admin(p_token);
 
+  SELECT status INTO v_old_status FROM election_settings WHERE id = p_id::uuid;
+  v_new_status := p_data->>'status';
+
+  -- If status is changing to 'ongoing' (Starting Election), clear previous votes and reset voters (no auto-archiving)
+  IF v_new_status = 'ongoing' AND (v_old_status IS NULL OR v_old_status != 'ongoing') THEN
+    UPDATE profiles SET has_voted = false WHERE user_id IS NOT NULL;
+    DELETE FROM votes WHERE id IS NOT NULL;
+  END IF;
+
   -- If setting to upcoming and no election_date, auto-fix past dates
-  IF (p_data->>'status') = 'upcoming' AND (p_data->>'election_date') IS NULL THEN
+  IF v_new_status = 'upcoming' AND (p_data->>'election_date') IS NULL THEN
     SELECT election_date INTO v_curr_date FROM election_settings WHERE id = p_id::uuid;
     v_today := current_date;
     IF v_curr_date IS NOT NULL AND v_curr_date < v_today THEN

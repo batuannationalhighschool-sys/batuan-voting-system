@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck } from "lucide-react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -96,6 +96,9 @@ export default function Admin() {
   const [archiveSearch, setArchiveSearch] = useState("");
   const [archiveCandidateSearch, setArchiveCandidateSearch] = useState("");
   const [archiveSubTab, setArchiveSubTab] = useState("voters");
+
+  // Archive election results state
+  const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
   // Voter management state
   const [newVoter, setNewVoter] = useState({ lrn: "", full_name: "", grade_level: "", section: "" });
@@ -225,7 +228,25 @@ export default function Admin() {
       if (!settings?.id) return;
       await api.put(`/election-settings/${settings.id}`, { status });
     },
-    onSuccess: () => { toast({ title: "Election status updated" }); queryClient.invalidateQueries({ queryKey: ["election-settings"] }); },
+    onSuccess: (data, variables) => {
+      if (variables === "ongoing") {
+        toast({
+          title: "Election Started!",
+          description: "Voting is now active. All voters can now cast their votes for the new election.",
+        });
+      } else {
+        toast({ title: "Election status updated" });
+      }
+      queryClient.invalidateQueries({ queryKey: ["election-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
+      queryClient.invalidateQueries({ queryKey: ["vote-counts-home"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: ["election-history"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-results"] });
+      queryClient.invalidateQueries({ queryKey: ["auth-me"] });
+    },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
@@ -284,6 +305,39 @@ export default function Admin() {
     },
     onSuccess: () => { toast({ title: "Schedule saved!", description: "Election schedule updated." }); queryClient.invalidateQueries({ queryKey: ["election-settings"] }); },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
+  });
+
+  // Archive election results to history
+  const archiveResults = useMutation({
+    mutationFn: async () => {
+      await api.post('/election-history/archive');
+    },
+    onSuccess: (data) => {
+      toast({ title: "Results archived!", description: "Election results have been saved to history. Students can view them under Past Elections." });
+      setShowArchiveConfirm(false);
+      queryClient.invalidateQueries({ queryKey: ["election-history"] });
+    },
+    onError: (err) => {
+      toast({ title: "Failed to archive", description: err.message, variant: "destructive" });
+      setShowArchiveConfirm(false);
+    },
+  });
+
+  const deleteHistory = useMutation({
+    mutationFn: async (schoolYear) => {
+      await api.delete(`/election-history/${encodeURIComponent(schoolYear)}`);
+    },
+    onSuccess: () => {
+      toast({ title: "Election history deleted" });
+      queryClient.invalidateQueries({ queryKey: ["election-history"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-results"] });
+    },
+    onError: (err) => toast({ title: "Failed to delete", description: err.message, variant: "destructive" }),
+  });
+
+  const { data: electionHistory } = useQuery({
+    queryKey: ["election-history"],
+    queryFn: () => api.get('/election-history'),
   });
 
   const updateInfo = useMutation({
@@ -415,6 +469,8 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
       queryClient.invalidateQueries({ queryKey: ["vote-counts-home"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
+      queryClient.invalidateQueries({ queryKey: ["election-history"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-results"] });
       setShowResetAllVotedConfirm(false);
     },
     onError: (err) => toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
@@ -1367,10 +1423,10 @@ export default function Admin() {
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              This will set <span className="font-semibold text-foreground">has_voted = false</span> for all voters and clear previous vote records.
+              This will set <span className="font-semibold text-foreground">has_voted = false</span> for all voters and clear current live vote tallies for the new election.
             </p>
             <p className="text-xs text-muted-foreground mb-6">
-              All registered voters will be able to cast their vote again.
+              All registered voters will be able to cast their vote again. (If you want to save the previous results to history, click <strong>Save Results to History</strong> first).
             </p>
             <div className="flex items-center justify-end gap-3">
               <button onClick={() => setShowResetAllVotedConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
@@ -1692,7 +1748,84 @@ export default function Admin() {
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity">
                     <Power className="w-4 h-4" /> End Election
                   </button>
+                  <button onClick={() => setShowResetAllVotedConfirm(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 font-medium text-sm hover:bg-gold/20 transition-colors ml-auto">
+                    <RotateCcw className="w-4 h-4" /> Reset Voters for New Election
+                  </button>
                 </div>
+              </div>
+
+              {/* Save Results to History */}
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
+                <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                  <History className="w-5 h-5 text-gold" /> Election History
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Save the current election results to history so students and staff can view past election winners. Results for the same school year will be replaced if archived again.
+                </p>
+
+                {!showArchiveConfirm ? (
+                  <button
+                    onClick={() => setShowArchiveConfirm(true)}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity"
+                  >
+                    <Archive className="w-4 h-4" /> Save Results to History
+                  </button>
+                ) : (
+                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
+                    <p className="text-sm text-foreground font-medium mb-1">Archive current results?</p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      This will save a snapshot of <strong>{settings?.name || "the current election"}</strong> (S.Y. {settings?.school_year || "—"}) to history.
+                      {" "}If results for this school year already exist, they will be replaced.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => archiveResults.mutate()}
+                        disabled={archiveResults.isPending}
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        {archiveResults.isPending
+                          ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
+                          : <Archive className="w-4 h-4" />}
+                        {archiveResults.isPending ? "Archiving…" : "Yes, Archive Now"}
+                      </button>
+                      <button
+                        onClick={() => setShowArchiveConfirm(false)}
+                        className="px-5 py-2 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {(electionHistory ?? []).length > 0 && (
+                  <div className="mt-6 pt-5 border-t border-border">
+                    <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Archived Past Elections</p>
+                    <div className="space-y-2">
+                      {(electionHistory ?? []).map((h) => (
+                        <div key={h.school_year} className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border">
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{h.election_name}</p>
+                            <p className="text-xs text-muted-foreground">S.Y. {h.school_year} {h.election_date ? `· ${h.election_date}` : ''}</p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (confirm(`Delete archived election history for S.Y. ${h.school_year}?`)) {
+                                deleteHistory.mutate(h.school_year);
+                              }
+                            }}
+                            disabled={deleteHistory.isPending}
+                            className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
+                            title="Delete this history record"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">

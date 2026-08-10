@@ -39,7 +39,7 @@ export default function AuthPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8 animate-fade-in">
-          <img src={schoolSeal} alt="BNHS Seal" className="w-20 h-20 rounded-full mx-auto mb-4 ring-4 ring-gold/20 shadow-elegant" />
+          <img src={schoolSeal} alt="BNHS Seal" className="w-28 h-28 rounded-full mx-auto mb-4 ring-4 ring-gold/30 shadow-lg object-cover" />
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
             Welcome
           </h1>

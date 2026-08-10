@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
-import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer } from "lucide-react";
+import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer, History, Calendar, Award } from "lucide-react";
 import schoolSeal from "@/assets/school-seal.jpg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
@@ -18,6 +18,11 @@ export default function Results() {
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState("");
   const nameInputRef = useRef(null);
+
+  // ── Tab state: "live" or "history" ──
+  const [activeTab, setActiveTab] = useState("live");
+  const [selectedYear, setSelectedYear] = useState("");
+  const [historyPositionFilter, setHistoryPositionFilter] = useState("all");
 
   // Lock default grade filter to student's grade level
   useEffect(() => {
@@ -67,6 +72,25 @@ export default function Results() {
   const { data: settings } = useQuery({
     queryKey: ["election-settings"],
     queryFn: () => api.get('/election-settings'),
+  });
+
+  // ── Election History queries ──
+  const { data: electionHistory } = useQuery({
+    queryKey: ["election-history"],
+    queryFn: () => api.get('/election-history'),
+  });
+
+  // Auto-select first year when history loads
+  useEffect(() => {
+    if (electionHistory && electionHistory.length > 0 && !selectedYear) {
+      setSelectedYear(electionHistory[0].school_year);
+    }
+  }, [electionHistory, selectedYear]);
+
+  const { data: archivedResults } = useQuery({
+    queryKey: ["archived-results", selectedYear],
+    queryFn: () => api.get(`/election-history/${encodeURIComponent(selectedYear)}/results`),
+    enabled: !!selectedYear,
   });
 
   // Mutation to save the election name
@@ -134,9 +158,45 @@ export default function Results() {
   const electionName = settings?.name ?? "SSLG Election 2026";
 
   const schoolNameFull = settings?.school_name ?? "Batuan National High School — Batuan, Bohol, Philippines";
-  const schoolNameParts = schoolNameFull.split(" — ");
+  const schoolNameParts = schoolNameFull.split(/\s+[—–-]\s+/);
   const schoolTitle    = schoolNameParts[0]?.trim() ?? "Batuan National High School";
-  const schoolLocation = schoolNameParts[1]?.trim() ?? "Batuan, Bohol, Philippines";
+  const schoolLocation = schoolNameParts.length > 1 ? schoolNameParts.slice(1).join(" — ") : "Batuan, Bohol, Philippines";
+
+  // ── Group archived results by position ──
+  const archivedGrouped = useMemo(() => {
+    if (!archivedResults || archivedResults.length === 0) return [];
+    const posMap = new Map();
+    for (const row of archivedResults) {
+      if (!posMap.has(row.position_title)) {
+        posMap.set(row.position_title, {
+          title: row.position_title,
+          order: row.position_order,
+          candidates: [],
+          totalVotes: 0,
+        });
+      }
+      const group = posMap.get(row.position_title);
+      group.candidates.push(row);
+      group.totalVotes += row.vote_count ?? 0;
+    }
+    const groups = Array.from(posMap.values()).sort((a, b) => a.order - b.order);
+    return groups;
+  }, [archivedResults]);
+
+  // Distinct position titles in archived results
+  const archivedPositionTitles = useMemo(() => {
+    return archivedGrouped.map(g => g.title);
+  }, [archivedGrouped]);
+
+  const filteredArchivedGrouped = historyPositionFilter === "all"
+    ? archivedGrouped
+    : archivedGrouped.filter(g => g.title === historyPositionFilter);
+
+  // Currently selected history election info
+  const selectedElection = (electionHistory ?? []).find(e => e.school_year === selectedYear);
+
+  // Check if any history exists
+  const hasHistory = (electionHistory ?? []).length > 0;
 
   return (
     <div className="container py-8 md:py-12">
@@ -193,7 +253,7 @@ export default function Results() {
         </div>
         <div className="text-right text-xs text-slate-500">
           <p className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-1">Official Results Tally</p>
-          <p>Election: <span className="font-semibold text-slate-800">{electionName}</span></p>
+          <p>Election: <span className="font-semibold text-slate-800">{activeTab === "history" && selectedElection ? selectedElection.election_name : electionName}</span></p>
           <p>Tally Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
         </div>
       </div>
@@ -262,131 +322,319 @@ export default function Results() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-8 print:hidden">
-        <StatCard icon={TrendingUp} label="Voter Turnout" value={`${turnout}%`} variant="gold" />
-        <StatCard icon={BarChart3} label="Voters Voted" value={profileCount > 0 ? `${votedCount.toLocaleString()} / ${profileCount.toLocaleString()}` : votedCount?.toLocaleString() ?? "0"} delay={100} />
-        <StatCard icon={Trophy} label="Positions" value={(positions ?? []).length} variant="navy" delay={200} />
+      {/* ── Tab Switcher ── */}
+      <div className="flex gap-1 p-1 bg-muted rounded-xl mb-8 overflow-x-auto print:hidden">
+        <button
+          onClick={() => setActiveTab("live")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === "live" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <BarChart3 className="w-4 h-4" /> Live Results
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === "history" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          <History className="w-4 h-4" /> Past Elections
+          {hasHistory && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-gold/15 text-gold">
+              {(electionHistory ?? []).length}
+            </span>
+          )}
+        </button>
       </div>
 
-      {/* Filter Dropdowns */}
-      <div className="bg-card border border-border rounded-xl p-4 mb-8 shadow-elegant print:hidden">
-        <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Filter Results</p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <div>
-            <label htmlFor="results-position-filter" className="block text-xs text-muted-foreground mb-1.5">Position</label>
-            <select
-              id="results-position-filter"
-              value={activePosition}
-              onChange={(e) => setActivePosition(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="all">All Positions</option>
-              {(positions ?? []).map((p) => (
-                <option key={p.id} value={p.id}>{p.title}</option>
-              ))}
-            </select>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ── LIVE RESULTS TAB ── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {activeTab === "live" && (
+        <div className="animate-fade-in">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-8 print:hidden">
+            <StatCard icon={TrendingUp} label="Voter Turnout" value={`${turnout}%`} variant="gold" />
+            <StatCard icon={BarChart3} label="Voters Voted" value={profileCount > 0 ? `${votedCount.toLocaleString()} / ${profileCount.toLocaleString()}` : votedCount?.toLocaleString() ?? "0"} delay={100} />
+            <StatCard icon={Trophy} label="Positions" value={(positions ?? []).length} variant="navy" delay={200} />
           </div>
 
-          <div>
-            <label htmlFor="results-grade-filter" className="block text-xs text-muted-foreground mb-1.5">Grade Level <span className="text-gold/70">(by voter)</span></label>
-            <select
-              id="results-grade-filter"
-              value={voterGrade}
-              onChange={(e) => handleGradeChange(e.target.value)}
-              disabled={user && !isAdmin}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-75 disabled:cursor-not-allowed"
-            >
-              {user && !isAdmin ? (
-                <option value={profile?.grade_level}>{profile?.grade_level}</option>
-              ) : (
-                <>
-                  <option value="all">All Grade Levels</option>
-                  {gradeLevels.map((g) => (
-                    <option key={g} value={g}>{g}</option>
-                  ))}
-                </>
-              )}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="results-section-filter" className="block text-xs text-muted-foreground mb-1.5">Section <span className="text-gold/70">(by voter)</span></label>
-            <select
-              id="results-section-filter"
-              value={voterSection}
-              onChange={(e) => setVoterSection(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-            >
-              <option value="all">All Sections</option>
-              {sections.map((s) => (
-                <option key={s} value={s}>{s}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {hasVoterFilter && (
-          <div className="mt-3 flex items-center gap-4">
-            <p className="text-xs text-muted-foreground italic">
-              Showing votes cast by: <span className="text-foreground font-medium">
-                {voterGrade !== "all" ? voterGrade : "All Grades"}
-                {voterSection !== "all" ? ` · ${voterSection}` : ""}
-              </span>
-            </p>
-            <button
-              onClick={() => { setVoterGrade("all"); setVoterSection("all"); setActivePosition("all"); }}
-              className="text-xs font-medium text-gold hover:text-gold/80 transition-colors"
-            >
-              ✕ Clear
-            </button>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        {filtered.map((group, gi) => (
-          <div key={group.position.id} className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant animate-fade-in" style={{ animationDelay: `${gi * 100}ms` }}>
-            <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
+          {/* Filter Dropdowns */}
+          <div className="bg-card border border-border rounded-xl p-4 mb-8 shadow-elegant print:hidden">
+            <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Filter Results</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <h2 className="font-display font-bold text-primary-foreground text-lg">{group.position.title}</h2>
-                <p className="text-xs text-primary-foreground/50">{group.totalVotes} total votes</p>
+                <label htmlFor="results-position-filter" className="block text-xs text-muted-foreground mb-1.5">Position</label>
+                <select
+                  id="results-position-filter"
+                  value={activePosition}
+                  onChange={(e) => setActivePosition(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Positions</option>
+                  {(positions ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>{p.title}</option>
+                  ))}
+                </select>
               </div>
-              {group.candidates[0] && (
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-4 h-4 text-gold" />
-                  <span className="text-sm font-semibold text-gold">{group.candidates[0].candidate_name}</span>
-                </div>
-              )}
+
+              <div>
+                <label htmlFor="results-grade-filter" className="block text-xs text-muted-foreground mb-1.5">Grade Level <span className="text-gold/70">(by voter)</span></label>
+                <select
+                  id="results-grade-filter"
+                  value={voterGrade}
+                  onChange={(e) => handleGradeChange(e.target.value)}
+                  disabled={user && !isAdmin}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-75 disabled:cursor-not-allowed"
+                >
+                  {user && !isAdmin ? (
+                    <option value={profile?.grade_level}>{profile?.grade_level}</option>
+                  ) : (
+                    <>
+                      <option value="all">All Grade Levels</option>
+                      {gradeLevels.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="results-section-filter" className="block text-xs text-muted-foreground mb-1.5">Section <span className="text-gold/70">(by voter)</span></label>
+                <select
+                  id="results-section-filter"
+                  value={voterSection}
+                  onChange={(e) => setVoterSection(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Sections</option>
+                  {sections.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="p-4 md:p-5 space-y-4">
-              {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates registered.</p>}
-              {group.candidates.map((c, ci) => {
-                const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
-                return (
-                  <div key={c.candidate_id} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="flex items-center gap-3">
-                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${ci === 0 ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{ci + 1}</span>
-                        <div>
-                          <p className="font-semibold text-foreground text-sm">{c.candidate_name}</p>
-                          <p className="text-xs text-muted-foreground">{c.party_list}</p>
+
+            {hasVoterFilter && (
+              <div className="mt-3 flex items-center gap-4">
+                <p className="text-xs text-muted-foreground italic">
+                  Showing votes cast by: <span className="text-foreground font-medium">
+                    {voterGrade !== "all" ? voterGrade : "All Grades"}
+                    {voterSection !== "all" ? ` · ${voterSection}` : ""}
+                  </span>
+                </p>
+                <button
+                  onClick={() => { setVoterGrade("all"); setVoterSection("all"); setActivePosition("all"); }}
+                  className="text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+                >
+                  ✕ Clear
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {filtered.map((group, gi) => (
+              <div key={group.position.id} className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant animate-fade-in" style={{ animationDelay: `${gi * 100}ms` }}>
+                <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <h2 className="font-display font-bold text-primary-foreground text-lg">{group.position.title}</h2>
+                    <p className="text-xs text-primary-foreground/50">{group.totalVotes} total votes</p>
+                  </div>
+                  {group.candidates[0] && (
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-4 h-4 text-gold" />
+                      <span className="text-sm font-semibold text-gold">{group.candidates[0].candidate_name}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 md:p-5 space-y-4">
+                  {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates registered.</p>}
+                  {group.candidates.map((c, ci) => {
+                    const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
+                    return (
+                      <div key={c.candidate_id} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${ci === 0 ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{ci + 1}</span>
+                            <div>
+                              <p className="font-semibold text-foreground text-sm">{c.candidate_name}</p>
+                              <p className="text-xs text-muted-foreground">{c.party_list}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="font-display font-bold text-foreground">{c.vote_count}</span>
+                            <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                          </div>
+                        </div>
+                        <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all duration-1000 ${ci === 0 ? "gradient-gold" : "bg-navy-light/50"}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="font-display font-bold text-foreground">{c.vote_count}</span>
-                        <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ── PAST ELECTIONS TAB ── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {activeTab === "history" && (
+        <div className="animate-fade-in">
+          {!hasHistory ? (
+            /* Empty state */
+            <div className="bg-card rounded-xl border border-border p-12 text-center shadow-elegant">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <History className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="font-display font-bold text-foreground text-lg mb-2">No Past Elections</h3>
+              <p className="text-muted-foreground text-sm max-w-md mx-auto">
+                No election results have been archived yet. Once an election is completed and archived by the administrator, past results will appear here.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* History Header Card */}
+              <div className="bg-card border border-border rounded-xl p-5 mb-6 shadow-elegant">
+                <div className="flex flex-col sm:flex-row sm:items-end gap-4">
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" /> Select School Year
+                    </p>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => { setSelectedYear(e.target.value); setHistoryPositionFilter("all"); }}
+                      className="w-full sm:max-w-xs px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      {(electionHistory ?? []).map((e) => (
+                        <option key={e.school_year} value={e.school_year}>
+                          {e.election_name} — S.Y. {e.school_year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Filter by Position</p>
+                    <select
+                      value={historyPositionFilter}
+                      onChange={(e) => setHistoryPositionFilter(e.target.value)}
+                      className="w-full sm:max-w-xs px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="all">All Positions</option>
+                      {archivedPositionTitles.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {selectedElection && (
+                  <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      {selectedElection.election_date
+                        ? new Date(selectedElection.election_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                        : "Date not set"}
+                    </span>
+                    <span className="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] uppercase tracking-wider border border-emerald-500/30">
+                      Archived
+                    </span>
+                    <span className="text-muted-foreground/60">
+                      Archived on {selectedElection.archived_at
+                        ? new Date(selectedElection.archived_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+                        : "—"}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Winners Summary Card */}
+              {archivedGrouped.length > 0 && (
+                <div className="bg-card border border-gold/20 rounded-xl p-5 mb-6 shadow-elegant">
+                  <h3 className="font-display font-bold text-foreground text-base mb-4 flex items-center gap-2">
+                    <Award className="w-5 h-5 text-gold" /> Winners Summary
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {archivedGrouped.map((group) => {
+                      const winners = group.candidates.filter(c => c.is_winner);
+                      if (winners.length === 0) return null;
+                      return (
+                        <div key={group.title} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/60 border border-border">
+                          <Trophy className="w-4 h-4 text-gold flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">{group.title}</p>
+                            {winners.map(w => (
+                              <p key={w.candidate_name} className="text-sm font-semibold text-foreground truncate">{w.candidate_name}</p>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Full Results by Position */}
+              <div className="space-y-6">
+                {filteredArchivedGrouped.map((group, gi) => (
+                  <div key={group.title} className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant animate-fade-in" style={{ animationDelay: `${gi * 100}ms` }}>
+                    <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <h2 className="font-display font-bold text-primary-foreground text-lg">{group.title}</h2>
+                        <p className="text-xs text-primary-foreground/50">{group.totalVotes} total votes</p>
                       </div>
+                      {group.candidates.filter(c => c.is_winner).length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <Trophy className="w-4 h-4 text-gold" />
+                          <span className="text-sm font-semibold text-gold">
+                            {group.candidates.filter(c => c.is_winner).map(w => w.candidate_name).join(", ")}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full transition-all duration-1000 ${ci === 0 ? "gradient-gold" : "bg-navy-light/50"}`} style={{ width: `${pct}%` }} />
+                    <div className="p-4 md:p-5 space-y-4">
+                      {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates in this position.</p>}
+                      {group.candidates.map((c, ci) => {
+                        const pct = group.totalVotes ? ((c.vote_count / group.totalVotes) * 100).toFixed(1) : "0";
+                        return (
+                          <div key={`${c.candidate_name}-${ci}`} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-3">
+                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${c.is_winner ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                                  {c.rank}
+                                </span>
+                                <div>
+                                  <p className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                                    {c.candidate_name}
+                                    {c.is_winner && <Trophy className="w-3 h-3 text-gold" />}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {c.candidate_party}
+                                    {c.candidate_grade && ` · ${c.candidate_grade}`}
+                                    {c.candidate_section && ` — ${c.candidate_section}`}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-display font-bold text-foreground">{c.vote_count}</span>
+                                <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                              </div>
+                            </div>
+                            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                              <div className={`h-full rounded-full transition-all duration-1000 ${c.is_winner ? "gradient-gold" : "bg-navy-light/50"}`} style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-        ))}
-      </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Print-only signature block */}
       <div className="hidden print:grid grid-cols-2 gap-12 mt-12 pt-8 border-t border-slate-300 text-sm">
