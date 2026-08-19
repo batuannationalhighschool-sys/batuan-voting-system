@@ -1,11 +1,22 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer, History, Calendar, Award } from "lucide-react";
 import schoolSeal from "@/assets/school-seal.jpg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
+import { supabase } from "@/lib/supabase";
 import StatCard from "@/components/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+
+// Helper: check if a position title matches a specific grade level (word-boundary safe)
+function gradeMatchesPosition(grade, positionTitle) {
+  if (!grade || grade === "all") return true;
+  const title = positionTitle.toLowerCase();
+  if (!title.includes('representative')) return true;
+  const gradeNum = grade.replace(/\D/g, '');
+  if (!gradeNum) return title.includes(grade.toLowerCase());
+  return new RegExp(`grade\\s*${gradeNum}\\b`, 'i').test(title);
+}
 
 export default function Results() {
   const [activePosition, setActivePosition] = useState("all");
@@ -23,23 +34,32 @@ export default function Results() {
   const [activeTab, setActiveTab] = useState("live");
   const [selectedYear, setSelectedYear] = useState("");
   const [historyPositionFilter, setHistoryPositionFilter] = useState("all");
+  const [historyGradeFilter, setHistoryGradeFilter] = useState("all");
+  const [historySectionFilter, setHistorySectionFilter] = useState("all");
 
-  // Lock default grade filter to student's grade level
+  // Scroll to active position in Live tab
   useEffect(() => {
-    if (user && !isAdmin && profile?.grade_level) {
-      setVoterGrade(profile.grade_level);
+    if (activePosition !== "all") {
+      const el = document.getElementById(`position-${activePosition}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
     }
-  }, [user, isAdmin, profile?.grade_level]);
+  }, [activePosition]);
 
-  const gradeLevel = !isAdmin && user ? profile?.grade_level : null;
-  const activeGradeFilter = gradeLevel || (voterGrade !== "all" ? voterGrade : null);
-  const posQueryParams = activeGradeFilter
-    ? `?grade_level=${encodeURIComponent(activeGradeFilter)}`
-    : '';
+  // Scroll to active position in History tab
+  useEffect(() => {
+    if (historyPositionFilter !== "all") {
+      const el = document.getElementById(`archived-position-${historyPositionFilter}`);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }
+  }, [historyPositionFilter]);
 
   const { data: positions } = useQuery({
-    queryKey: ["positions", activeGradeFilter],
-    queryFn: () => api.get(`/positions${posQueryParams}`),
+    queryKey: ["positions"],
+    queryFn: () => api.get('/positions'),
   });
 
   // Build vote count query params based on voter filters
@@ -54,7 +74,7 @@ export default function Results() {
   const { data: voteCounts } = useQuery({
     queryKey: ["vote-counts", voterGrade, voterSection],
     queryFn: () => api.get(`/votes/counts${voteCountParams}`),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   // Voter groups for dropdown options (grade levels & sections from voter profiles)
@@ -66,13 +86,32 @@ export default function Results() {
   const { data: stats } = useQuery({
     queryKey: ["stats", voterGrade, voterSection],
     queryFn: () => api.get(`/stats${voteCountParams}`),
-    refetchInterval: 10000,
+    refetchInterval: 30000,
   });
 
   const { data: settings } = useQuery({
     queryKey: ["election-settings"],
     queryFn: () => api.get('/election-settings'),
   });
+
+  // ── Supabase Realtime: instant vote updates ──
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('live-votes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votes' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
+        queryClient.invalidateQueries({ queryKey: ["stats"] });
+      })
+      .subscribe((status) => {
+        setIsRealtimeConnected(status === 'SUBSCRIBED');
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // ── Election History queries ──
   const { data: electionHistory } = useQuery({
@@ -131,18 +170,29 @@ export default function Results() {
 
   // Filter sections to those matching selected grade level
   const sections = useMemo(() => {
-    if (voterGrade === "all") return allSections.map(s => s.section);
+    if (voterGrade === "all") return [...new Set(allSections.map(s => s.section))];
     return allSections.filter(s => s.grade_level === voterGrade).map(s => s.section);
   }, [allSections, voterGrade]);
 
   const handleGradeChange = (val) => {
     setVoterGrade(val);
     setVoterSection("all");
+    if (val !== "all" && activePosition !== "all") {
+      const posObj = (positions ?? []).find(p => String(p.id) === String(activePosition));
+      if (posObj && !gradeMatchesPosition(val, posObj.title)) {
+        setActivePosition("all");
+      }
+    }
   };
 
   const votedCount = stats?.votedCount ?? 0;
   const profileCount = stats?.voterCount ?? 0;
   const turnout = profileCount && profileCount > 0 ? ((votedCount) / profileCount * 100).toFixed(1) : "0";
+
+  const relevantPositions = useMemo(() => {
+    if (voterGrade === "all") return positions ?? [];
+    return (positions ?? []).filter(p => gradeMatchesPosition(voterGrade, p.title));
+  }, [positions, voterGrade]);
 
   const grouped = (positions ?? []).map((pos) => {
     const posCandidates = (voteCounts ?? [])
@@ -152,7 +202,14 @@ export default function Results() {
     return { position: pos, candidates: posCandidates, totalVotes: totalPosVotes };
   });
 
-  const filtered = activePosition === "all" ? grouped : grouped.filter((g) => g.position.id === activePosition);
+  const relevantGrouped = useMemo(() => {
+    if (voterGrade === "all") return grouped;
+    return grouped.filter(g => gradeMatchesPosition(voterGrade, g.position.title));
+  }, [grouped, voterGrade]);
+
+  const filtered = activePosition === "all"
+    ? relevantGrouped
+    : relevantGrouped.filter(g => String(g.position.id) === String(activePosition));
   const hasVoterFilter = voterGrade !== "all" || voterSection !== "all";
 
   const electionName = settings?.name ?? "SSLG Election 2026";
@@ -183,14 +240,74 @@ export default function Results() {
     return groups;
   }, [archivedResults]);
 
-  // Distinct position titles in archived results
+  // Distinct position titles in archived results (filtered by grade level if active)
   const archivedPositionTitles = useMemo(() => {
-    return archivedGrouped.map(g => g.title);
-  }, [archivedGrouped]);
+    let groups = archivedGrouped;
+    if (historyGradeFilter !== "all") {
+      groups = groups.filter(g => gradeMatchesPosition(historyGradeFilter, g.title));
+    }
+    return groups.map(g => g.title);
+  }, [archivedGrouped, historyGradeFilter]);
 
-  const filteredArchivedGrouped = historyPositionFilter === "all"
-    ? archivedGrouped
-    : archivedGrouped.filter(g => g.title === historyPositionFilter);
+  // Distinct grade levels from archived candidate results
+  const archivedGradeLevels = useMemo(() => {
+    if (!archivedResults) return [];
+    const grades = [...new Set(archivedResults.map(r => r.candidate_grade).filter(Boolean))];
+    return grades.sort();
+  }, [archivedResults]);
+
+  // Distinct sections from archived candidate results (filtered by selected grade)
+  const archivedSections = useMemo(() => {
+    if (!archivedResults) return [];
+    const filtered = historyGradeFilter === "all"
+      ? archivedResults
+      : archivedResults.filter(r => r.candidate_grade === historyGradeFilter);
+    const sects = [...new Set(filtered.map(r => r.candidate_section).filter(Boolean))];
+    return sects.sort();
+  }, [archivedResults, historyGradeFilter]);
+
+  const handleHistoryGradeChange = (val) => {
+    setHistoryGradeFilter(val);
+    setHistorySectionFilter("all");
+    if (val !== "all" && historyPositionFilter !== "all") {
+      if (!gradeMatchesPosition(val, historyPositionFilter)) {
+        setHistoryPositionFilter("all");
+      }
+    }
+  };
+
+  const filteredArchivedGrouped = useMemo(() => {
+    let groups = archivedGrouped;
+
+    // Filter out representative positions for other grade levels when grade filter is active
+    if (historyGradeFilter !== "all") {
+      groups = groups.filter(group => gradeMatchesPosition(historyGradeFilter, group.title));
+    }
+
+    // Apply grade/section filter to candidates within each group
+    if (historyGradeFilter !== "all" || historySectionFilter !== "all") {
+      groups = groups.map(group => {
+        const matchedCandidates = group.candidates.filter(c => {
+          if (historyGradeFilter !== "all" && c.candidate_grade !== historyGradeFilter) return false;
+          if (historySectionFilter !== "all" && c.candidate_section !== historySectionFilter) return false;
+          return true;
+        });
+        const unmatchedCandidates = group.candidates.filter(c => !matchedCandidates.includes(c));
+        const reordered = [...matchedCandidates, ...unmatchedCandidates];
+        return { ...group, candidates: reordered, filteredCandidates: matchedCandidates };
+      });
+    }
+
+    return groups;
+  }, [archivedGrouped, historyGradeFilter, historySectionFilter]);
+
+  // Apply position filter to archived groups (mirrors live results behavior)
+  const displayedArchivedGroups = useMemo(() => {
+    if (historyPositionFilter === "all") return filteredArchivedGrouped;
+    return filteredArchivedGrouped.filter(g => g.title === historyPositionFilter);
+  }, [filteredArchivedGrouped, historyPositionFilter]);
+
+  const hasHistoryFilter = historyGradeFilter !== "all" || historySectionFilter !== "all";
 
   // Currently selected history election info
   const selectedElection = (electionHistory ?? []).find(e => e.school_year === selectedYear);
@@ -329,6 +446,12 @@ export default function Results() {
           className={`flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-all whitespace-nowrap ${activeTab === "live" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
         >
           <BarChart3 className="w-4 h-4" /> Live Results
+          {isRealtimeConnected && (
+            <span className="relative flex h-2 w-2" title="Real-time updates active">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          )}
         </button>
         <button
           onClick={() => setActiveTab("history")}
@@ -351,7 +474,7 @@ export default function Results() {
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mb-8 print:hidden">
             <StatCard icon={TrendingUp} label="Voter Turnout" value={`${turnout}%`} variant="gold" />
             <StatCard icon={BarChart3} label="Voters Voted" value={profileCount > 0 ? `${votedCount.toLocaleString()} / ${profileCount.toLocaleString()}` : votedCount?.toLocaleString() ?? "0"} delay={100} />
-            <StatCard icon={Trophy} label="Positions" value={(positions ?? []).length} variant="navy" delay={200} />
+            <StatCard icon={Trophy} label="Positions" value={relevantPositions.length} variant="navy" delay={200} />
           </div>
 
           {/* Filter Dropdowns */}
@@ -367,7 +490,7 @@ export default function Results() {
                   className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Positions</option>
-                  {(positions ?? []).map((p) => (
+                  {relevantPositions.map((p) => (
                     <option key={p.id} value={p.id}>{p.title}</option>
                   ))}
                 </select>
@@ -379,19 +502,12 @@ export default function Results() {
                   id="results-grade-filter"
                   value={voterGrade}
                   onChange={(e) => handleGradeChange(e.target.value)}
-                  disabled={user && !isAdmin}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-75 disabled:cursor-not-allowed"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
-                  {user && !isAdmin ? (
-                    <option value={profile?.grade_level}>{profile?.grade_level}</option>
-                  ) : (
-                    <>
-                      <option value="all">All Grade Levels</option>
-                      {gradeLevels.map((g) => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                    </>
-                  )}
+                  <option value="all">All Grade Levels</option>
+                  {gradeLevels.map((g) => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
                 </select>
               </div>
 
@@ -429,15 +545,77 @@ export default function Results() {
             )}
           </div>
 
+          {/* Live Winners Summary */}
+          {filtered.length > 0 && (
+            <div className="bg-card border border-gold/20 rounded-xl p-5 mb-8 shadow-elegant print:hidden animate-fade-in">
+              <h3 className="font-display font-bold text-foreground text-base mb-4 flex items-center gap-2">
+                <Award className="w-5 h-5 text-gold" /> Winners Summary
+                {(voterGrade !== "all" || voterSection !== "all" || activePosition !== "all") && (
+                  <span className="text-xs font-normal text-muted-foreground ml-1">
+                    —{" "}
+                    {activePosition !== "all"
+                      ? (positions ?? []).find(p => String(p.id) === String(activePosition))?.title ?? "Selected Position"
+                      : "All Positions"}
+                    {voterGrade !== "all" ? ` · ${voterGrade}` : ""}
+                    {voterSection !== "all" ? ` · ${voterSection}` : ""}
+                  </span>
+                )}
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {filtered.map((group) => {
+                  const topCandidate = group.candidates[0];
+                  const hasVotes = topCandidate && (topCandidate.vote_count ?? 0) > 0;
+                  return (
+                    <div key={group.position.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/60 border border-border">
+                      <Trophy className={`w-4 h-4 flex-shrink-0 mt-0.5 ${hasVotes ? "text-gold" : "text-muted-foreground/30"}`} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">{group.position.title}</p>
+                        {hasVotes ? (
+                          <>
+                            <p className="text-sm font-semibold text-foreground truncate">{topCandidate.candidate_name}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {(topCandidate.vote_count ?? 0).toLocaleString()} vote{topCandidate.vote_count !== 1 ? "s" : ""}
+                              {group.candidates.length > 1 && group.candidates[1]?.candidate_name
+                                ? ` · vs ${group.candidates[1].candidate_name} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
+                                : ""}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="text-xs text-muted-foreground italic">No votes yet</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="space-y-6">
             {filtered.map((group, gi) => (
-              <div key={group.position.id} className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant animate-fade-in" style={{ animationDelay: `${gi * 100}ms` }}>
+              <div
+                key={group.position.id}
+                id={`position-${group.position.id}`}
+                className={`bg-card rounded-xl border overflow-hidden shadow-elegant animate-fade-in transition-all duration-300 ${
+                  activePosition !== "all" && String(activePosition) === String(group.position.id)
+                    ? "ring-2 ring-gold border-gold shadow-gold-sm scale-[1.01]"
+                    : "border-border"
+                }`}
+                style={{ animationDelay: `${gi * 100}ms` }}
+              >
                 <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
                   <div>
                     <h2 className="font-display font-bold text-primary-foreground text-lg">{group.position.title}</h2>
-                    <p className="text-xs text-primary-foreground/50">{group.totalVotes} total votes</p>
+                    <p className="text-xs text-primary-foreground/50">
+                      {group.totalVotes.toLocaleString()} total votes
+                      {hasVoterFilter && (
+                        <span className="ml-2 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-semibold uppercase tracking-wider">
+                          Filtered
+                        </span>
+                      )}
+                    </p>
                   </div>
-                  {group.candidates[0] && (
+                  {group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && (
                     <div className="flex items-center gap-2">
                       <Trophy className="w-4 h-4 text-gold" />
                       <span className="text-sm font-semibold text-gold">{group.candidates[0].candidate_name}</span>
@@ -459,7 +637,7 @@ export default function Results() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className="font-display font-bold text-foreground">{c.vote_count}</span>
+                            <span className="font-display font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</span>
                             <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
                           </div>
                         </div>
@@ -496,15 +674,21 @@ export default function Results() {
             <>
               {/* History Header Card */}
               <div className="bg-card border border-border rounded-xl p-5 mb-6 shadow-elegant">
-                <div className="flex flex-col sm:flex-row sm:items-end gap-4">
-                  <div className="flex-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* School Year */}
+                  <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide flex items-center gap-1.5">
                       <Calendar className="w-3.5 h-3.5" /> Select School Year
                     </p>
                     <select
                       value={selectedYear}
-                      onChange={(e) => { setSelectedYear(e.target.value); setHistoryPositionFilter("all"); }}
-                      className="w-full sm:max-w-xs px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
+                      onChange={(e) => {
+                        setSelectedYear(e.target.value);
+                        setHistoryPositionFilter("all");
+                        setHistoryGradeFilter("all");
+                        setHistorySectionFilter("all");
+                      }}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       {(electionHistory ?? []).map((e) => (
                         <option key={e.school_year} value={e.school_year}>
@@ -514,12 +698,13 @@ export default function Results() {
                     </select>
                   </div>
 
-                  <div className="flex-1">
+                  {/* Filter by Position */}
+                  <div>
                     <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Filter by Position</p>
                     <select
                       value={historyPositionFilter}
                       onChange={(e) => setHistoryPositionFilter(e.target.value)}
-                      className="w-full sm:max-w-xs px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value="all">All Positions</option>
                       {archivedPositionTitles.map((t) => (
@@ -527,7 +712,55 @@ export default function Results() {
                       ))}
                     </select>
                   </div>
+
+                  {/* Filter by Grade */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Filter by Grade</p>
+                    <select
+                      value={historyGradeFilter}
+                      onChange={(e) => handleHistoryGradeChange(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="all">All Grades</option>
+                      {archivedGradeLevels.map((g) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Filter by Section */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wide">Filter by Section</p>
+                    <select
+                      value={historySectionFilter}
+                      onChange={(e) => setHistorySectionFilter(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="all">All Sections</option>
+                      {archivedSections.map((s) => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
+
+                {/* Active filter indicator */}
+                {(historyGradeFilter !== "all" || historySectionFilter !== "all") && (
+                  <div className="mt-3 flex items-center gap-4 pt-3 border-t border-border">
+                    <p className="text-xs text-muted-foreground italic">
+                      Showing candidates from: <span className="text-foreground font-medium">
+                        {historyGradeFilter !== "all" ? historyGradeFilter : "All Grades"}
+                        {historySectionFilter !== "all" ? ` · ${historySectionFilter}` : ""}
+                      </span>
+                    </p>
+                    <button
+                      onClick={() => { setHistoryGradeFilter("all"); setHistorySectionFilter("all"); }}
+                      className="text-xs font-medium text-gold hover:text-gold/80 transition-colors"
+                    >
+                      ✕ Clear
+                    </button>
+                  </div>
+                )}
 
                 {selectedElection && (
                   <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
@@ -550,23 +783,43 @@ export default function Results() {
               </div>
 
               {/* Winners Summary Card */}
-              {archivedGrouped.length > 0 && (
+              {displayedArchivedGroups.length > 0 && (
                 <div className="bg-card border border-gold/20 rounded-xl p-5 mb-6 shadow-elegant">
                   <h3 className="font-display font-bold text-foreground text-base mb-4 flex items-center gap-2">
                     <Award className="w-5 h-5 text-gold" /> Winners Summary
+                    {(historyGradeFilter !== "all" || historySectionFilter !== "all" || historyPositionFilter !== "all") && (
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">
+                        —{" "}
+                        {historyPositionFilter !== "all" ? historyPositionFilter : "All Positions"}
+                        {historyGradeFilter !== "all" ? ` · ${historyGradeFilter}` : ""}
+                        {historySectionFilter !== "all" ? ` · ${historySectionFilter}` : ""}
+                      </span>
+                    )}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {archivedGrouped.map((group) => {
-                      const winners = group.candidates.filter(c => c.is_winner);
-                      if (winners.length === 0) return null;
+                    {displayedArchivedGroups.map((group) => {
+                      // Always show official winners from the archived data
+                      const officialWinners = group.candidates.filter(c => c.is_winner);
+                      const topCandidates = officialWinners.length > 0 ? officialWinners : [];
+
                       return (
-                        <div key={group.title} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-muted/60 border border-border">
-                          <Trophy className="w-4 h-4 text-gold flex-shrink-0" />
+                        <div key={group.title} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/60 border border-border">
+                          <Trophy className={`w-4 h-4 flex-shrink-0 mt-0.5 ${topCandidates.length > 0 ? "text-gold" : "text-muted-foreground/40"}`} />
                           <div className="min-w-0">
                             <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">{group.title}</p>
-                            {winners.map(w => (
-                              <p key={w.candidate_name} className="text-sm font-semibold text-foreground truncate">{w.candidate_name}</p>
-                            ))}
+                            {topCandidates.length > 0 ? (
+                              topCandidates.map(w => (
+                                <div key={w.candidate_name}>
+                                  <p className="text-sm font-semibold text-foreground truncate">{w.candidate_name}</p>
+                                  <p className="text-[10px] text-muted-foreground">
+                                    {(w.vote_count ?? 0).toLocaleString()} vote{(w.vote_count ?? 0) !== 1 ? "s" : ""}
+                                    {(w.candidate_grade || w.candidate_section) && ` · ${w.candidate_grade ?? ""}${w.candidate_section ? ` — ${w.candidate_section}` : ""}`}
+                                  </p>
+                                </div>
+                              ))
+                            ) : (
+                              <p className="text-xs text-muted-foreground italic">No candidates for this filter</p>
+                            )}
                           </div>
                         </div>
                       );
@@ -577,59 +830,101 @@ export default function Results() {
 
               {/* Full Results by Position */}
               <div className="space-y-6">
-                {filteredArchivedGrouped.map((group, gi) => (
-                  <div key={group.title} className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant animate-fade-in" style={{ animationDelay: `${gi * 100}ms` }}>
-                    <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <h2 className="font-display font-bold text-primary-foreground text-lg">{group.title}</h2>
-                        <p className="text-xs text-primary-foreground/50">{group.totalVotes} total votes</p>
-                      </div>
-                      {group.candidates.filter(c => c.is_winner).length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <Trophy className="w-4 h-4 text-gold" />
-                          <span className="text-sm font-semibold text-gold">
-                            {group.candidates.filter(c => c.is_winner).map(w => w.candidate_name).join(", ")}
-                          </span>
+                {displayedArchivedGroups.map((group, gi) => {
+                  const filteredSet = new Set((group.filteredCandidates ?? []).map(c => c.candidate_name));
+
+                  // Always use all candidates with their real vote counts
+                  const allCandidates = group.candidates;
+                  const allTotal = allCandidates.reduce((sum, c) => sum + (c.vote_count ?? 0), 0);
+
+                  // Official winners from the archived data
+                  const officialWinners = allCandidates.filter(c => c.is_winner);
+
+                  return (
+                    <div
+                      key={group.title}
+                      id={`archived-position-${group.title}`}
+                      className="bg-card rounded-xl border overflow-hidden shadow-elegant animate-fade-in transition-all duration-300 border-border"
+                      style={{ animationDelay: `${gi * 100}ms` }}
+                    >
+                      {/* Position Header */}
+                      <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <h2 className="font-display font-bold text-primary-foreground text-lg">{group.title}</h2>
+                          <p className="text-xs text-primary-foreground/50">
+                            {allTotal.toLocaleString()} total votes
+                            {hasHistoryFilter && (
+                              <span className="ml-2 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-semibold uppercase tracking-wider">
+                                Filtered
+                              </span>
+                            )}
+                          </p>
                         </div>
-                      )}
-                    </div>
-                    <div className="p-4 md:p-5 space-y-4">
-                      {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates in this position.</p>}
-                      {group.candidates.map((c, ci) => {
-                        const pct = group.totalVotes ? ((c.vote_count / group.totalVotes) * 100).toFixed(1) : "0";
-                        return (
-                          <div key={`${c.candidate_name}-${ci}`} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
-                            <div className="flex items-center justify-between mb-1.5">
-                              <div className="flex items-center gap-3">
-                                <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${c.is_winner ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
-                                  {c.rank}
-                                </span>
-                                <div>
-                                  <p className="font-semibold text-foreground text-sm flex items-center gap-1.5">
-                                    {c.candidate_name}
-                                    {c.is_winner && <Trophy className="w-3 h-3 text-gold" />}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {c.candidate_party}
-                                    {c.candidate_grade && ` · ${c.candidate_grade}`}
-                                    {c.candidate_section && ` — ${c.candidate_section}`}
-                                  </p>
+                        {officialWinners.length > 0 && (
+                          <div className="flex items-center gap-2">
+                            <Trophy className="w-4 h-4 text-gold" />
+                            <span className="text-sm font-semibold text-gold">
+                              {officialWinners.map(w => w.candidate_name).join(", ")}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Candidates List */}
+                      <div className="p-4 md:p-5 space-y-4">
+                        {allCandidates.length === 0 && (
+                          <p className="text-muted-foreground text-sm">No candidates in this position.</p>
+                        )}
+                        {allCandidates.map((c, ci) => {
+                          const pct = allTotal > 0
+                            ? (((c.vote_count ?? 0) / allTotal) * 100).toFixed(1)
+                            : "0";
+                          const isWinner = c.is_winner;
+                          // Candidate matches the active grade/section filter
+                          const isMatch = hasHistoryFilter && filteredSet.has(c.candidate_name);
+
+                          return (
+                            <div key={`${c.candidate_name}-${ci}`} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <div className="flex items-center gap-3">
+                                  <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${isWinner ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>
+                                    {c.rank}
+                                  </span>
+                                  <div>
+                                    <p className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                                      {c.candidate_name}
+                                      {isWinner && <Trophy className="w-3 h-3 text-gold" />}
+                                      {isMatch && (
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 font-bold uppercase tracking-wide">
+                                          {historyGradeFilter !== "all" ? historyGradeFilter : ""}{historySectionFilter !== "all" ? ` ${historySectionFilter}` : ""}
+                                        </span>
+                                      )}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {c.candidate_party}
+                                      {c.candidate_grade && ` · ${c.candidate_grade}`}
+                                      {c.candidate_section && ` — ${c.candidate_section}`}
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <span className="font-display font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</span>
+                                  <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <span className="font-display font-bold text-foreground">{c.vote_count}</span>
-                                <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                              <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full transition-all duration-1000 ${isWinner ? "gradient-gold" : "bg-navy-light/50"}`}
+                                  style={{ width: `${pct}%` }}
+                                />
                               </div>
                             </div>
-                            <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all duration-1000 ${c.is_winner ? "gradient-gold" : "bg-navy-light/50"}`} style={{ width: `${pct}%` }} />
-                            </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}
