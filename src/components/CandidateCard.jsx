@@ -37,7 +37,7 @@ export default function CandidateCard({
         </div>
       )}
       <div className="p-5">
-        <div className="w-32 h-32 rounded-full overflow-hidden flex items-center justify-center mx-auto mb-4 ring-4 ring-border">
+        <div className="w-44 h-44 rounded-full overflow-hidden flex items-center justify-center mx-auto mb-4 ring-4 ring-border">
           {candidate.avatar_url ? (
             <img src={candidate.avatar_url}
               alt={candidate.name} className="w-full h-full object-cover" />
