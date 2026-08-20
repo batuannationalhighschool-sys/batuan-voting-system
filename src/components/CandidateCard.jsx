@@ -48,7 +48,7 @@ export default function CandidateCard({
           )}
         </div>
         <div className="text-center">
-          <h3 className="font-display font-bold text-foreground text-lg">{candidate.name}</h3>
+          <h3 className="font-display font-bold text-foreground text-lg uppercase">{candidate.name}</h3>
           {positionTitle && <p className="text-sm font-semibold text-gold mt-0.5">{positionTitle}</p>}
           <div className="flex items-center justify-center gap-2 mt-2 text-xs text-muted-foreground">
             <span>{candidate.grade_level}</span>

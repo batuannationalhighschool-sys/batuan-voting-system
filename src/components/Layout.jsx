@@ -88,7 +88,7 @@ export default function Layout({ children }) {
                 })}
                 {user ? (
                   <div className="flex items-center gap-2 ml-2 pl-2 border-l border-primary-foreground/15">
-                    <span className="text-xs text-primary-foreground/60 max-w-[120px] truncate">{profile?.full_name || user.full_name}</span>
+                    <span className="text-xs text-primary-foreground/60 max-w-[120px] truncate uppercase">{profile?.full_name || user.full_name}</span>
                     <button onClick={() => setShowLogoutConfirm(true)} className="p-2 rounded-lg text-primary-foreground/60 hover:text-primary-foreground hover:bg-primary-foreground/5 transition-colors" title="Sign Out">
                       <LogOut className="w-4 h-4" />
                     </button>
@@ -132,7 +132,7 @@ export default function Layout({ children }) {
               <button onClick={() => { setShowLogoutConfirm(true); setMobileOpen(false); }}
                 className="flex items-center gap-3 mx-4 mt-1 px-4 py-3 rounded-lg text-sm font-medium text-primary-foreground/70 hover:text-primary-foreground w-full text-left">
                 <LogOut className="w-4 h-4" />
-                Sign Out ({profile?.full_name || user.full_name})
+                Sign Out (<span className="uppercase">{profile?.full_name || user.full_name}</span>)
               </button>
             ) : (
               <Link to="/auth" onClick={() => setMobileOpen(false)}

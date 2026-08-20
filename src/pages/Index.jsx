@@ -70,11 +70,21 @@ export default function Index() {
         <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle at 25% 25%, hsl(45 80% 55%) 1px, transparent 1px)", backgroundSize: "40px 40px" }} />
         <div className="container relative">
           <div className="flex flex-col items-center text-center max-w-3xl mx-auto">
-            <img 
-              src={schoolSeal} 
-              alt="Batuan National High School Seal" 
-              className="w-36 h-36 sm:w-44 sm:h-44 md:w-52 md:h-52 lg:w-60 lg:h-60 mb-8 animate-scale-in rounded-full ring-4 ring-gold/40 shadow-2xl object-cover hover:scale-105 transition-transform duration-300" 
-            />
+            <div className="relative group mb-8 md:mb-10 animate-scale-in">
+              {/* Ambient gold glow halo */}
+              <div className="absolute -inset-3 sm:-inset-4 md:-inset-6 rounded-full bg-gradient-to-tr from-gold/40 via-amber-300/30 to-gold/50 blur-2xl opacity-60 group-hover:opacity-90 transition-opacity duration-500" />
+              
+              {/* Multi-layered gold medallion bezel */}
+              <div className="relative p-2 sm:p-2.5 md:p-3.5 rounded-full bg-gradient-to-b from-amber-200 via-gold to-amber-700 shadow-[0_12px_40px_rgba(217,160,20,0.4)] ring-2 ring-gold/50">
+                <div className="p-1 sm:p-1.5 rounded-full bg-[#0a1529] shadow-inner">
+                  <img 
+                    src={schoolSeal} 
+                    alt="Batuan National High School Seal" 
+                    className="w-52 h-52 sm:w-64 sm:h-64 md:w-80 md:h-80 lg:w-96 lg:h-96 rounded-full object-cover shadow-2xl transition-transform duration-500 group-hover:scale-[1.02]" 
+                  />
+                </div>
+              </div>
+            </div>
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-display font-extrabold text-primary-foreground leading-tight animate-fade-in">
               {electionLabel}{" "}
               <span className="inline-block text-gradient-gold ml-2">{electionYear}</span>
@@ -94,22 +104,26 @@ export default function Index() {
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-3 mt-8 animate-fade-in" style={{ animationDelay: "400ms" }}>
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-5 mt-9 animate-fade-in" style={{ animationDelay: "400ms" }}>
               {user ? (
                 isAdmin ? (
-                  <Link to="/admin" className="px-8 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold hover:opacity-90 transition-opacity">Admin Dashboard</Link>
+                  <Link to="/admin" className="px-9 py-3.5 sm:px-10 sm:py-4 rounded-2xl gradient-navy text-primary-foreground font-bold text-base sm:text-lg hover:opacity-90 transition-all shadow-lg hover:scale-105">
+                    Admin Dashboard
+                  </Link>
                 ) : (
-                  <Link to="/vote" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">
+                  <Link to="/vote" className="px-9 py-3.5 sm:px-10 sm:py-4 rounded-2xl gradient-gold text-accent-foreground font-bold text-base sm:text-lg shadow-gold hover:opacity-90 transition-all hover:scale-105">
                     {settings?.status === "upcoming" ? "Election Upcoming" : settings?.status === "completed" ? "Election Completed" : "Cast Your Vote"}
                   </Link>
                 )
               ) : (
-                <Link to="/auth" className="px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity flex items-center gap-2">
-                  <LogIn className="w-4 h-4" />
+                <Link to="/auth" className="px-9 py-3.5 sm:px-10 sm:py-4 rounded-2xl gradient-gold text-accent-foreground font-bold text-base sm:text-lg shadow-gold hover:opacity-90 transition-all hover:scale-105 flex items-center gap-2.5">
+                  <LogIn className="w-5 h-5" />
                   Sign In to Vote
                 </Link>
               )}
-              <Link to="/candidates" className="px-8 py-3 rounded-xl bg-primary-foreground/10 text-primary-foreground font-semibold hover:bg-primary-foreground/15 transition-colors border border-primary-foreground/10">View Candidates</Link>
+              <Link to="/candidates" className="px-9 py-3.5 sm:px-10 sm:py-4 rounded-2xl bg-primary-foreground/10 text-primary-foreground font-bold text-base sm:text-lg hover:bg-primary-foreground/15 transition-all hover:scale-105 border border-primary-foreground/15 shadow-lg">
+                View Candidates
+              </Link>
             </div>
           </div>
         </div>
@@ -136,7 +150,7 @@ export default function Index() {
                 <div key={c.candidate_id} className="flex items-center gap-4 bg-card rounded-xl border border-border p-4 shadow-elegant animate-slide-in-right" style={{ animationDelay: `${i * 80}ms` }}>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${i === 0 ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{i + 1}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate">{c.candidate_name}</p>
+                    <p className="font-semibold text-foreground truncate uppercase">{c.candidate_name}</p>
                     <p className="text-xs text-muted-foreground">{c.position_title} · {c.party_list}</p>
                   </div>
                   <div className="text-right">

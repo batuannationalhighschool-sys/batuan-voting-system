@@ -998,56 +998,44 @@ app.get('/api/votes/counts', async (req, res) => {
       return res.json(rows);
     }
 
-    // Build a filtered query — we need to do this via raw SQL since the view
-    // doesn't support filtering by voter demographics
-    // Use supabase.rpc or build the query manually
-    let query = supabase
-      .from('candidates')
-      .select(`
-        id,
-        name,
-        position_id,
-        party_list,
-        grade_level,
-        section,
-        motto,
-        positions!inner (title, display_order)
-      `);
-
-    const { data: candidates, error: candError } = await query;
-    if (candError) throw candError;
-
-    // Get filtered votes
-    let votesQuery = supabase
-      .from('votes')
-      .select('candidate_id, voter_id, profiles!inner(grade_level, section)')
-      .eq('profiles.user_id', undefined); // This won't work — we need a different approach
-
-    // Alternative: get all votes with profile info
-    const { data: allVotes, error: votesError } = await supabase
-      .from('votes')
-      .select('candidate_id, voter_id');
-
-    if (votesError) throw votesError;
-
-    // Get profiles for filtering
-    let profilesQuery = supabase.from('profiles').select('user_id, grade_level, section');
+    // Efficient DB-level filtering: get matching voter IDs, then count their votes
+    // 1. Get voter IDs whose profile matches the grade/section filter (active voters only)
+    let profilesQuery = supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('archived', false);
     if (voter_grade) profilesQuery = profilesQuery.eq('grade_level', voter_grade);
     if (voter_section) profilesQuery = profilesQuery.eq('section', voter_section);
 
     const { data: filteredProfiles, error: profError } = await profilesQuery;
     if (profError) throw profError;
 
-    const filteredVoterIds = new Set(filteredProfiles.map(p => p.user_id));
+    const filteredVoterIds = filteredProfiles.map(p => p.user_id);
 
-    // Count votes per candidate from filtered voters only
-    const voteCounts = {};
-    for (const v of allVotes) {
-      if (filteredVoterIds.has(v.voter_id)) {
-        voteCounts[v.candidate_id] = (voteCounts[v.candidate_id] || 0) + 1;
+    // 2. Get all candidates with position info
+    const { data: candidates, error: candError } = await supabase
+      .from('candidates')
+      .select('id, name, position_id, party_list, grade_level, section, motto, positions!inner(title, display_order)');
+    if (candError) throw candError;
+
+    // 3. Count votes per candidate from filtered voters only (fetched from DB in batches)
+    const voteCountMap = {};
+    if (filteredVoterIds.length > 0) {
+      const CHUNK = 500;
+      for (let i = 0; i < filteredVoterIds.length; i += CHUNK) {
+        const chunk = filteredVoterIds.slice(i, i + CHUNK);
+        const { data: votes, error: vErr } = await supabase
+          .from('votes')
+          .select('candidate_id')
+          .in('voter_id', chunk);
+        if (vErr) throw vErr;
+        for (const v of votes) {
+          voteCountMap[v.candidate_id] = (voteCountMap[v.candidate_id] || 0) + 1;
+        }
       }
     }
 
+    // 4. Build response rows
     const rows = candidates.map(c => ({
       candidate_id: c.id,
       candidate_name: c.name,
@@ -1058,7 +1046,7 @@ app.get('/api/votes/counts', async (req, res) => {
       motto: c.motto,
       position_title: c.positions.title,
       display_order: c.positions.display_order,
-      vote_count: voteCounts[c.id] || 0,
+      vote_count: voteCountMap[c.id] || 0,
     }));
 
     rows.sort((a, b) => {

@@ -39,7 +39,12 @@ export default function AuthPage() {
     <div className="min-h-[80vh] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8 animate-fade-in">
-          <img src={schoolSeal} alt="BNHS Seal" className="w-28 h-28 rounded-full mx-auto mb-4 ring-4 ring-gold/30 shadow-lg object-cover" />
+          <div className="inline-block relative group mb-4">
+            <div className="absolute -inset-2 rounded-full bg-gold/20 blur-lg opacity-70 group-hover:opacity-100 transition-opacity" />
+            <div className="relative p-1.5 rounded-full bg-gradient-to-b from-amber-200 via-gold to-amber-600 shadow-gold shadow-lg">
+              <img src={schoolSeal} alt="BNHS Seal" className="w-32 h-32 md:w-36 md:h-36 rounded-full object-cover shadow-md" />
+            </div>
+          </div>
           <h1 className="text-2xl md:text-3xl font-display font-bold text-foreground">
             Welcome
           </h1>

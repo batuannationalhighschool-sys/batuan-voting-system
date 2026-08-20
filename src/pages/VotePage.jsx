@@ -198,7 +198,7 @@ export default function VotePage() {
                 return (
                   <div key={`${posId}-${idx}`} className="flex justify-between py-1.5 text-sm border-b border-border last:border-0">
                     <span className="text-muted-foreground">{pos?.title}{(pos?.max_votes ?? 1) > 1 ? ` (${idx + 1})` : ''}</span>
-                    <span className="font-medium text-foreground">{cand?.name}</span>
+                    <span className="font-medium text-foreground uppercase">{cand?.name}</span>
                   </div>
                 );
               });

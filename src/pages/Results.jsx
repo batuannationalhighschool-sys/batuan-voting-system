@@ -572,11 +572,11 @@ export default function Results() {
                         <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">{group.position.title}</p>
                         {hasVotes ? (
                           <>
-                            <p className="text-sm font-semibold text-foreground truncate">{topCandidate.candidate_name}</p>
+                            <p className="text-sm font-semibold text-foreground truncate uppercase">{topCandidate.candidate_name}</p>
                             <p className="text-[10px] text-muted-foreground">
                               {(topCandidate.vote_count ?? 0).toLocaleString()} vote{topCandidate.vote_count !== 1 ? "s" : ""}
                               {group.candidates.length > 1 && group.candidates[1]?.candidate_name
-                                ? ` · vs ${group.candidates[1].candidate_name} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
+                                ? ` · vs ${group.candidates[1].candidate_name.toUpperCase()} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
                                 : ""}
                             </p>
                           </>
@@ -618,7 +618,7 @@ export default function Results() {
                   {group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && (
                     <div className="flex items-center gap-2">
                       <Trophy className="w-4 h-4 text-gold" />
-                      <span className="text-sm font-semibold text-gold">{group.candidates[0].candidate_name}</span>
+                      <span className="text-sm font-semibold text-gold uppercase">{group.candidates[0].candidate_name}</span>
                     </div>
                   )}
                 </div>
@@ -632,7 +632,7 @@ export default function Results() {
                           <div className="flex items-center gap-3">
                             <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${ci === 0 ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{ci + 1}</span>
                             <div>
-                              <p className="font-semibold text-foreground text-sm">{c.candidate_name}</p>
+                              <p className="font-semibold text-foreground text-sm uppercase">{c.candidate_name}</p>
                               <p className="text-xs text-muted-foreground">{c.party_list}</p>
                             </div>
                           </div>
@@ -810,7 +810,7 @@ export default function Results() {
                             {topCandidates.length > 0 ? (
                               topCandidates.map(w => (
                                 <div key={w.candidate_name}>
-                                  <p className="text-sm font-semibold text-foreground truncate">{w.candidate_name}</p>
+                                  <p className="text-sm font-semibold text-foreground truncate uppercase">{w.candidate_name}</p>
                                   <p className="text-[10px] text-muted-foreground">
                                     {(w.vote_count ?? 0).toLocaleString()} vote{(w.vote_count ?? 0) !== 1 ? "s" : ""}
                                     {(w.candidate_grade || w.candidate_section) && ` · ${w.candidate_grade ?? ""}${w.candidate_section ? ` — ${w.candidate_section}` : ""}`}
@@ -863,7 +863,7 @@ export default function Results() {
                         {officialWinners.length > 0 && (
                           <div className="flex items-center gap-2">
                             <Trophy className="w-4 h-4 text-gold" />
-                            <span className="text-sm font-semibold text-gold">
+                            <span className="text-sm font-semibold text-gold uppercase">
                               {officialWinners.map(w => w.candidate_name).join(", ")}
                             </span>
                           </div>
@@ -891,11 +891,11 @@ export default function Results() {
                                     {c.rank}
                                   </span>
                                   <div>
-                                    <p className="font-semibold text-foreground text-sm flex items-center gap-1.5">
+                                    <p className="font-semibold text-foreground text-sm flex items-center gap-1.5 uppercase">
                                       {c.candidate_name}
                                       {isWinner && <Trophy className="w-3 h-3 text-gold" />}
                                       {isMatch && (
-                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 font-bold uppercase tracking-wide">
+                                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500 font-bold uppercase tracking-wide normal-case">
                                           {historyGradeFilter !== "all" ? historyGradeFilter : ""}{historySectionFilter !== "all" ? ` ${historySectionFilter}` : ""}
                                         </span>
                                       )}

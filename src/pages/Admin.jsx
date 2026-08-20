@@ -698,7 +698,7 @@ export default function Admin() {
                           <tr key={i} className={`border-t border-border ${hasError ? 'bg-destructive/5' : ''}`}>
                             <td className="p-2.5 text-muted-foreground">{i + 1}</td>
                             <td className={`p-2.5 font-mono ${hasError ? 'text-destructive' : 'text-foreground'}`}>{row.lrn || <span className="italic text-destructive">missing</span>}</td>
-                            <td className={`p-2.5 ${!row.full_name ? 'text-destructive italic' : 'text-foreground'}`}>{row.full_name || 'missing'}</td>
+                            <td className={`p-2.5 uppercase ${!row.full_name ? 'text-destructive italic' : 'text-foreground'}`}>{row.full_name || 'missing'}</td>
                             <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.grade_level || '—'}</td>
                             <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.section || '—'}</td>
                           </tr>
@@ -826,7 +826,7 @@ export default function Admin() {
                   {filteredVoters.map((v) => (
                     <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="p-4 font-mono text-foreground text-xs">{v.lrn}</td>
-                      <td className="p-4 font-medium text-foreground">{v.full_name}</td>
+                      <td className="p-4 font-medium text-foreground uppercase">{v.full_name}</td>
                       <td className="p-4 text-muted-foreground hidden sm:table-cell">{v.grade_level && v.section ? `${v.grade_level} — ${v.section}` : <span className="text-xs italic">Not set</span>}</td>
                       <td className="p-4 hidden md:table-cell">
                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -932,7 +932,7 @@ export default function Admin() {
                         return (
                           <tr key={i} className={`border-t border-border ${hasError ? 'bg-destructive/5' : ''}`}>
                             <td className="p-2.5 text-muted-foreground">{i + 1}</td>
-                            <td className={`p-2.5 ${!row.name ? 'text-destructive italic' : 'text-foreground font-medium'}`}>{row.name || 'missing'}</td>
+                            <td className={`p-2.5 uppercase ${!row.name ? 'text-destructive italic' : 'text-foreground font-medium'}`}>{row.name || 'missing'}</td>
                             <td className={`p-2.5 ${!posValid ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
                               {row.position ? row.position : <span className="italic text-destructive">missing</span>}
                               {row.position && !posValid && <span className="text-[10px] block text-destructive">(invalid position)</span>}
@@ -1111,7 +1111,7 @@ export default function Admin() {
                     const pos = (positions ?? []).find((p) => p.id === c.position_id);
                     return (
                       <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
-                        <td className="p-4 font-medium text-foreground">{c.name}</td>
+                        <td className="p-4 font-medium text-foreground uppercase">{c.name}</td>
                         <td className="p-4 text-muted-foreground">{pos?.title}</td>
                         <td className="p-4 text-muted-foreground hidden sm:table-cell">{c.party_list}</td>
                         <td className="p-4 text-muted-foreground hidden md:table-cell">{c.section}</td>
@@ -1157,7 +1157,7 @@ export default function Admin() {
             <p className="text-sm text-muted-foreground mb-1">
               {(deleteTarget.type === 'candidate' || deleteTarget.type === 'voter') ? 'Are you sure you want to archive' : 'Are you sure you want to permanently delete'}
             </p>
-            <p className="font-semibold text-foreground mb-5">{deleteTarget.name}?</p>
+            <p className="font-semibold text-foreground mb-5 uppercase">{deleteTarget.name}?</p>
             <p className="text-xs text-muted-foreground mb-6">
               {deleteTarget.type === 'candidate'
                 ? "This candidate will be archived and removed from the ballot. You can restore them from the Archive tab."
@@ -1206,7 +1206,7 @@ export default function Admin() {
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-1">Reset password for</p>
-            <p className="font-semibold text-foreground mb-2">{resetTarget.name}</p>
+            <p className="font-semibold text-foreground mb-2 uppercase">{resetTarget.name}</p>
             <p className="text-sm text-muted-foreground mb-5">
               The password will be reset to their LRN: <span className="font-mono font-medium text-foreground">{resetTarget.lrn}</span>
             </p>
@@ -1567,7 +1567,7 @@ export default function Admin() {
                       {filteredArchived.map((v) => (
                         <tr key={v.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                           <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{v.lrn}</td>
-                          <td className="py-3 px-3 font-medium text-foreground">{v.full_name}</td>
+                          <td className="py-3 px-3 font-medium text-foreground uppercase">{v.full_name}</td>
                           <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">
                             {v.grade_level && v.section ? `${v.grade_level} — ${v.section}` : <span className="italic text-xs">Not set</span>}
                           </td>
@@ -1666,7 +1666,7 @@ export default function Admin() {
                               </div>
                             )}
                           </td>
-                          <td className="py-3 px-3 font-medium text-foreground">{c.name}</td>
+                          <td className="py-3 px-3 font-medium text-foreground uppercase">{c.name}</td>
                           <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{c.position_title || '—'}</td>
                           <td className="py-3 px-3 text-muted-foreground hidden md:table-cell">{c.party_list || '—'}</td>
                           <td className="py-3 px-3 text-xs text-muted-foreground">
