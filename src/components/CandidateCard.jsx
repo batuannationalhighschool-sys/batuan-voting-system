@@ -37,13 +37,13 @@ export default function CandidateCard({
         </div>
       )}
       <div className="p-5">
-        <div className="w-16 h-16 rounded-full overflow-hidden flex items-center justify-center mx-auto mb-4 ring-2 ring-border">
+        <div className="w-32 h-32 rounded-full overflow-hidden flex items-center justify-center mx-auto mb-4 ring-4 ring-border">
           {candidate.avatar_url ? (
-            <img src={`${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:3001'}${candidate.avatar_url}`}
+            <img src={candidate.avatar_url}
               alt={candidate.name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full gradient-navy flex items-center justify-center">
-              <User className="w-8 h-8 text-gold" />
+              <User className="w-12 h-12 text-gold" />
             </div>
           )}
         </div>

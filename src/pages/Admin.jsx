@@ -121,7 +121,7 @@ export default function Admin() {
   const openEditModal = (c) => {
     setEditCandidate({ id: c.id, name: c.name, position_id: c.position_id, grade_level: c.grade_level, section: c.section, party_list: c.party_list, motto: c.motto || '' });
     setEditPhotoFile(null);
-    setEditPhotoPreview(c.avatar_url ? `${import.meta.env.VITE_API_URL ? import.meta.env.VITE_API_URL.replace('/api', '') : 'http://localhost:3001'}${c.avatar_url}` : null);
+    setEditPhotoPreview(c.avatar_url ? c.avatar_url : null);
   };
 
   const closeEditModal = () => {
