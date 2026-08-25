@@ -1,0 +1,197 @@
+{
+  "path": "C:\\Users\\johnley\\Downloads\\CargoExpressFlowchart.docx",
+  "sha256": "f8e1fc694236849bac32769cbee199f422efc7d9de703f5aec319cc344f44c4e",
+  "size": 1760053,
+  "package_parts": 19,
+  "paragraphs": [
+    {
+      "style": null,
+      "text": "Figure 2. Landing Page Flowchart "
+    },
+    {
+      "style": "Heading1",
+      "text": "Figure 3. Customer Dashboard Flowchart "
+    },
+    {
+      "style": "Heading1",
+      "text": "Figure 4. Admin Dashboard Flowchart "
+    },
+    {
+      "style": null,
+      "text": "Figure 5. Orders and Trips Management Flowchart "
+    },
+    {
+      "style": "Heading1",
+      "text": "Figure 6. Inbox Admin Flowchart "
+    },
+    {
+      "style": null,
+      "text": "Figure 7. Inquiries and Customer Feedback Flowchart "
+    },
+    {
+      "style": null,
+      "text": "FIGURE 8. Company Information Flowchart "
+    }
+  ],
+  "drawings": [
+    {
+      "text": "",
+      "cx": "8689271",
+      "cy": "4093210"
+    },
+    {
+      "text": "",
+      "cx": "7266766",
+      "cy": "5455285"
+    },
+    {
+      "text": "",
+      "cx": "8955405",
+      "cy": "5148580"
+    },
+    {
+      "text": "",
+      "cx": "8134911",
+      "cy": "3709670"
+    },
+    {
+      "text": "",
+      "cx": "8133025",
+      "cy": "5445125"
+    },
+    {
+      "text": "",
+      "cx": "5467350",
+      "cy": "4848860"
+    },
+    {
+      "text": "",
+      "cx": "7304406",
+      "cy": "4807541"
+    }
+  ],
+  "sections": [
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "15840"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "1448",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "1428",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "1461",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "2160",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "720",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "720",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "2160",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "4689",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "962",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "1440",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "720",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "720",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "15840"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "1440",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "1433",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "1440",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "2160",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "720",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "720",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    }
+  ],
+  "media": [
+    {
+      "name": "word/media/image1.png",
+      "size": 202506,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image1.png"
+    },
+    {
+      "name": "word/media/image2.png",
+      "size": 284424,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image2.png"
+    },
+    {
+      "name": "word/media/image3.png",
+      "size": 355219,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image3.png"
+    },
+    {
+      "name": "word/media/image4.png",
+      "size": 227932,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image4.png"
+    },
+    {
+      "name": "word/media/image5.png",
+      "size": 220740,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image5.png"
+    },
+    {
+      "name": "word/media/image6.png",
+      "size": 218894,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image6.png"
+    },
+    {
+      "name": "word/media/image7.png",
+      "size": 234140,
+      "extracted": "C:\\batuan-voting\\flowchart_build\\reference_inspection\\image7.png"
+    }
+  ],
+  "style_ids": [
+    "DefaultParagraphFont",
+    "Heading1",
+    "Heading1Char",
+    "NoList",
+    "Normal",
+    "TableGrid",
+    "TableNormal"
+  ],
+  "all_parts": [
+    "[Content_Types].xml",
+    "_rels/.rels",
+    "word/document.xml",
+    "word/_rels/document.xml.rels",
+    "word/media/image1.png",
+    "word/media/image2.png",
+    "word/media/image3.png",
+    "word/media/image4.png",
+    "word/media/image5.png",
+    "word/media/image6.png",
+    "word/media/image7.png",
+    "word/theme/theme1.xml",
+    "word/settings.xml",
+    "word/numbering.xml",
+    "word/styles.xml",
+    "word/webSettings.xml",
+    "word/fontTable.xml",
+    "docProps/core.xml",
+    "docProps/app.xml"
+  ]
+}

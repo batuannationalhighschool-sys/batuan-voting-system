@@ -1,0 +1,2997 @@
+{
+  "path": "Batuan_Voting_System_Editable_Flowcharts.docx",
+  "sha256": "53f2de892a0087e6e3414acb9cdcf612126126fd3a8aac2a3114c420d6c97661",
+  "size": 55628,
+  "package_parts": 19,
+  "paragraphs": [
+    {
+      "style": null,
+      "text": "BATUAN NATIONAL HIGH SCHOOL"
+    },
+    {
+      "style": null,
+      "text": "SUPREME SECONDARY LEARNER GOVERNMENT (SSLG)"
+    },
+    {
+      "style": null,
+      "text": "Automated Voting & Management System"
+    },
+    {
+      "style": null,
+      "text": "Editable Word-native Flowchart Set | Version 1.0"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM BASIS"
+    },
+    {
+      "style": null,
+      "text": "Active React/Vite routes, Supabase queries/RPCs, and PostgreSQL schema in the batuan-voting workspace."
+    },
+    {
+      "style": null,
+      "text": "REFERENCE BASIS"
+    },
+    {
+      "style": null,
+      "text": "CargoExpressFlowchart.docx and the CargoExpressPH source tree; Figure 2\u20138 decomposition retained as the organizing pattern."
+    },
+    {
+      "style": null,
+      "text": "EDITABLE FORMAT"
+    },
+    {
+      "style": null,
+      "text": "All flowchart nodes are Word table cells with editable text and formatting. No diagram screenshot is embedded."
+    },
+    {
+      "style": null,
+      "text": "PRIMARY ROLES"
+    },
+    {
+      "style": null,
+      "text": "Public visitor, student voter, and administrator / election manager."
+    },
+    {
+      "style": null,
+      "text": "Flowchart symbol key"
+    },
+    {
+      "style": null,
+      "text": "The diagram pages use a dark canvas with light, editable node cells to echo the supplied reference while keeping content customizable in Word."
+    },
+    {
+      "style": null,
+      "text": "TERMINAL"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "DECISION"
+    },
+    {
+      "style": null,
+      "text": "PROCESS"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "START / END"
+    },
+    {
+      "style": null,
+      "text": "Menu / form"
+    },
+    {
+      "style": null,
+      "text": "Condition"
+    },
+    {
+      "style": null,
+      "text": "Save / update"
+    },
+    {
+      "style": null,
+      "text": "Display"
+    },
+    {
+      "style": null,
+      "text": "Off-page"
+    },
+    {
+      "style": null,
+      "text": "Customization note"
+    },
+    {
+      "style": null,
+      "text": "To customize: click inside any node cell, replace the text, then adjust the cell fill/border if needed. Use the Y/N columns as branch labels; duplicate a row when adding a new decision. The structure is intentionally table-based so it remains editable in Word, LibreOffice, and Google Docs import."
+    },
+    {
+      "style": null,
+      "text": "Current-system accuracy note"
+    },
+    {
+      "style": null,
+      "text": "The active client routes data through src/api/client.js to Supabase public reads and app_* PostgreSQL RPCs. The legacy README wording about Express/MySQL is not used as the source of truth for these flowcharts."
+    },
+    {
+      "style": null,
+      "text": "Figure 2. Public Landing Page & Authentication"
+    },
+    {
+      "style": null,
+      "text": "Entry routes: /, /auth, /change-password | Branch labels Y = yes, N = no"
+    },
+    {
+      "style": null,
+      "text": "TERMINAL"
+    },
+    {
+      "style": null,
+      "text": "START"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Load public landing page"
+    },
+    {
+      "style": null,
+      "text": "/"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Choices:"
+    },
+    {
+      "style": null,
+      "text": "A. Home / Overview"
+    },
+    {
+      "style": null,
+      "text": "B. Candidates"
+    },
+    {
+      "style": null,
+      "text": "C. Results"
+    },
+    {
+      "style": null,
+      "text": "D. Sign In"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "A"
+    },
+    {
+      "style": null,
+      "text": "if choice == Home / Overview"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display election status, date, turnout stats, leading candidates, and quick actions"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice B"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "/election-settings"
+    },
+    {
+      "style": null,
+      "text": "/stats"
+    },
+    {
+      "style": null,
+      "text": "/candidates"
+    },
+    {
+      "style": null,
+      "text": "/positions"
+    },
+    {
+      "style": null,
+      "text": "B"
+    },
+    {
+      "style": null,
+      "text": "if choice == Candidates"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display active candidate directory; search by name / party / section and filter by position"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice C"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "/candidates"
+    },
+    {
+      "style": null,
+      "text": "/positions"
+    },
+    {
+      "style": null,
+      "text": "C"
+    },
+    {
+      "style": null,
+      "text": "if choice == Results"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display Live Results or Past Elections with position, grade, and section filters"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice D"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "/votes/counts"
+    },
+    {
+      "style": null,
+      "text": "/election-history"
+    },
+    {
+      "style": null,
+      "text": "D"
+    },
+    {
+      "style": null,
+      "text": "if choice == Sign In"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Enter LRN / admin username + password"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 loop"
+    },
+    {
+      "style": null,
+      "text": "Return to public choices"
+    },
+    {
+      "style": null,
+      "text": "POST"
+    },
+    {
+      "style": null,
+      "text": "/auth/login \u2192 app_login"
+    },
+    {
+      "style": null,
+      "text": "1"
+    },
+    {
+      "style": null,
+      "text": "Credentials valid?"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Check role"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Show login error toast; retry credentials"
+    },
+    {
+      "style": null,
+      "text": "AUTH"
+    },
+    {
+      "style": null,
+      "text": "Store auth_token; fetch /auth/me"
+    },
+    {
+      "style": null,
+      "text": "2"
+    },
+    {
+      "style": null,
+      "text": "isAdmin == true?"
+    },
+    {
+      "style": null,
+      "text": "Y \u2192 1"
+    },
+    {
+      "style": null,
+      "text": "Admin Dashboard /admin"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Check must_change_password"
+    },
+    {
+      "style": null,
+      "text": "ROLE"
+    },
+    {
+      "style": null,
+      "text": "user_roles = admin or voter"
+    },
+    {
+      "style": null,
+      "text": "3"
+    },
+    {
+      "style": null,
+      "text": "must_change_password?"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Change password (minimum 6 chars)"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 2"
+    },
+    {
+      "style": null,
+      "text": "Student Voter Dashboard /"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "app_change_password"
+    },
+    {
+      "style": null,
+      "text": "clear flag; refresh session"
+    },
+    {
+      "style": null,
+      "text": "SUCCESS"
+    },
+    {
+      "style": null,
+      "text": "Password saved \u2192 Student Voter Dashboard"
+    },
+    {
+      "style": null,
+      "text": "\u2192 2"
+    },
+    {
+      "style": null,
+      "text": "Voter portal"
+    },
+    {
+      "style": null,
+      "text": "Public routes remain accessible without a session"
+    },
+    {
+      "style": null,
+      "text": "SECURITY"
+    },
+    {
+      "style": null,
+      "text": "Invalid token \u2192 clear local auth_token"
+    },
+    {
+      "style": null,
+      "text": "Implementation anchors"
+    },
+    {
+      "style": null,
+      "text": "src/App.jsx routes /, /auth, /change-password; src/contexts/AuthContext.jsx handles signIn, fetchMe, role, must_change_password, and signOut."
+    },
+    {
+      "style": null,
+      "text": "Figure 3. Student Voter Dashboard & Ballot Casting"
+    },
+    {
+      "style": null,
+      "text": "Student route: / | Voting route: /vote | Candidate route: /candidates | Results route: /results"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "2"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Student Voter Dashboard"
+    },
+    {
+      "style": null,
+      "text": "/"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Choices:"
+    },
+    {
+      "style": null,
+      "text": "1. Dashboard"
+    },
+    {
+      "style": null,
+      "text": "2. Candidates"
+    },
+    {
+      "style": null,
+      "text": "3. Cast Vote"
+    },
+    {
+      "style": null,
+      "text": "4. Results"
+    },
+    {
+      "style": null,
+      "text": "5. Account"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Display voter status"
+    },
+    {
+      "style": null,
+      "text": "Not voted / Voted"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "1"
+    },
+    {
+      "style": null,
+      "text": "Dashboard"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Show election status, date, turnout, voter status, and quick actions"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 2"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "/election-settings"
+    },
+    {
+      "style": null,
+      "text": "/stats"
+    },
+    {
+      "style": null,
+      "text": "/auth/me"
+    },
+    {
+      "style": null,
+      "text": "2"
+    },
+    {
+      "style": null,
+      "text": "Candidates"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Browse candidate cards; filter by position; view party and motto"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 3"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "/candidates"
+    },
+    {
+      "style": null,
+      "text": "/positions"
+    },
+    {
+      "style": null,
+      "text": "3"
+    },
+    {
+      "style": null,
+      "text": "Cast Vote"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Check election status"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 4"
+    },
+    {
+      "style": null,
+      "text": "GUARD"
+    },
+    {
+      "style": null,
+      "text": "User required; admins cannot vote"
+    },
+    {
+      "style": null,
+      "text": "4"
+    },
+    {
+      "style": null,
+      "text": "status == ongoing?"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Check profile.has_voted"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Show Upcoming / Voting Has Ended; link to candidates or results"
+    },
+    {
+      "style": null,
+      "text": "STATE"
+    },
+    {
+      "style": null,
+      "text": "upcoming \u2192 ongoing \u2192 completed"
+    },
+    {
+      "style": null,
+      "text": "5"
+    },
+    {
+      "style": null,
+      "text": "has_voted?"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display You've Already Voted; link to Results"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Load ballot positions and candidates"
+    },
+    {
+      "style": null,
+      "text": "FILTER"
+    },
+    {
+      "style": null,
+      "text": "Grade Representative positions match voter grade"
+    },
+    {
+      "style": null,
+      "text": "BALLOT"
+    },
+    {
+      "style": null,
+      "text": "Select candidates per position"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Selection count <= position.max_votes"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Toast: max selection reached; deselect first"
+    },
+    {
+      "style": null,
+      "text": "RULE"
+    },
+    {
+      "style": null,
+      "text": "P.I.O. and Peace Officer allow up to 2"
+    },
+    {
+      "style": null,
+      "text": "SUBMIT"
+    },
+    {
+      "style": null,
+      "text": "Submit Final Vote"
+    },
+    {
+      "style": null,
+      "text": "SUCCESS"
+    },
+    {
+      "style": null,
+      "text": "Vote Submitted; refresh profile and results"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Show vote failed toast; remain on ballot"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_submit_votes \u2192 insert votes; set has_voted = true"
+    },
+    {
+      "style": null,
+      "text": "5.1 / 5.2"
+    },
+    {
+      "style": null,
+      "text": "Account: Change Password or Sign Out"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Save password or clear local auth_token"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Return to account choices"
+    },
+    {
+      "style": null,
+      "text": "END"
+    },
+    {
+      "style": null,
+      "text": "Sign out clears user/profile/admin state"
+    },
+    {
+      "style": null,
+      "text": "Implementation anchors"
+    },
+    {
+      "style": null,
+      "text": "src/pages/VotePage.jsx enforces client guards and selection limits; server/schema.sql app_submit_votes enforces authentication, election state, grade representative matching, max_votes, and duplicate-vote protection."
+    },
+    {
+      "style": null,
+      "text": "Figure 4. Administrator Dashboard & Navigation Hub"
+    },
+    {
+      "style": null,
+      "text": "Admin panel tabs 1\u20135; global navigation also exposes Results and Sign Out"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "1"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Admin Dashboard"
+    },
+    {
+      "style": null,
+      "text": "/admin"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Choices:"
+    },
+    {
+      "style": null,
+      "text": "1. Overview"
+    },
+    {
+      "style": null,
+      "text": "2. Voters"
+    },
+    {
+      "style": null,
+      "text": "3. Candidates"
+    },
+    {
+      "style": null,
+      "text": "4. Archive"
+    },
+    {
+      "style": null,
+      "text": "5. Settings"
+    },
+    {
+      "style": null,
+      "text": "6. Results (global nav)"
+    },
+    {
+      "style": null,
+      "text": "7. Sign Out"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "1"
+    },
+    {
+      "style": null,
+      "text": "Overview"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display registered voters, voted count, turnout, and candidate count"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 2"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "/stats"
+    },
+    {
+      "style": null,
+      "text": "/voters"
+    },
+    {
+      "style": null,
+      "text": "/candidates"
+    },
+    {
+      "style": null,
+      "text": "2"
+    },
+    {
+      "style": null,
+      "text": "Voters"
+    },
+    {
+      "style": null,
+      "text": "Y \u2192 2"
+    },
+    {
+      "style": null,
+      "text": "Voter Management"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 3"
+    },
+    {
+      "style": null,
+      "text": "AUTH"
+    },
+    {
+      "style": null,
+      "text": "require_admin RPC guard"
+    },
+    {
+      "style": null,
+      "text": "3"
+    },
+    {
+      "style": null,
+      "text": "Candidates"
+    },
+    {
+      "style": null,
+      "text": "Y \u2192 3"
+    },
+    {
+      "style": null,
+      "text": "Candidate Management"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 4"
+    },
+    {
+      "style": null,
+      "text": "AUTH"
+    },
+    {
+      "style": null,
+      "text": "Admin-only mutations"
+    },
+    {
+      "style": null,
+      "text": "4"
+    },
+    {
+      "style": null,
+      "text": "Archive"
+    },
+    {
+      "style": null,
+      "text": "Y \u2192 4"
+    },
+    {
+      "style": null,
+      "text": "Archive / Recovery"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 5"
+    },
+    {
+      "style": null,
+      "text": "SOFT"
+    },
+    {
+      "style": null,
+      "text": "Archived flag hides item from active lists"
+    },
+    {
+      "style": null,
+      "text": "5"
+    },
+    {
+      "style": null,
+      "text": "Settings"
+    },
+    {
+      "style": null,
+      "text": "Y \u2192 5"
+    },
+    {
+      "style": null,
+      "text": "Election Settings & History"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 6"
+    },
+    {
+      "style": null,
+      "text": "UPDATE"
+    },
+    {
+      "style": null,
+      "text": "Status, schedule, info, archive history"
+    },
+    {
+      "style": null,
+      "text": "6"
+    },
+    {
+      "style": null,
+      "text": "Results from global nav"
+    },
+    {
+      "style": null,
+      "text": "Y \u2192 6"
+    },
+    {
+      "style": null,
+      "text": "Live / Past Results"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 next"
+    },
+    {
+      "style": null,
+      "text": "Check choice 7"
+    },
+    {
+      "style": null,
+      "text": "NAV"
+    },
+    {
+      "style": null,
+      "text": "Results is not an Admin tab; it is a shared /results route"
+    },
+    {
+      "style": null,
+      "text": "7"
+    },
+    {
+      "style": null,
+      "text": "Sign Out"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Open confirmation; clear auth_token and session state"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Return to dashboard"
+    },
+    {
+      "style": null,
+      "text": "END"
+    },
+    {
+      "style": null,
+      "text": "Public landing page"
+    },
+    {
+      "style": null,
+      "text": "Implementation anchors"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Admin.jsx defines the Overview, Voters, Candidates, Archive, and Settings tabs. src/components/Layout.jsx provides the shared Candidates, Results, Admin, and Sign In/Sign Out navigation."
+    },
+    {
+      "style": null,
+      "text": "Figure 5. Voters and Candidates Management"
+    },
+    {
+      "style": null,
+      "text": "Connector 2 \u2014 Voter Management | All nodes are editable Word cells"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "2"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Voter Management"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Search by LRN, name, or section"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Active voters table"
+    },
+    {
+      "style": null,
+      "text": "status: Voted / Not voted / New"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "2.1"
+    },
+    {
+      "style": null,
+      "text": "Bulk CSV Upload"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Parse and preview rows: lrn, full_name, grade_level, section"
+    },
+    {
+      "style": null,
+      "text": "N / invalid"
+    },
+    {
+      "style": null,
+      "text": "Show row errors; keep preview for correction"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_bulk_upload_voters"
+    },
+    {
+      "style": null,
+      "text": "insert / skip duplicate / return errors"
+    },
+    {
+      "style": null,
+      "text": "2.2"
+    },
+    {
+      "style": null,
+      "text": "Add New Voter"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Create user + profile + voter role"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "LRN must be exactly 12 digits; duplicate rejected"
+    },
+    {
+      "style": null,
+      "text": "DEFAULT"
+    },
+    {
+      "style": null,
+      "text": "Password = LRN; must_change_password = true"
+    },
+    {
+      "style": null,
+      "text": "2.3"
+    },
+    {
+      "style": null,
+      "text": "Edit voter"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Update LRN, name, grade, section"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Reject missing fields or LRN conflict"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_update_voter"
+    },
+    {
+      "style": null,
+      "text": "2.4"
+    },
+    {
+      "style": null,
+      "text": "Reset password"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Reset password to LRN; force change on next login"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Voter not found"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_reset_voter_password"
+    },
+    {
+      "style": null,
+      "text": "2.5"
+    },
+    {
+      "style": null,
+      "text": "Archive voter"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Set profiles.archived = true; remove from active list"
+    },
+    {
+      "style": null,
+      "text": "CANCEL"
+    },
+    {
+      "style": null,
+      "text": "Keep voter active"
+    },
+    {
+      "style": null,
+      "text": "\u2192 4"
+    },
+    {
+      "style": null,
+      "text": "Available in Archive for restore / permanent delete"
+    },
+    {
+      "style": null,
+      "text": "2.6"
+    },
+    {
+      "style": null,
+      "text": "Reset all voting statuses"
+    },
+    {
+      "style": null,
+      "text": "CONFIRM"
+    },
+    {
+      "style": null,
+      "text": "Set has_voted = false and delete live votes"
+    },
+    {
+      "style": null,
+      "text": "CANCEL"
+    },
+    {
+      "style": null,
+      "text": "No changes"
+    },
+    {
+      "style": null,
+      "text": "NEW ELECTION"
+    },
+    {
+      "style": null,
+      "text": "Admin confirmation required; invalidates current live tallies"
+    },
+    {
+      "style": null,
+      "text": "Data guard"
+    },
+    {
+      "style": null,
+      "text": "All voter mutations call require_admin through app_* RPCs. The UI previews bulk uploads and reports inserted, skipped duplicate, and error counts."
+    },
+    {
+      "style": null,
+      "text": "Figure 5. Voters and Candidates Management"
+    },
+    {
+      "style": null,
+      "text": "Connector 3 \u2014 Candidate Management | Figure 5 continues on this page"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "3"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Candidate Management"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Search by name, position, party, or section"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Active candidates table"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "3.1"
+    },
+    {
+      "style": null,
+      "text": "Bulk CSV Upload"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Parse and preview name, position, grade, section, party, motto"
+    },
+    {
+      "style": null,
+      "text": "N / invalid"
+    },
+    {
+      "style": null,
+      "text": "Show missing fields or invalid position; keep preview"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_bulk_upload_candidates"
+    },
+    {
+      "style": null,
+      "text": "insert / skip duplicate / return errors"
+    },
+    {
+      "style": null,
+      "text": "3.2"
+    },
+    {
+      "style": null,
+      "text": "Add Candidate"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Validate form and create candidate record"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Require name, position, grade, section, party list"
+    },
+    {
+      "style": null,
+      "text": "PHOTO"
+    },
+    {
+      "style": null,
+      "text": "Optional image upload to candidate-photos storage"
+    },
+    {
+      "style": null,
+      "text": "3.3"
+    },
+    {
+      "style": null,
+      "text": "Edit candidate"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Update profile fields and optionally replace photo"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Show validation or RPC error"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_update_candidate"
+    },
+    {
+      "style": null,
+      "text": "3.4"
+    },
+    {
+      "style": null,
+      "text": "Archive candidate"
+    },
+    {
+      "style": null,
+      "text": "CONFIRM"
+    },
+    {
+      "style": null,
+      "text": "Set archived = true; remove from active ballot"
+    },
+    {
+      "style": null,
+      "text": "CANCEL"
+    },
+    {
+      "style": null,
+      "text": "Keep candidate active"
+    },
+    {
+      "style": null,
+      "text": "\u2192 4"
+    },
+    {
+      "style": null,
+      "text": "Archived candidates can be restored or permanently deleted"
+    },
+    {
+      "style": null,
+      "text": "RESULT"
+    },
+    {
+      "style": null,
+      "text": "Refresh active candidates list"
+    },
+    {
+      "style": null,
+      "text": "CACHE"
+    },
+    {
+      "style": null,
+      "text": "Invalidate candidates queries"
+    },
+    {
+      "style": null,
+      "text": "Candidate position comes from positions table"
+    },
+    {
+      "style": null,
+      "text": "DATA"
+    },
+    {
+      "style": null,
+      "text": "candidates.position_id \u2192 positions.id"
+    },
+    {
+      "style": null,
+      "text": "Data guard"
+    },
+    {
+      "style": null,
+      "text": "The active API client uses app_add_candidate/app_update_candidate RPCs and Supabase Storage for candidate photos. Candidate rows are filtered by archived = false for public and ballot views."
+    },
+    {
+      "style": null,
+      "text": "Figure 6. Archive and Recovery Management"
+    },
+    {
+      "style": null,
+      "text": "Connector 4 \u2014 soft-delete safety flow for voters and candidates"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "4"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Archive Management Panel"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Sub-tabs:"
+    },
+    {
+      "style": null,
+      "text": "4.1 Archived Voters"
+    },
+    {
+      "style": null,
+      "text": "4.2 Archived Candidates"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "4.1"
+    },
+    {
+      "style": null,
+      "text": "Archived Voters"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display archived voters table; search by LRN, name, section"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 4.2"
+    },
+    {
+      "style": null,
+      "text": "Open archived candidates"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "app_list_archived_voters"
+    },
+    {
+      "style": null,
+      "text": "V-A"
+    },
+    {
+      "style": null,
+      "text": "Select voter action"
+    },
+    {
+      "style": null,
+      "text": "Restore"
+    },
+    {
+      "style": null,
+      "text": "Set archived = false; return to active voter list"
+    },
+    {
+      "style": null,
+      "text": "Permanent delete"
+    },
+    {
+      "style": null,
+      "text": "Confirm then hard delete user and cascaded records"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_restore_voter"
+    },
+    {
+      "style": null,
+      "text": "app_permanent_delete_voter"
+    },
+    {
+      "style": null,
+      "text": "4.2"
+    },
+    {
+      "style": null,
+      "text": "Archived Candidates"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display archived candidates table; search by name, position, party"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 loop"
+    },
+    {
+      "style": null,
+      "text": "Return to archive choices"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "app_list_archived_candidates"
+    },
+    {
+      "style": null,
+      "text": "C-A"
+    },
+    {
+      "style": null,
+      "text": "Select candidate action"
+    },
+    {
+      "style": null,
+      "text": "Restore"
+    },
+    {
+      "style": null,
+      "text": "Set archived = false; return to active candidate list"
+    },
+    {
+      "style": null,
+      "text": "Permanent delete"
+    },
+    {
+      "style": null,
+      "text": "Confirm then remove candidate record"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_restore_candidate"
+    },
+    {
+      "style": null,
+      "text": "app_permanent_delete_candidate"
+    },
+    {
+      "style": null,
+      "text": "DONE"
+    },
+    {
+      "style": null,
+      "text": "Toast success; invalidate archive and active-list queries"
+    },
+    {
+      "style": null,
+      "text": "\u2192 4"
+    },
+    {
+      "style": null,
+      "text": "Remain in archive panel"
+    },
+    {
+      "style": null,
+      "text": "Cancel leaves item unchanged"
+    },
+    {
+      "style": null,
+      "text": "ADMIN"
+    },
+    {
+      "style": null,
+      "text": "All actions require admin token"
+    },
+    {
+      "style": null,
+      "text": "Safety distinction"
+    },
+    {
+      "style": null,
+      "text": "Archive is reversible soft delete. Permanent delete is destructive and confirmation-gated; database foreign keys cascade related records where defined."
+    },
+    {
+      "style": null,
+      "text": "Figure 7. Election Settings, Schedule, and History"
+    },
+    {
+      "style": null,
+      "text": "Connector 5 \u2014 election lifecycle controls and historical result snapshots"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "5"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Election Settings Panel"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Choices:"
+    },
+    {
+      "style": null,
+      "text": "5.1 Status Control"
+    },
+    {
+      "style": null,
+      "text": "5.2 Schedule"
+    },
+    {
+      "style": null,
+      "text": "5.3 Election Info"
+    },
+    {
+      "style": null,
+      "text": "5.4 History"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "5.1"
+    },
+    {
+      "style": null,
+      "text": "Status Control"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Set Upcoming / Ongoing / Completed"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Show schedule or transition error"
+    },
+    {
+      "style": null,
+      "text": "START"
+    },
+    {
+      "style": null,
+      "text": "Starting Ongoing clears live votes and resets voter statuses"
+    },
+    {
+      "style": null,
+      "text": "5.2"
+    },
+    {
+      "style": null,
+      "text": "Schedule Configuration"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Save election date, voting start, end, auto-end toggle"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Keep current settings; show error toast"
+    },
+    {
+      "style": null,
+      "text": "AUTO"
+    },
+    {
+      "style": null,
+      "text": "app_auto_manage_elections moves Upcoming \u2192 Ongoing \u2192 Completed"
+    },
+    {
+      "style": null,
+      "text": "5.3"
+    },
+    {
+      "style": null,
+      "text": "Election Info"
+    },
+    {
+      "style": null,
+      "text": "SAVE"
+    },
+    {
+      "style": null,
+      "text": "Save election name, school year, school name/location"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Keep form open"
+    },
+    {
+      "style": null,
+      "text": "UI"
+    },
+    {
+      "style": null,
+      "text": "Updates page titles, hero, footer, and results letterhead"
+    },
+    {
+      "style": null,
+      "text": "5.4"
+    },
+    {
+      "style": null,
+      "text": "Archive current results"
+    },
+    {
+      "style": null,
+      "text": "CONFIRM"
+    },
+    {
+      "style": null,
+      "text": "Snapshot candidate ranks, winners, vote counts, and voter groups"
+    },
+    {
+      "style": null,
+      "text": "ERROR"
+    },
+    {
+      "style": null,
+      "text": "Show failed-to-archive toast"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_archive_election_results"
+    },
+    {
+      "style": null,
+      "text": "5.5"
+    },
+    {
+      "style": null,
+      "text": "Delete archived school year"
+    },
+    {
+      "style": null,
+      "text": "CONFIRM"
+    },
+    {
+      "style": null,
+      "text": "Delete archive rows for selected school year"
+    },
+    {
+      "style": null,
+      "text": "CANCEL"
+    },
+    {
+      "style": null,
+      "text": "Leave history unchanged"
+    },
+    {
+      "style": null,
+      "text": "RPC"
+    },
+    {
+      "style": null,
+      "text": "app_delete_election_history"
+    },
+    {
+      "style": null,
+      "text": "DONE"
+    },
+    {
+      "style": null,
+      "text": "Refresh settings and history queries; public Past Elections can read snapshots"
+    },
+    {
+      "style": null,
+      "text": "\u2192 6"
+    },
+    {
+      "style": null,
+      "text": "Results consumes archived data"
+    },
+    {
+      "style": null,
+      "text": "History is separate from current live votes"
+    },
+    {
+      "style": null,
+      "text": "TABLES"
+    },
+    {
+      "style": null,
+      "text": "election_settings"
+    },
+    {
+      "style": null,
+      "text": "election_results_archive"
+    },
+    {
+      "style": null,
+      "text": "election_voter_groups_archive"
+    },
+    {
+      "style": null,
+      "text": "Implementation anchors"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Admin.jsx owns status, schedule, election info, archive, and delete-history mutations. server/migration-election-history.sql defines archive tables and history RPCs."
+    },
+    {
+      "style": null,
+      "text": "Figure 8. Election Results and Analytics"
+    },
+    {
+      "style": null,
+      "text": "Connector 6 \u2014 shared /results route for live tally, history, filtering, and print"
+    },
+    {
+      "style": null,
+      "text": "CONNECTOR"
+    },
+    {
+      "style": null,
+      "text": "6"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Election Results"
+    },
+    {
+      "style": null,
+      "text": "/results"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "INPUT"
+    },
+    {
+      "style": null,
+      "text": "Tabs:"
+    },
+    {
+      "style": null,
+      "text": "Live Results"
+    },
+    {
+      "style": null,
+      "text": "Past Elections"
+    },
+    {
+      "style": null,
+      "text": "\u2192"
+    },
+    {
+      "style": null,
+      "text": "OUTPUT"
+    },
+    {
+      "style": null,
+      "text": "Position groups with ranks, vote counts, percentages, and winners"
+    },
+    {
+      "style": null,
+      "text": "FLOW NODE / DECISION"
+    },
+    {
+      "style": null,
+      "text": "YES (Y) PATH"
+    },
+    {
+      "style": null,
+      "text": "NO (N) PATH / NEXT"
+    },
+    {
+      "style": null,
+      "text": "SYSTEM DATA / GUARD"
+    },
+    {
+      "style": null,
+      "text": "6.1"
+    },
+    {
+      "style": null,
+      "text": "Live Results"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Display current tallies grouped by position; highlight leading candidates"
+    },
+    {
+      "style": null,
+      "text": "N \u2192 6.4"
+    },
+    {
+      "style": null,
+      "text": "Open Past Elections"
+    },
+    {
+      "style": null,
+      "text": "REALTIME"
+    },
+    {
+      "style": null,
+      "text": "Subscribe to votes INSERT on channel live-votes; invalidate vote-count query"
+    },
+    {
+      "style": null,
+      "text": "6.2"
+    },
+    {
+      "style": null,
+      "text": "Live filters"
+    },
+    {
+      "style": null,
+      "text": "FILTER"
+    },
+    {
+      "style": null,
+      "text": "Select position, voter grade, and section"
+    },
+    {
+      "style": null,
+      "text": "CLEAR"
+    },
+    {
+      "style": null,
+      "text": "Show all positions / grades / sections"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "app_get_filtered_vote_counts + app_get_voter_groups"
+    },
+    {
+      "style": null,
+      "text": "6.3"
+    },
+    {
+      "style": null,
+      "text": "Winners summary"
+    },
+    {
+      "style": null,
+      "text": "COMPUTE"
+    },
+    {
+      "style": null,
+      "text": "Rank candidates per position; display winner badge(s)"
+    },
+    {
+      "style": null,
+      "text": "No vote count \u2192 no winner"
+    },
+    {
+      "style": null,
+      "text": "VIEW"
+    },
+    {
+      "style": null,
+      "text": "vote_counts grouped by position"
+    },
+    {
+      "style": null,
+      "text": "6.4"
+    },
+    {
+      "style": null,
+      "text": "Past Elections"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Select school year; filter position / grade / section"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Show no archived results message"
+    },
+    {
+      "style": null,
+      "text": "GET"
+    },
+    {
+      "style": null,
+      "text": "app_get_election_history"
+    },
+    {
+      "style": null,
+      "text": "app_get_archived_results"
+    },
+    {
+      "style": null,
+      "text": "app_get_archived_voter_groups"
+    },
+    {
+      "style": null,
+      "text": "6.5"
+    },
+    {
+      "style": null,
+      "text": "History filter supported?"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Apply archived voter grade / section breakdown"
+    },
+    {
+      "style": null,
+      "text": "N"
+    },
+    {
+      "style": null,
+      "text": "Disable grade / section filters; keep position filter"
+    },
+    {
+      "style": null,
+      "text": "ARCHIVE"
+    },
+    {
+      "style": null,
+      "text": "Historical filters use captured voter groups, not today\u2019s roster"
+    },
+    {
+      "style": null,
+      "text": "PRINT"
+    },
+    {
+      "style": null,
+      "text": "Admin clicks Print Results Tally"
+    },
+    {
+      "style": null,
+      "text": "Y"
+    },
+    {
+      "style": null,
+      "text": "Open browser print dialog with seal, letterhead, tally, and signatures"
+    },
+    {
+      "style": null,
+      "text": "CANCEL"
+    },
+    {
+      "style": null,
+      "text": "Return to results"
+    },
+    {
+      "style": null,
+      "text": "BROWSER"
+    },
+    {
+      "style": null,
+      "text": "window.print(); print CSS removes app chrome"
+    },
+    {
+      "style": null,
+      "text": "Implementation anchors"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Results.jsx owns live/history tabs, Supabase Realtime, filters, winners summary, archived results, and admin-only print. Public users can view results; only admins see the print action and edit election name."
+    },
+    {
+      "style": null,
+      "text": "Customization and source map"
+    },
+    {
+      "style": null,
+      "text": "Use this page as a human-editable index when revising the flowchart for a new election year or school workflow."
+    },
+    {
+      "style": null,
+      "text": "FIGURE"
+    },
+    {
+      "style": null,
+      "text": "PURPOSE"
+    },
+    {
+      "style": null,
+      "text": "SOURCE OF TRUTH"
+    },
+    {
+      "style": null,
+      "text": "Figure 2"
+    },
+    {
+      "style": null,
+      "text": "Public landing and authentication"
+    },
+    {
+      "style": null,
+      "text": "src/App.jsx; src/pages/AuthPage.jsx; src/contexts/AuthContext.jsx; src/api/client.js"
+    },
+    {
+      "style": null,
+      "text": "Figure 3"
+    },
+    {
+      "style": null,
+      "text": "Student voter dashboard and ballot casting"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Index.jsx; src/pages/VotePage.jsx; server/schema.sql app_submit_votes"
+    },
+    {
+      "style": null,
+      "text": "Figure 4"
+    },
+    {
+      "style": null,
+      "text": "Administrator navigation hub"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Admin.jsx; src/components/Layout.jsx"
+    },
+    {
+      "style": null,
+      "text": "Figure 5"
+    },
+    {
+      "style": null,
+      "text": "Voters and candidates management"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Admin.jsx; server/schema.sql voter/candidate RPCs"
+    },
+    {
+      "style": null,
+      "text": "Figure 6"
+    },
+    {
+      "style": null,
+      "text": "Archive and recovery"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Admin.jsx; server/schema.sql app_archive/app_restore/app_permanent_delete RPCs"
+    },
+    {
+      "style": null,
+      "text": "Figure 7"
+    },
+    {
+      "style": null,
+      "text": "Settings, schedule, and history"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Admin.jsx; server/migration-election-history.sql"
+    },
+    {
+      "style": null,
+      "text": "Figure 8"
+    },
+    {
+      "style": null,
+      "text": "Live and historical results"
+    },
+    {
+      "style": null,
+      "text": "src/pages/Results.jsx; server/migration-election-history.sql"
+    },
+    {
+      "style": null,
+      "text": "Editing checklist"
+    },
+    {
+      "style": null,
+      "text": "1) Update election names, dates, and role labels. 2) Keep Y/N branches aligned with the condition. 3) If a route or RPC changes, update the corresponding source-map row and implementation anchor. 4) Re-open the document in Word and inspect each landscape page after edits."
+    },
+    {
+      "style": null,
+      "text": "Reference-derived visual rule"
+    },
+    {
+      "style": null,
+      "text": "The supplied CargoExpress flowchart used dark backgrounds and light nodes with Figure 2\u20138 decomposition. This document keeps that visual cue but replaces screenshot-based figures with editable tables so a human can change labels, branches, and implementation notes directly."
+    }
+  ],
+  "drawings": [],
+  "sections": [
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    },
+    {
+      "page_size": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}w": "15840",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}h": "12240",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}orient": "landscape"
+      },
+      "margins": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}top": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}right": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}bottom": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}left": "605",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}header": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}footer": "288",
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}gutter": "0"
+      },
+      "cols": {
+        "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}space": "720"
+      }
+    }
+  ],
+  "media": [],
+  "style_ids": [
+    "BodyText",
+    "BodyText2",
+    "BodyText2Char",
+    "BodyText3",
+    "BodyText3Char",
+    "BodyTextChar",
+    "BookTitle",
+    "Caption",
+    "ColorfulGrid",
+    "ColorfulGrid-Accent1",
+    "ColorfulGrid-Accent2",
+    "ColorfulGrid-Accent3",
+    "ColorfulGrid-Accent4",
+    "ColorfulGrid-Accent5",
+    "ColorfulGrid-Accent6",
+    "ColorfulList",
+    "ColorfulList-Accent1",
+    "ColorfulList-Accent2",
+    "ColorfulList-Accent3",
+    "ColorfulList-Accent4",
+    "ColorfulList-Accent5",
+    "ColorfulList-Accent6",
+    "ColorfulShading",
+    "ColorfulShading-Accent1",
+    "ColorfulShading-Accent2",
+    "ColorfulShading-Accent3",
+    "ColorfulShading-Accent4",
+    "ColorfulShading-Accent5",
+    "ColorfulShading-Accent6",
+    "DarkList",
+    "DarkList-Accent1",
+    "DarkList-Accent2",
+    "DarkList-Accent3",
+    "DarkList-Accent4",
+    "DarkList-Accent5",
+    "DarkList-Accent6",
+    "DefaultParagraphFont",
+    "Emphasis",
+    "Footer",
+    "FooterChar",
+    "Header",
+    "HeaderChar",
+    "Heading1",
+    "Heading1Char",
+    "Heading2",
+    "Heading2Char",
+    "Heading3",
+    "Heading3Char",
+    "Heading4",
+    "Heading4Char",
+    "Heading5",
+    "Heading5Char",
+    "Heading6",
+    "Heading6Char",
+    "Heading7",
+    "Heading7Char",
+    "Heading8",
+    "Heading8Char",
+    "Heading9",
+    "Heading9Char",
+    "IntenseEmphasis",
+    "IntenseQuote",
+    "IntenseQuoteChar",
+    "IntenseReference",
+    "LightGrid",
+    "LightGrid-Accent1",
+    "LightGrid-Accent2",
+    "LightGrid-Accent3",
+    "LightGrid-Accent4",
+    "LightGrid-Accent5",
+    "LightGrid-Accent6",
+    "LightList",
+    "LightList-Accent1",
+    "LightList-Accent2",
+    "LightList-Accent3",
+    "LightList-Accent4",
+    "LightList-Accent5",
+    "LightList-Accent6",
+    "LightShading",
+    "LightShading-Accent1",
+    "LightShading-Accent2",
+    "LightShading-Accent3",
+    "LightShading-Accent4",
+    "LightShading-Accent5",
+    "LightShading-Accent6",
+    "List",
+    "List2",
+    "List3",
+    "ListBullet",
+    "ListBullet2",
+    "ListBullet3",
+    "ListContinue",
+    "ListContinue2",
+    "ListContinue3",
+    "ListNumber",
+    "ListNumber2",
+    "ListNumber3",
+    "ListParagraph",
+    "MacroText",
+    "MacroTextChar",
+    "MediumGrid1",
+    "MediumGrid1-Accent1",
+    "MediumGrid1-Accent2",
+    "MediumGrid1-Accent3",
+    "MediumGrid1-Accent4",
+    "MediumGrid1-Accent5",
+    "MediumGrid1-Accent6",
+    "MediumGrid2",
+    "MediumGrid2-Accent1",
+    "MediumGrid2-Accent2",
+    "MediumGrid2-Accent3",
+    "MediumGrid2-Accent4",
+    "MediumGrid2-Accent5",
+    "MediumGrid2-Accent6",
+    "MediumGrid3",
+    "MediumGrid3-Accent1",
+    "MediumGrid3-Accent2",
+    "MediumGrid3-Accent3",
+    "MediumGrid3-Accent4",
+    "MediumGrid3-Accent5",
+    "MediumGrid3-Accent6",
+    "MediumList1",
+    "MediumList1-Accent1",
+    "MediumList1-Accent2",
+    "MediumList1-Accent3",
+    "MediumList1-Accent4",
+    "MediumList1-Accent5",
+    "MediumList1-Accent6",
+    "MediumList2",
+    "MediumList2-Accent1",
+    "MediumList2-Accent2",
+    "MediumList2-Accent3",
+    "MediumList2-Accent4",
+    "MediumList2-Accent5",
+    "MediumList2-Accent6",
+    "MediumShading1",
+    "MediumShading1-Accent1",
+    "MediumShading1-Accent2",
+    "MediumShading1-Accent3",
+    "MediumShading1-Accent4",
+    "MediumShading1-Accent5",
+    "MediumShading1-Accent6",
+    "MediumShading2",
+    "MediumShading2-Accent1",
+    "MediumShading2-Accent2",
+    "MediumShading2-Accent3",
+    "MediumShading2-Accent4",
+    "MediumShading2-Accent5",
+    "MediumShading2-Accent6",
+    "NoList",
+    "NoSpacing",
+    "Normal",
+    "Quote",
+    "QuoteChar",
+    "Strong",
+    "Subtitle",
+    "SubtitleChar",
+    "SubtleEmphasis",
+    "SubtleReference",
+    "TOCHeading",
+    "TableGrid",
+    "TableNormal",
+    "Title",
+    "TitleChar"
+  ],
+  "all_parts": [
+    "[Content_Types].xml",
+    "_rels/.rels",
+    "docProps/core.xml",
+    "docProps/app.xml",
+    "word/document.xml",
+    "word/_rels/document.xml.rels",
+    "word/styles.xml",
+    "word/stylesWithEffects.xml",
+    "word/settings.xml",
+    "word/webSettings.xml",
+    "word/fontTable.xml",
+    "word/theme/theme1.xml",
+    "customXml/item1.xml",
+    "customXml/_rels/item1.xml.rels",
+    "customXml/itemProps1.xml",
+    "word/numbering.xml",
+    "word/header1.xml",
+    "word/footer1.xml",
+    "docProps/thumbnail.jpeg"
+  ]
+}

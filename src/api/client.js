@@ -14,6 +14,12 @@ function getToken() {
   return localStorage.getItem('auth_token');
 }
 
+function isMissingRpc(error) {
+  return error?.code === '42883'
+    || error?.code === 'PGRST202'
+    || /function .* does not exist/i.test(error?.message ?? '');
+}
+
 // ─── GET Router ─────────────────────────────────────────────────────
 async function handleGet(path) {
   const qIdx = path.indexOf('?');
@@ -100,9 +106,34 @@ async function handleGet(path) {
     return data;
   }
 
-  const m = pathname.match(/^\/election-history\/([^/]+)\/results$/);
+  let m = pathname.match(/^\/election-history\/([^/]+)\/groups$/);
   if (m) {
-    const { data, error } = await supabase.rpc('app_get_archived_results', { p_school_year: decodeURIComponent(m[1]) });
+    const { data, error } = await supabase.rpc('app_get_archived_voter_groups', {
+      p_school_year: decodeURIComponent(m[1]),
+    });
+    if (error) {
+      // Older databases do not have the historical voter-group snapshot yet.
+      // Keep the archive readable while the migration is being applied.
+      if (isMissingRpc(error)) return { filterSupported: false, gradeLevels: [], sections: [] };
+      throw new Error(error.message);
+    }
+    return data;
+  }
+
+  m = pathname.match(/^\/election-history\/([^/]+)\/results$/);
+  if (m) {
+    const archivedParams = {
+      p_school_year: decodeURIComponent(m[1]),
+      p_voter_grade: params.voter_grade || null,
+      p_voter_section: params.voter_section || null,
+    };
+    let { data, error } = await supabase.rpc('app_get_archived_results', archivedParams);
+    if (error && isMissingRpc(error)) {
+      // Fall back to the original unfiltered archive RPC during rollout.
+      ({ data, error } = await supabase.rpc('app_get_archived_results', {
+        p_school_year: decodeURIComponent(m[1]),
+      }));
+    }
     if (error) throw new Error(error.message);
     return data;
   }

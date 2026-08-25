@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS election_results_archive (
   election_date DATE,
   position_title VARCHAR(100) NOT NULL,
   position_order INT NOT NULL DEFAULT 0,
+  position_max_votes INT NOT NULL DEFAULT 1,
   candidate_name VARCHAR(100) NOT NULL,
   candidate_party VARCHAR(100),
   candidate_grade VARCHAR(50),
@@ -19,8 +20,39 @@ CREATE TABLE IF NOT EXISTS election_results_archive (
   total_position_votes INT NOT NULL DEFAULT 0,
   rank INT NOT NULL DEFAULT 1,
   is_winner BOOLEAN NOT NULL DEFAULT FALSE,
+  voter_filter_available BOOLEAN NOT NULL DEFAULT FALSE,
   archived_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE election_results_archive
+  ADD COLUMN IF NOT EXISTS position_max_votes INT NOT NULL DEFAULT 1;
+ALTER TABLE election_results_archive
+  ADD COLUMN IF NOT EXISTS voter_filter_available BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS election_results_voter_breakdown (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  archive_id UUID NOT NULL REFERENCES election_results_archive(id) ON DELETE CASCADE,
+  voter_grade VARCHAR(50) NOT NULL DEFAULT '',
+  voter_section VARCHAR(50) NOT NULL DEFAULT '',
+  vote_count INT NOT NULL DEFAULT 0 CHECK (vote_count >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (archive_id, voter_grade, voter_section)
+);
+
+CREATE TABLE IF NOT EXISTS election_voter_groups_archive (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  school_year VARCHAR(20) NOT NULL,
+  voter_grade VARCHAR(50) NOT NULL DEFAULT '',
+  voter_section VARCHAR(50) NOT NULL DEFAULT '',
+  voter_count INT NOT NULL DEFAULT 0 CHECK (voter_count >= 0),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (school_year, voter_grade, voter_section)
+);
+
+CREATE INDEX IF NOT EXISTS election_results_voter_breakdown_archive_idx
+  ON election_results_voter_breakdown (archive_id, voter_grade, voter_section);
+CREATE INDEX IF NOT EXISTS election_voter_groups_archive_year_idx
+  ON election_voter_groups_archive (school_year, voter_grade, voter_section);
 
 -- ─── 2. Row Level Security ───────────────────────────────────────────
 ALTER TABLE election_results_archive ENABLE ROW LEVEL SECURITY;
@@ -31,6 +63,24 @@ EXCEPTION WHEN OTHERS THEN NULL;
 END $$;
 
 CREATE POLICY "election_results_archive_anon_select" ON election_results_archive FOR SELECT USING (true);
+
+ALTER TABLE election_results_voter_breakdown ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "election_results_voter_breakdown_anon_select" ON election_results_voter_breakdown;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+CREATE POLICY "election_results_voter_breakdown_anon_select" ON election_results_voter_breakdown FOR SELECT USING (true);
+
+ALTER TABLE election_voter_groups_archive ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "election_voter_groups_archive_anon_select" ON election_voter_groups_archive;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+CREATE POLICY "election_voter_groups_archive_anon_select" ON election_voter_groups_archive FOR SELECT USING (true);
 
 
 -- ═════════════════════════════════════════════════════════════════════
@@ -52,6 +102,7 @@ DECLARE
   v_current_rank INT := 1;
   v_pos_max_votes INT := 1;
   v_total_pos_votes INT := 0;
+  v_archive_id UUID;
 BEGIN
   -- Validate admin token
   v_admin_id := require_admin(p_token);
@@ -64,10 +115,22 @@ BEGIN
 
   -- Delete existing results for this school_year to allow re-archiving
   DELETE FROM election_results_archive WHERE school_year = v_settings.school_year;
+  DELETE FROM election_voter_groups_archive WHERE school_year = v_settings.school_year;
+
+  INSERT INTO election_voter_groups_archive (school_year, voter_grade, voter_section, voter_count)
+  SELECT
+    v_settings.school_year,
+    COALESCE(p.grade_level, ''),
+    COALESCE(p.section, ''),
+    COUNT(*)::INT
+  FROM profiles p
+  WHERE COALESCE(p.grade_level, '') <> ''
+  GROUP BY COALESCE(p.grade_level, ''), COALESCE(p.section, '');
 
   -- Query vote_counts to get all candidates and their votes
   FOR v_candidate IN (
     SELECT 
+      c.candidate_id,
       c.candidate_name,
       c.party_list,
       c.grade_level,
@@ -99,14 +162,30 @@ BEGIN
     INSERT INTO election_results_archive (
       election_name, school_year, election_date,
       position_title, position_order,
+      position_max_votes,
       candidate_name, candidate_party, candidate_grade, candidate_section, candidate_avatar_url,
-      vote_count, total_position_votes, rank, is_winner
+      vote_count, total_position_votes, rank, is_winner, voter_filter_available
     ) VALUES (
       v_settings.name, v_settings.school_year, v_settings.election_date,
       v_candidate.position_title, v_candidate.display_order,
+      v_candidate.max_votes,
       v_candidate.candidate_name, v_candidate.party_list, v_candidate.grade_level, v_candidate.section, v_candidate.avatar_url,
-      v_candidate.vote_count, v_total_pos_votes, v_current_rank, (v_current_rank <= v_pos_max_votes)
-    );
+      v_candidate.vote_count, v_total_pos_votes, v_current_rank, (v_current_rank <= v_pos_max_votes), TRUE
+    )
+    RETURNING id INTO v_archive_id;
+
+    INSERT INTO election_results_voter_breakdown (
+      archive_id, voter_grade, voter_section, vote_count
+    )
+    SELECT
+      v_archive_id,
+      COALESCE(pr.grade_level, ''),
+      COALESCE(pr.section, ''),
+      COUNT(*)::INT
+    FROM votes v
+    JOIN profiles pr ON pr.user_id = v.voter_id
+    WHERE v.candidate_id = v_candidate.candidate_id
+    GROUP BY COALESCE(pr.grade_level, ''), COALESCE(pr.section, '');
     
     v_archived_count := v_archived_count + 1;
   END LOOP;
@@ -126,8 +205,11 @@ BEGIN
   RETURN COALESCE((
     SELECT jsonb_agg(row_to_json(r))
     FROM (
-      SELECT DISTINCT school_year, election_name, election_date, archived_at
+      SELECT school_year, election_name, election_date,
+        MAX(archived_at) AS archived_at,
+        BOOL_OR(voter_filter_available) AS voter_filter_available
       FROM election_results_archive
+      GROUP BY school_year, election_name, election_date
       ORDER BY election_date DESC
     ) r
   ), '[]'::jsonb);
@@ -135,19 +217,136 @@ END;
 $$;
 
 -- ─── 5. RPC: Get archived results for a school year (Public) ────────
-CREATE OR REPLACE FUNCTION app_get_archived_results(p_school_year TEXT)
+CREATE OR REPLACE FUNCTION app_get_archived_voter_groups(p_school_year TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_supported BOOLEAN;
 BEGIN
+  SELECT COALESCE(BOOL_OR(voter_filter_available), FALSE)
+  INTO v_supported
+  FROM election_results_archive
+  WHERE school_year = p_school_year;
+
+  RETURN jsonb_build_object(
+    'filterSupported', COALESCE(v_supported, FALSE),
+    'gradeLevels', COALESCE((
+      SELECT jsonb_agg(t.voter_grade ORDER BY t.voter_grade)
+      FROM (
+        SELECT DISTINCT voter_grade
+        FROM election_voter_groups_archive
+        WHERE v_supported
+          AND school_year = p_school_year
+          AND voter_grade <> ''
+      ) t
+    ), '[]'::jsonb),
+    'sections', COALESCE((
+      SELECT jsonb_agg(
+        jsonb_build_object('grade_level', t.voter_grade, 'section', t.voter_section)
+        ORDER BY t.voter_grade, t.voter_section
+      )
+      FROM (
+        SELECT DISTINCT voter_grade, voter_section
+        FROM election_voter_groups_archive
+        WHERE v_supported
+          AND school_year = p_school_year
+          AND voter_grade <> ''
+          AND voter_section <> ''
+      ) t
+    ), '[]'::jsonb)
+  );
+END;
+$$;
+
+DROP FUNCTION IF EXISTS app_get_archived_results(TEXT);
+
+CREATE OR REPLACE FUNCTION app_get_archived_results(
+  p_school_year TEXT,
+  p_voter_grade TEXT DEFAULT NULL,
+  p_voter_section TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_has_rows BOOLEAN;
+  v_filter_supported BOOLEAN;
+BEGIN
+  SELECT EXISTS(
+    SELECT 1 FROM election_results_archive WHERE school_year = p_school_year
+  ) INTO v_has_rows;
+
+  IF NOT v_has_rows THEN
+    RETURN '[]'::jsonb;
+  END IF;
+
+  SELECT COALESCE(BOOL_OR(voter_filter_available), FALSE)
+  INTO v_filter_supported
+  FROM election_results_archive
+  WHERE school_year = p_school_year;
+
+  IF (p_voter_grade IS NULL AND p_voter_section IS NULL)
+     OR NOT COALESCE(v_filter_supported, FALSE) THEN
+    RETURN COALESCE((
+      SELECT jsonb_agg(row_to_json(r))
+      FROM (
+        SELECT *
+        FROM election_results_archive
+        WHERE school_year = p_school_year
+        ORDER BY position_order ASC, rank ASC
+      ) r
+    ), '[]'::jsonb);
+  END IF;
+
   RETURN COALESCE((
     SELECT jsonb_agg(row_to_json(r))
     FROM (
-      SELECT *
-      FROM election_results_archive
-      WHERE school_year = p_school_year
-      ORDER BY position_order ASC, rank ASC
+      WITH counted AS (
+        SELECT
+          a.*,
+          COALESCE((
+            SELECT SUM(b.vote_count)
+            FROM election_results_voter_breakdown b
+            WHERE b.archive_id = a.id
+              AND (p_voter_grade IS NULL OR b.voter_grade = p_voter_grade)
+              AND (p_voter_section IS NULL OR b.voter_section = p_voter_section)
+          ), 0)::INT AS filtered_vote_count
+        FROM election_results_archive a
+        WHERE a.school_year = p_school_year
+      ), ranked AS (
+        SELECT
+          c.*,
+          SUM(c.filtered_vote_count) OVER (PARTITION BY c.position_title)::INT AS filtered_total_position_votes,
+          ROW_NUMBER() OVER (
+            PARTITION BY c.position_title
+            ORDER BY c.filtered_vote_count DESC, c.rank ASC, c.candidate_name ASC
+          )::INT AS filtered_rank
+        FROM counted c
+      )
+      SELECT
+        r.id,
+        r.election_name,
+        r.school_year,
+        r.election_date,
+        r.position_title,
+        r.position_order,
+        r.position_max_votes,
+        r.candidate_name,
+        r.candidate_party,
+        r.candidate_grade,
+        r.candidate_section,
+        r.candidate_avatar_url,
+        r.filtered_vote_count AS vote_count,
+        r.filtered_total_position_votes AS total_position_votes,
+        r.filtered_rank AS rank,
+        (r.filtered_total_position_votes > 0 AND r.filtered_rank <= r.position_max_votes) AS is_winner,
+        TRUE AS voter_filter_available,
+        r.archived_at
+      FROM ranked r
+      ORDER BY r.position_order ASC, r.filtered_rank ASC
     ) r
   ), '[]'::jsonb);
 END;
@@ -167,6 +366,7 @@ BEGIN
   
   -- Delete all rows from election_results_archive
   DELETE FROM election_results_archive WHERE school_year = p_school_year;
+  DELETE FROM election_voter_groups_archive WHERE school_year = p_school_year;
   
   -- Return success
   RETURN jsonb_build_object('success', true);
@@ -292,11 +492,9 @@ $$;
 
 GRANT EXECUTE ON FUNCTION app_archive_election_results TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_get_election_history TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION app_get_archived_results TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_get_archived_voter_groups(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION app_get_archived_results(TEXT, TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_delete_election_history TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_reset_all_voted TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_get_me TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_update_election_settings TO anon, authenticated;
-
-
-
