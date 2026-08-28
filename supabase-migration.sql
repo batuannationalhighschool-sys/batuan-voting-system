@@ -7,12 +7,52 @@
 -- ─── Enable required extensions ─────────────────────────────────────
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS pgjwt WITH SCHEMA extensions;
+CREATE EXTENSION IF NOT EXISTS supabase_vault WITH SCHEMA vault;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM vault.decrypted_secrets
+    WHERE name = 'batuan-voting-app-jwt-secret'
+  ) THEN
+    PERFORM vault.create_secret(
+      encode(public.gen_random_bytes(32), 'hex'),
+      'batuan-voting-app-jwt-secret',
+      'Signing key for Batuan Voting custom session tokens',
+      NULL::uuid
+    );
+  END IF;
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION app_get_jwt_secret()
+RETURNS TEXT
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = pg_catalog, public, extensions, vault
+AS $$
+DECLARE v_secret TEXT;
+BEGIN
+  SELECT decrypted_secret INTO v_secret
+  FROM vault.decrypted_secrets
+  WHERE name = 'batuan-voting-app-jwt-secret'
+  LIMIT 1;
+  IF v_secret IS NULL OR v_secret = '' THEN
+    RAISE EXCEPTION 'Authentication configuration is incomplete';
+  END IF;
+  RETURN v_secret;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION app_get_jwt_secret() FROM PUBLIC, anon, authenticated;
 
 -- ─── Helper: Verify custom JWT token ────────────────────────────────
 CREATE OR REPLACE FUNCTION verify_app_token(p_token TEXT)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = pg_catalog, public, extensions
 AS $$
 DECLARE
   v_result RECORD;
@@ -23,7 +63,7 @@ BEGIN
   END IF;
 
   SELECT payload, valid INTO v_result
-  FROM extensions.verify(p_token, 'batuan-voting-secret-key-2026');
+  FROM extensions.verify(p_token, app_get_jwt_secret());
 
   IF NOT v_result.valid THEN
     RAISE EXCEPTION 'Invalid or expired token';
@@ -69,6 +109,7 @@ CREATE OR REPLACE FUNCTION sign_app_token(p_user_id UUID, p_lrn TEXT)
 RETURNS TEXT
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = pg_catalog, public, extensions
 AS $$
 BEGIN
   RETURN extensions.sign(
@@ -78,7 +119,7 @@ BEGIN
       'iat', extract(epoch FROM now())::integer,
       'exp', extract(epoch FROM (now() + interval '7 days'))::integer
     ),
-    'batuan-voting-secret-key-2026'
+    app_get_jwt_secret()
   );
 END;
 $$;

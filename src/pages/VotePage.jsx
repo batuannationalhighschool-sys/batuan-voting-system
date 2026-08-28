@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Vote, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, ShieldAlert, Clock, Calendar } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
@@ -6,14 +6,21 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import CandidateCard from "@/components/CandidateCard";
 import { useNavigate } from "react-router-dom";
+import { ELECTION_TIME_ZONE, formatElectionDate, getElectionWindowState } from "@/lib/election-time";
 
 export default function VotePage() {
   const [selections, setSelections] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const { user, profile, refreshProfile, isAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const gradeLevel = profile?.grade_level;
   const queryParams = gradeLevel
@@ -56,7 +63,7 @@ export default function VotePage() {
       queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
       queryClient.invalidateQueries({ queryKey: ["vote-counts-home"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast({ title: "Vote submitted!", description: "Your vote for SSLG Election 2026 has been recorded securely." });
+      toast({ title: "Vote submitted!", description: `Your vote for ${settings?.name || "the election"} has been recorded securely.` });
     },
     onError: (err) => {
       const msg = err.message?.includes("duplicate") || err.message?.includes("already voted")
@@ -89,12 +96,17 @@ export default function VotePage() {
   }
 
   // ── Trappings: Check Election Status ────────────────────────────────
-  const electionStatus = settings?.status ?? 'upcoming';
+  // The database status is still required by the submit RPC. The schedule
+  // state prevents a stale `ongoing` status from showing an active ballot.
+  const windowState = getElectionWindowState(settings, now);
+  const electionStatus = !settings
+    ? 'upcoming'
+    : settings.status === 'ongoing'
+      ? windowState.state
+      : settings.status;
 
   if (electionStatus === 'upcoming') {
-    const formattedDate = settings?.election_date
-      ? new Date(settings.election_date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
-      : "TBA";
+    const formattedDate = formatElectionDate(settings?.election_date);
     const startTime = settings?.voting_start?.slice(0, 5) || "08:00";
     const endTime = settings?.voting_end?.slice(0, 5) || "16:00";
 
@@ -110,7 +122,7 @@ export default function VotePage() {
           Voting Is Not Open Yet
         </h1>
         <p className="text-muted-foreground text-base mb-8 max-w-md mx-auto">
-          The administrator has set this election as <strong className="text-foreground">Upcoming</strong>. You can cast your vote as soon as the election is triggered by the administrator.
+          Voting opens on the scheduled date and time. The administrator must also have the election in its active state before a ballot can be submitted.
         </p>
 
         <div className="bg-card rounded-2xl border border-border p-6 mb-8 shadow-elegant text-left space-y-3">
@@ -121,6 +133,7 @@ export default function VotePage() {
           </div>
           <div className="flex items-center justify-between text-sm py-1.5 border-b border-border">
             <span className="text-muted-foreground flex items-center gap-2"><Clock className="w-4 h-4 text-gold" /> Scheduled Voting Hours</span>
+            <span className="sr-only">Timezone: {ELECTION_TIME_ZONE}</span>
             <span className="font-semibold text-foreground">{startTime} — {endTime}</span>
           </div>
         </div>
@@ -137,26 +150,30 @@ export default function VotePage() {
     );
   }
 
-  if (electionStatus === 'completed') {
+  if (electionStatus === 'completed' || electionStatus === 'invalid') {
     return (
       <div className="container py-16 text-center animate-fade-in max-w-2xl mx-auto">
         <div className="w-20 h-20 rounded-full bg-destructive/10 flex items-center justify-center mx-auto mb-6 text-destructive ring-8 ring-destructive/5">
           <AlertCircle className="w-10 h-10" />
         </div>
         <span className="px-3.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider bg-destructive/15 text-destructive border border-destructive/30 inline-block mb-3">
-          Election Completed
+          {electionStatus === 'invalid' ? 'Election Unavailable' : 'Election Completed'}
         </span>
         <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">
-          Voting Has Ended
+          {electionStatus === 'invalid' ? 'Voting Is Unavailable' : 'Voting Has Ended'}
         </h1>
         <p className="text-muted-foreground text-base mb-8 max-w-md mx-auto">
-          Voting for <strong className="text-foreground">{settings?.name || "SSLG Election"}</strong> is officially closed. Thank you to everyone who participated!
+          {electionStatus === 'invalid'
+            ? 'The election schedule is invalid. Please contact the administrator before voting is enabled.'
+            : <>Voting for <strong className="text-foreground">{settings?.name || "SSLG Election"}</strong> is officially closed. Thank you to everyone who participated!</>}
         </p>
 
         <div className="flex flex-wrap justify-center gap-4">
-          <button onClick={() => navigate("/results")} className="px-6 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">
-            View Election Results
-          </button>
+          {electionStatus !== 'invalid' && (
+            <button onClick={() => navigate("/results")} className="px-6 py-3 rounded-xl gradient-gold text-accent-foreground font-semibold shadow-gold hover:opacity-90 transition-opacity">
+              View Election Results
+            </button>
+          )}
           <button onClick={() => navigate("/candidates")} className="px-6 py-3 rounded-xl bg-card border border-border text-foreground font-semibold hover:bg-muted transition-colors">
             View Candidates
           </button>

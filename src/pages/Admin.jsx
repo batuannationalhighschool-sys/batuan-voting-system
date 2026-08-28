@@ -1,5 +1,5 @@
-import { useState, useRef, useMemo } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History } from "lucide-react";
+import { useState, useRef, useMemo, useEffect, useCallback } from "react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,7 @@ import StatCard from "@/components/StatCard";
 import ElectionScheduleForm from "@/components/ElectionScheduleForm";
 import ElectionInfoForm from "@/components/ElectionInfoForm";
 import { useNavigate } from "react-router-dom";
+import { ELECTION_TIME_ZONE, parseElectionDateTime } from "@/lib/election-time";
 
 
 
@@ -250,6 +251,143 @@ export default function Admin() {
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
+  // ── Auto-Start Timer: fires at exactly the scheduled voting_start ──
+  const [autoStartCountdown, setAutoStartCountdown] = useState(null);
+  const autoStartTimerRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+
+  const clearAutoStartTimers = useCallback(() => {
+    if (autoStartTimerRef.current) { clearTimeout(autoStartTimerRef.current); autoStartTimerRef.current = null; }
+    if (countdownIntervalRef.current) { clearInterval(countdownIntervalRef.current); countdownIntervalRef.current = null; }
+    setAutoStartCountdown(null);
+  }, []);
+
+  useEffect(() => {
+    if (settings?.status !== "upcoming") {
+      clearAutoStartTimers();
+      return;
+    }
+
+    const dateStr = settings.election_date instanceof Date
+      ? settings.election_date.toISOString().slice(0, 10)
+      : String(settings.election_date || '').slice(0, 10);
+
+    const startDateTime = parseElectionDateTime(dateStr, settings.voting_start);
+    const endDateTime = parseElectionDateTime(dateStr, settings.voting_end);
+
+    if (!startDateTime || !endDateTime || endDateTime <= startDateTime) {
+      clearAutoStartTimers();
+      return;
+    }
+
+    const now = new Date();
+
+    // If start time already passed but end time hasn't, start immediately
+    if (now >= startDateTime && now < endDateTime) {
+      updateStatus.mutate("ongoing");
+      clearAutoStartTimers();
+      return;
+    }
+
+    // If end time already passed, don't set a timer
+    if (now >= endDateTime) {
+      clearAutoStartTimers();
+      return;
+    }
+
+    // Schedule auto-start at exactly the voting_start time
+    const msUntilStart = startDateTime.getTime() - now.getTime();
+    setAutoStartCountdown(Math.ceil(msUntilStart / 1000));
+
+    autoStartTimerRef.current = setTimeout(() => {
+      updateStatus.mutate("ongoing");
+      clearAutoStartTimers();
+    }, msUntilStart);
+
+    countdownIntervalRef.current = setInterval(() => {
+      const remaining = Math.ceil((startDateTime.getTime() - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setAutoStartCountdown(0);
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      } else {
+        setAutoStartCountdown(remaining);
+      }
+    }, 1000);
+
+    return () => clearAutoStartTimers();
+  }, [settings?.status, settings?.election_date, settings?.voting_start, settings?.voting_end]);
+
+  const formatCountdown = (totalSeconds) => {
+    if (totalSeconds == null || totalSeconds <= 0) return null;
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m ${String(s).padStart(2, '0')}s`;
+    if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`;
+    return `${s}s`;
+  };
+
+  // ── Auto-End Timer: fires at exactly the scheduled voting_end ──
+  const [autoEndCountdown, setAutoEndCountdown] = useState(null);
+  const autoEndTimerRef = useRef(null);
+  const autoEndIntervalRef = useRef(null);
+
+  const clearAutoEndTimers = useCallback(() => {
+    if (autoEndTimerRef.current) { clearTimeout(autoEndTimerRef.current); autoEndTimerRef.current = null; }
+    if (autoEndIntervalRef.current) { clearInterval(autoEndIntervalRef.current); autoEndIntervalRef.current = null; }
+    setAutoEndCountdown(null);
+  }, []);
+
+  useEffect(() => {
+    if (settings?.status !== "ongoing" || !settings?.auto_end_enabled) {
+      clearAutoEndTimers();
+      return;
+    }
+
+    const dateStr = settings.election_date instanceof Date
+      ? settings.election_date.toISOString().slice(0, 10)
+      : String(settings.election_date || '').slice(0, 10);
+
+    const endDateTime = parseElectionDateTime(dateStr, settings.voting_end);
+
+    if (!endDateTime) {
+      clearAutoEndTimers();
+      return;
+    }
+
+    const now = new Date();
+
+    // If end time already passed, end immediately
+    if (now >= endDateTime) {
+      updateStatus.mutate("completed");
+      clearAutoEndTimers();
+      return;
+    }
+
+    // Schedule auto-end at exactly the voting_end time
+    const msUntilEnd = endDateTime.getTime() - now.getTime();
+    setAutoEndCountdown(Math.ceil(msUntilEnd / 1000));
+
+    autoEndTimerRef.current = setTimeout(() => {
+      updateStatus.mutate("completed");
+      clearAutoEndTimers();
+    }, msUntilEnd);
+
+    autoEndIntervalRef.current = setInterval(() => {
+      const remaining = Math.ceil((endDateTime.getTime() - Date.now()) / 1000);
+      if (remaining <= 0) {
+        setAutoEndCountdown(0);
+        clearInterval(autoEndIntervalRef.current);
+        autoEndIntervalRef.current = null;
+      } else {
+        setAutoEndCountdown(remaining);
+      }
+    }, 1000);
+
+    return () => clearAutoEndTimers();
+  }, [settings?.status, settings?.election_date, settings?.voting_end, settings?.auto_end_enabled]);
+
   const [showExpiredEndConfirm, setShowExpiredEndConfirm] = useState(false);
 
   const handleStartElection = () => {
@@ -259,11 +397,15 @@ export default function Admin() {
       ? settings.election_date.toISOString().slice(0, 10)
       : String(settings.election_date || '').slice(0, 10);
 
-    if (dateStr && settings.voting_end) {
-      const [year, month, day] = dateStr.split('-').map(Number);
-      const [endH, endM, endS = 0] = String(settings.voting_end).split(':').map(Number);
-      const endDateTime = new Date(year, month - 1, day, endH, endM, endS);
+    if (dateStr && settings.voting_start && settings.voting_end) {
+      const startDateTime = parseElectionDateTime(dateStr, settings.voting_start);
+      const endDateTime = parseElectionDateTime(dateStr, settings.voting_end);
       const now = new Date();
+
+      if (!startDateTime || !endDateTime || endDateTime <= startDateTime) {
+        toast({ title: "Invalid schedule", description: `The election end time must be later than the opening time (${ELECTION_TIME_ZONE}).`, variant: "destructive" });
+        return;
+      }
 
       // Trapping: Prompt to extend end time & start if configured end time has already passed
       if (now >= endDateTime) {
@@ -273,8 +415,6 @@ export default function Admin() {
 
       // Trapping: Prompt confirmation if voting start time has not arrived yet
       if (settings.voting_start) {
-        const [startH, startM, startS = 0] = String(settings.voting_start).split(':').map(Number);
-        const startDateTime = new Date(year, month - 1, day, startH, startM, startS);
         if (now < startDateTime) {
           setShowEarlyStartConfirm(true);
           return;
@@ -285,17 +425,21 @@ export default function Admin() {
     updateStatus.mutate("ongoing");
   };
 
-  const handleExtendAndStart = () => {
+  const handleExtendAndStart = async () => {
     const todayStr = new Date().toLocaleDateString('sv-SE');
-    updateSchedule.mutate({
-      name: settings?.name || "SSLG Election 2026",
-      election_date: todayStr,
-      voting_start: settings?.voting_start || "08:00:00",
-      voting_end: "23:59:00",
-      auto_end_enabled: settings?.auto_end_enabled ?? true,
-    });
-    updateStatus.mutate("ongoing");
-    setShowExpiredEndConfirm(false);
+    try {
+      await updateSchedule.mutateAsync({
+        name: settings?.name || "SSLG Election 2026",
+        election_date: todayStr,
+        voting_start: settings?.voting_start || "08:00:00",
+        voting_end: "23:59:00",
+        auto_end_enabled: settings?.auto_end_enabled ?? true,
+      });
+      await updateStatus.mutateAsync("ongoing");
+      setShowExpiredEndConfirm(false);
+    } catch {
+      // The mutation handlers already show the server error to the admin.
+    }
   };
 
   const updateSchedule = useMutation({
@@ -1726,10 +1870,22 @@ export default function Admin() {
                 <p className="text-xs text-muted-foreground mb-4">
                   {settings?.status === "ongoing" ? (
                     settings?.auto_end_enabled ? (
-                      <span className="text-gold font-medium">⏰ Auto-End Enabled: Election will automatically end when voting schedule expires.</span>
+                      autoEndCountdown != null && autoEndCountdown > 0 ? (
+                        <span className="text-gold font-medium flex items-center gap-1.5">
+                          <Clock className="w-3.5 h-3.5 animate-pulse" />
+                          Auto-End in <strong className="mx-1">{formatCountdown(autoEndCountdown)}</strong> — Election will automatically end at the scheduled time.
+                        </span>
+                      ) : (
+                        <span className="text-gold font-medium">⏰ Auto-End Enabled: Election will automatically end when voting schedule expires.</span>
+                      )
                     ) : (
                       <span className="text-muted-foreground font-medium">🔒 Manual Mode: Auto-end is disabled. You control when to end the election.</span>
                     )
+                  ) : settings?.status === "upcoming" && autoStartCountdown != null && autoStartCountdown > 0 ? (
+                    <span className="text-gold font-medium flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 animate-pulse" />
+                      Auto-Start in <strong className="mx-1">{formatCountdown(autoStartCountdown)}</strong> — Election will begin automatically at the scheduled time.
+                    </span>
                   ) : (
                     <span>Controls voting access for all students across the platform.</span>
                   )}

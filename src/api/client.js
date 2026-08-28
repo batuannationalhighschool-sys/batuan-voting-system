@@ -326,15 +326,35 @@ async function handleDelete(path) {
 // ─── File Upload Helpers ────────────────────────────────────────────
 async function uploadPhotoToStorage(file) {
   if (!file || !(file instanceof File)) return null;
-  const ext = file.name.split('.').pop().toLowerCase();
-  const fileName = `${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from('candidate-photos').upload(fileName, file, {
-    contentType: file.type,
-    upsert: false,
+  const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  if (!allowedTypes.has(file.type)) {
+    throw new Error('Only JPEG, PNG, and WebP images are allowed');
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Candidate photos must be 5 MB or smaller');
+  }
+
+  const endpoint = import.meta.env.VITE_UPLOAD_API_URL
+    || (import.meta.env.DEV ? 'http://localhost:3001/api/candidate-photo' : '/api/candidate-photo');
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+      'Content-Type': file.type,
+    },
+    body: file,
   });
-  if (error) throw new Error(`Photo upload failed: ${error.message}`);
-  const { data: urlData } = supabase.storage.from('candidate-photos').getPublicUrl(fileName);
-  return urlData.publicUrl;
+
+  let result = null;
+  try {
+    result = await response.json();
+  } catch {
+    // Keep the user-facing error below stable if the proxy returns no JSON.
+  }
+  if (!response.ok || !result?.url) {
+    throw new Error(result?.error || 'Photo upload failed');
+  }
+  return result.url;
 }
 
 // ─── Upload (POST with FormData) ────────────────────────────────────

@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -328,7 +328,7 @@ async function seed() {
   const voterIds = [];
 
   for (const v of voters) {
-    const id = uuidv4();
+    const id = randomUUID();
     userBatch.push({
       id,
       lrn: v.lrn,
@@ -337,14 +337,14 @@ async function seed() {
       must_change_password: false,
     });
     profileBatch.push({
-      id: uuidv4(),
+      id: randomUUID(),
       user_id: id,
       full_name: v.full_name,
       grade_level: v.grade_level,
       section: v.section,
     });
     roleBatch.push({
-      id: uuidv4(),
+      id: randomUUID(),
       user_id: id,
       role: 'voter',
     });
@@ -375,7 +375,7 @@ async function seed() {
     candidateRecords[posTitle] = [];
 
     for (const c of cands) {
-      const id = uuidv4();
+      const id = randomUUID();
       const candObj = {
         id, name: c.name, position_id: posId,
         grade_level: c.grade_level, section: c.section,

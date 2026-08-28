@@ -21,6 +21,14 @@ export default function CandidateCard({
   return (
     <div
       onClick={() => selectable && onSelect?.(candidate.id)}
+      onKeyDown={(event) => {
+        if (selectable && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onSelect?.(candidate.id);
+        }
+      }}
+      role={selectable ? "button" : undefined}
+      tabIndex={selectable ? 0 : undefined}
       className={`group relative bg-card rounded-xl border overflow-hidden transition-all duration-300 animate-fade-in ${
         selectable ? "cursor-pointer hover:shadow-elegant hover:-translate-y-1" : "shadow-elegant"
       } ${selected ? "ring-2 ring-gold border-gold shadow-gold" : "border-border"}`}

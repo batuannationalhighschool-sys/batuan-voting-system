@@ -1,106 +1,72 @@
 /**
- * Batuan Voting — One-Command Deployment Script
+ * Batuan Voting - deployment helper for Vercel.
  *
- * Usage: node deployment.js
- *
- * Reads vercel_token from .env, builds the frontend,
- * and deploys the dist/ folder to Vercel via API.
+ * The VERCEL_TOKEN must be supplied by the process environment or a CI secret
+ * store. This file intentionally never reads tokens from .env.
  */
-import { execSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
-import crypto from 'crypto';
-import { fileURLToPath } from 'url';
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const projectName = 'batuan-voting';
+const vercelApi = 'https://api.vercel.com';
+const vercelToken = process.env.VERCEL_TOKEN;
 
-// ─── Load .env ──────────────────────────────────────────────────────
-function loadEnv() {
-  const envPath = path.join(__dirname, '.env');
-  if (!fs.existsSync(envPath)) {
-    console.error('❌ .env file not found');
-    process.exit(1);
-  }
-  const lines = fs.readFileSync(envPath, 'utf-8').split('\n');
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const eqIdx = trimmed.indexOf('=');
-    if (eqIdx < 0) continue;
-    const key = trimmed.slice(0, eqIdx).trim();
-    const val = trimmed.slice(eqIdx + 1).trim();
-    if (!process.env[key]) process.env[key] = val;
-  }
-}
-
-loadEnv();
-
-const VERCEL_TOKEN = process.env.vercel_token;
-const PROJECT_NAME = 'batuan-voting';
-const VERCEL_API = 'https://api.vercel.com';
-
-if (!VERCEL_TOKEN) {
-  console.error('❌ vercel_token not found in .env');
+if (!vercelToken) {
+  console.error('VERCEL_TOKEN is not set in the process environment.');
   process.exit(1);
 }
 
-// ─── Helpers ────────────────────────────────────────────────────────
 async function vercelFetch(endpoint, options = {}) {
-  const res = await fetch(`${VERCEL_API}${endpoint}`, {
+  return fetch(`${vercelApi}${endpoint}`, {
     ...options,
     headers: {
-      Authorization: `Bearer ${VERCEL_TOKEN}`,
+      Authorization: `Bearer ${vercelToken}`,
       ...options.headers,
     },
   });
-  return res;
 }
 
-function getAllFiles(dir, base = '') {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+function getAllFiles(directory, base = '') {
+  const entries = fs.readdirSync(directory, { withFileTypes: true });
   const files = [];
   for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name);
+    const fullPath = path.join(directory, entry.name);
     const relativePath = base ? `${base}/${entry.name}` : entry.name;
-    if (entry.isDirectory()) {
-      files.push(...getAllFiles(fullPath, relativePath));
-    } else {
-      files.push({ file: relativePath, fullPath });
-    }
+    if (entry.isDirectory()) files.push(...getAllFiles(fullPath, relativePath));
+    else files.push({ file: relativePath, fullPath });
   }
   return files;
 }
 
-// ─── Step 1: Build ──────────────────────────────────────────────────
-console.log('');
-console.log('🔨 Building frontend...');
-console.log('─'.repeat(50));
-try {
-  execSync('npm run build', { stdio: 'inherit', cwd: __dirname });
-} catch (err) {
-  console.error('❌ Build failed');
-  process.exit(1);
+function deploymentFiles() {
+  const files = [];
+  const distDir = path.join(projectDir, 'dist');
+  const apiDir = path.join(projectDir, 'api');
+
+  files.push(...getAllFiles(distDir));
+  if (fs.existsSync(apiDir)) files.push(...getAllFiles(apiDir, 'api'));
+
+  for (const file of ['package.json', 'package-lock.json', 'vercel.json']) {
+    const fullPath = path.join(projectDir, file);
+    if (fs.existsSync(fullPath)) files.push({ file, fullPath });
+  }
+  return files;
 }
 
-// ─── Step 2: Upload files to Vercel ─────────────────────────────────
-console.log('');
-console.log('📦 Uploading files to Vercel...');
-console.log('─'.repeat(50));
+console.log('Building frontend...');
+execSync('npm run build', { stdio: 'inherit', cwd: projectDir });
 
-const distDir = path.join(__dirname, 'dist');
-if (!fs.existsSync(distDir)) {
-  console.error('❌ dist/ directory not found. Build may have failed.');
-  process.exit(1);
-}
-
-const files = getAllFiles(distDir);
+const entries = deploymentFiles();
 const fileManifest = [];
 
-for (const f of files) {
-  const content = fs.readFileSync(f.fullPath);
+for (const entry of entries) {
+  const content = fs.readFileSync(entry.fullPath);
   const sha = crypto.createHash('sha1').update(content).digest('hex');
-
-  const uploadRes = await vercelFetch('/v2/files', {
+  const uploadResponse = await vercelFetch('/v2/files', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/octet-stream',
@@ -110,56 +76,37 @@ for (const f of files) {
     body: content,
   });
 
-  if (!uploadRes.ok && uploadRes.status !== 409) {
-    const errText = await uploadRes.text();
-    console.error(`❌ Failed to upload ${f.file}: ${errText}`);
+  if (!uploadResponse.ok && uploadResponse.status !== 409) {
+    console.error(`Failed to upload ${entry.file}: ${await uploadResponse.text()}`);
     process.exit(1);
   }
 
-  fileManifest.push({ file: f.file, sha, size: content.length });
-  process.stdout.write(`  ✓ ${f.file}\n`);
+  fileManifest.push({ file: entry.file, sha, size: content.length });
+  console.log(`Uploaded ${entry.file}`);
 }
 
-console.log(`\n  📁 ${fileManifest.length} files uploaded`);
-
-// ─── Step 3: Create deployment ──────────────────────────────────────
-console.log('');
-console.log('🚀 Creating Vercel deployment...');
-console.log('─'.repeat(50));
-
-const deployRes = await vercelFetch('/v13/deployments', {
+const deploymentResponse = await vercelFetch('/v13/deployments', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    name: PROJECT_NAME,
+    name: projectName,
     files: fileManifest,
     target: 'production',
-    projectSettings: {
-      framework: null,
-    },
+    projectSettings: { framework: null },
+    builds: [{ src: 'api/*.js', use: '@vercel/node' }],
     routes: [
+      { src: '/api/(.*)', dest: '/api/$1' },
       { handle: 'filesystem' },
       { src: '/(.*)', dest: '/index.html' },
     ],
   }),
 });
 
-const deployData = await deployRes.json();
-
-if (!deployRes.ok) {
-  console.error('❌ Deployment failed:', JSON.stringify(deployData, null, 2));
+const deployment = await deploymentResponse.json();
+if (!deploymentResponse.ok) {
+  console.error('Deployment failed:', JSON.stringify(deployment));
   process.exit(1);
 }
 
-console.log('');
-console.log('═'.repeat(50));
-console.log('✅ DEPLOYMENT SUCCESSFUL!');
-console.log('═'.repeat(50));
-console.log('');
-console.log(`  🌐 URL:         https://${deployData.url}`);
-if (deployData.alias && deployData.alias.length > 0) {
-  console.log(`  🔗 Production:  https://${deployData.alias[0]}`);
-}
-console.log(`  📋 Status:      ${deployData.readyState || 'DEPLOYING'}`);
-console.log(`  🕐 Deployed at: ${new Date().toLocaleString()}`);
-console.log('');
+console.log(`Deployment created: https://${deployment.url}`);
+if (deployment.alias?.length) console.log(`Production alias: https://${deployment.alias[0]}`);

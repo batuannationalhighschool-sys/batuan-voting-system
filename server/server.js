@@ -2,11 +2,11 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'node:crypto';
 import multer from 'multer';
 import path from 'path';
 import supabase from './db.js';
-import { generateToken, requireAuth, requireAdmin } from './middleware/auth.js';
+import { requireAuth, requireAdmin } from './middleware/auth.js';
 
 // Multer config — temporary in-memory storage before uploading to Supabase Storage
 const upload = multer({
@@ -23,7 +23,7 @@ const upload = multer({
 // Helper: upload file buffer to Supabase Storage
 async function uploadToSupabaseStorage(fileBuffer, originalName) {
   const ext = path.extname(originalName).toLowerCase();
-  const fileName = `${uuidv4()}${ext}`;
+  const fileName = `${randomUUID()}${ext}`;
   const { data, error } = await supabase.storage
     .from('candidate-photos')
     .upload(fileName, fileBuffer, {
@@ -40,11 +40,43 @@ async function uploadToSupabaseStorage(fileBuffer, originalName) {
   return urlData.publicUrl;
 }
 
+function detectImageType(buffer) {
+  if (!Buffer.isBuffer(buffer)) return null;
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return { extension: 'jpg', mimeType: 'image/jpeg' };
+  }
+  if (
+    buffer.length >= 8
+    && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  ) {
+    return { extension: 'png', mimeType: 'image/png' };
+  }
+  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
+    return { extension: 'webp', mimeType: 'image/webp' };
+  }
+  return null;
+}
+
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-app.use(cors());
-app.use(express.json());
+const configuredCorsOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(cors({
+  origin(origin, callback) {
+    // Same-origin and non-browser requests do not send an Origin header.
+    if (!origin) return callback(null, true);
+    if (configuredCorsOrigins.includes(origin)) return callback(null, true);
+    if (process.env.NODE_ENV !== 'production' && configuredCorsOrigins.length === 0) {
+      return callback(null, true);
+    }
+    return callback(new Error('Origin is not allowed'));
+  },
+}));
+app.use(express.json({ limit: '1mb' }));
 
 // ─── Auth Routes ────────────────────────────────────────────────
 
@@ -56,30 +88,19 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'LRN and password are required' });
     }
 
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('lrn', lrn)
-      .single();
-
-    if (error || !user) {
-      return res.status(401).json({ error: 'Invalid LRN or password' });
-    }
-
-    const valid = await bcrypt.compare(password, user.password_hash);
-    if (!valid) {
-      return res.status(401).json({ error: 'Invalid LRN or password' });
-    }
-
-    const token = generateToken(user);
-    res.json({
-      token,
-      user: { id: user.id, lrn: user.lrn, full_name: user.full_name },
-      must_change_password: !!user.must_change_password,
+    const { data, error } = await supabase.rpc('app_login', {
+      p_lrn: lrn,
+      p_password: password,
     });
+
+    if (error || !data?.token) {
+      return res.status(401).json({ error: 'Invalid LRN or password' });
+    }
+
+    return res.json(data);
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ error: 'Login failed' });
+    console.error('Login error:', err.message);
+    return res.status(500).json({ error: 'Login failed' });
   }
 });
 
@@ -91,61 +112,47 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
 
-    const password_hash = await bcrypt.hash(new_password, 10);
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ password_hash, must_change_password: false })
-      .eq('id', req.user.id);
+    const { data, error } = await supabase.rpc('app_change_password', {
+      p_token: req.authToken,
+      p_new_password: new_password,
+    });
 
-    if (updateError) throw updateError;
-
-    // Generate a new token
-    const { data: updatedUser, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', req.user.id)
-      .single();
-
-    if (fetchError) throw fetchError;
-    const token = generateToken(updatedUser);
-
-    res.json({ success: true, token });
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json(data);
   } catch (err) {
-    console.error('Change password error:', err);
-    res.status(500).json({ error: 'Failed to change password' });
+    console.error('Change password error:', err.message);
+    return res.status(500).json({ error: 'Failed to change password' });
   }
 });
 
 app.get('/api/auth/me', requireAuth, async (req, res) => {
-  try {
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('full_name, has_voted, grade_level, section')
-      .eq('user_id', req.user.id);
-
-    if (profileError) throw profileError;
-
-    const { data: roles, error: roleError } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', req.user.id);
-
-    if (roleError) throw roleError;
-
-    const profile = profiles?.[0] || null;
-    const isAdmin = roles?.some(r => r.role === 'admin') || false;
-
-    res.json({
-      user: { id: req.user.id, lrn: req.user.lrn, full_name: req.user.full_name },
-      profile,
-      isAdmin,
-      must_change_password: !!req.user.must_change_password,
-    });
-  } catch (err) {
-    console.error('Me error:', err);
-    res.status(500).json({ error: 'Failed to fetch user info' });
-  }
+  return res.json(req.authData);
 });
+
+// Candidate photo proxy. Anonymous browser uploads are intentionally not
+// allowed by the database policy; only an authenticated administrator can
+// reach storage through this server-side service-role path.
+app.post(
+  '/api/candidate-photo',
+  requireAuth,
+  requireAdmin,
+  express.raw({ type: /^image\/(jpeg|png|webp)$/, limit: '5mb' }),
+  async (req, res) => {
+    try {
+      const image = detectImageType(req.body);
+      const contentType = req.headers['content-type']?.split(';')[0]?.toLowerCase();
+      if (!image || image.mimeType !== contentType) {
+        return res.status(400).json({ error: 'The uploaded file is not a supported image' });
+      }
+
+      const url = await uploadToSupabaseStorage(req.body, `candidate.${image.extension}`);
+      return res.json({ url });
+    } catch (err) {
+      console.error('Candidate photo upload error:', err.message);
+      return res.status(400).json({ error: 'Candidate photo upload failed' });
+    }
+  },
+);
 
 // ─── Voter Management (Admin only) ─────────────────────────────
 
@@ -220,7 +227,7 @@ app.post('/api/voters', requireAuth, requireAdmin, async (req, res) => {
       return res.status(400).json({ error: 'LRN already registered' });
     }
 
-    const id = uuidv4();
+    const id = randomUUID();
     // Default password = LRN
     const password_hash = await bcrypt.hash(lrn, 10);
 
@@ -234,7 +241,7 @@ app.post('/api/voters', requireAuth, requireAdmin, async (req, res) => {
     const { error: profileError } = await supabase
       .from('profiles')
       .insert({
-        id: uuidv4(),
+        id: randomUUID(),
         user_id: id,
         full_name,
         grade_level: grade_level || null,
@@ -246,7 +253,7 @@ app.post('/api/voters', requireAuth, requireAdmin, async (req, res) => {
     // Assign voter role
     const { error: roleError } = await supabase
       .from('user_roles')
-      .insert({ id: uuidv4(), user_id: id, role: 'voter' });
+      .insert({ id: randomUUID(), user_id: id, role: 'voter' });
 
     if (roleError) throw roleError;
 
@@ -465,7 +472,7 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
         continue;
       }
 
-      const id = uuidv4();
+      const id = randomUUID();
       const password_hash = await bcrypt.hash(cleanLrn, 10);
 
       const { error: userError } = await supabase
@@ -480,7 +487,7 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
-          id: uuidv4(),
+          id: randomUUID(),
           user_id: id,
           full_name: String(full_name).slice(0, 100),
           grade_level: grade_level ? String(grade_level).slice(0, 50) : null,
@@ -494,7 +501,7 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
 
       const { error: roleError } = await supabase
         .from('user_roles')
-        .insert({ id: uuidv4(), user_id: id, role: 'voter' });
+        .insert({ id: randomUUID(), user_id: id, role: 'voter' });
 
       if (roleError) {
         errors.push({ row: rowLabel, lrn: cleanLrn, reason: roleError.message });
@@ -577,7 +584,7 @@ app.post('/api/positions', requireAuth, requireAdmin, async (req, res) => {
     const { title, display_order } = req.body;
     if (!title) return res.status(400).json({ error: 'Title is required' });
 
-    const id = uuidv4();
+    const id = randomUUID();
     const { error } = await supabase
       .from('positions')
       .insert({ id, title, display_order: display_order || 0 });
@@ -629,7 +636,7 @@ app.post('/api/candidates', requireAuth, requireAdmin, upload.single('photo'), a
       return res.status(400).json({ error: 'Name, position, grade level, section, and party list are required' });
     }
 
-    const id = uuidv4();
+    const id = randomUUID();
     let avatar_url = null;
 
     if (req.file) {
@@ -827,7 +834,7 @@ app.post('/api/candidates/bulk', requireAuth, requireAdmin, async (req, res) => 
         continue;
       }
 
-      const id = uuidv4();
+      const id = randomUUID();
       const { error: insertError } = await supabase
         .from('candidates')
         .insert({
@@ -886,7 +893,7 @@ app.post('/api/votes', requireAuth, async (req, res) => {
     // ── Check if election status is ongoing ─────────────────────────────
     const { data: settingsRows } = await supabase
       .from('election_settings')
-      .select('status, name, election_date, voting_start')
+      .select('status, name, election_date, voting_start, voting_end, auto_end_enabled')
       .limit(1);
 
     const election = settingsRows?.[0];
@@ -900,6 +907,19 @@ app.post('/api/votes', requireAuth, async (req, res) => {
           error: 'Voting is closed. This election is not currently active.'
         });
       }
+    }
+
+    const startDateTime = parseLocalDate(election.election_date, election.voting_start);
+    const endDateTime = parseLocalDate(election.election_date, election.voting_end);
+    if (!startDateTime || !endDateTime || endDateTime <= startDateTime) {
+      return res.status(503).json({ error: 'Election schedule is invalid' });
+    }
+    const now = new Date();
+    if (now < startDateTime) {
+      return res.status(403).json({ error: 'Voting is not open yet' });
+    }
+    if (election.auto_end_enabled !== false && now >= endDateTime) {
+      return res.status(403).json({ error: 'Voting is closed' });
     }
 
     // Fetch voter profile (grade_level)
@@ -962,20 +982,24 @@ app.post('/api/votes', requireAuth, async (req, res) => {
     }
 
     // Use the RPC function for atomic vote submission
-    const { error: rpcError } = await supabase.rpc('submit_votes', {
-      p_voter_id: req.user.id,
+    const { data: result, error: rpcError } = await supabase.rpc('app_submit_votes', {
+      p_token: req.authToken,
       p_votes: votes,
     });
 
     if (rpcError) {
       // Check for unique constraint violation (duplicate vote)
-      if (rpcError.message && rpcError.message.includes('unique') || rpcError.code === '23505') {
+      const rpcMessage = rpcError.message || '';
+      if (rpcError.code === '23505' || /already voted|duplicate|unique/i.test(rpcMessage)) {
         return res.status(400).json({ error: 'You have already voted for one of the selected candidates' });
+      }
+      if (/not open|closed|administrator|voter role|password|profile/i.test(rpcMessage)) {
+        return res.status(403).json({ error: rpcMessage });
       }
       throw rpcError;
     }
 
-    res.json({ success: true });
+    res.json(result || { success: true });
   } catch (err) {
     console.error('Vote error:', err);
     res.status(500).json({ error: err.message || 'Failed to submit votes' });
@@ -1126,29 +1150,26 @@ app.put('/api/election-settings/:id', requireAuth, requireAdmin, async (req, res
     if (school_name !== undefined) updateData.school_name = school_name;
     if (auto_end_enabled !== undefined) updateData.auto_end_enabled = !!auto_end_enabled;
 
-    // If setting to upcoming and election_date is in the past, auto-update election_date to today's date
-    if (status === 'upcoming' && !election_date) {
-      const { data: curr } = await supabase.from('election_settings').select('election_date').eq('id', req.params.id).single();
-      if (curr && curr.election_date) {
-        const currDateStr = curr.election_date instanceof Date ? curr.election_date.toISOString().slice(0, 10) : String(curr.election_date).slice(0, 10);
-        const todayStr = new Date().toLocaleDateString('sv-SE');
-        if (currDateStr < todayStr) {
-          updateData.election_date = todayStr;
-        }
-      }
-    }
-
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
     }
 
-    const { error } = await supabase
-      .from('election_settings')
-      .update(updateData)
-      .eq('id', req.params.id);
+    // Route compatibility updates through the same guarded RPC used by the
+    // frontend so this server cannot bypass schedule validation or the
+    // election-history archive gate.
+    const { data, error } = await supabase.rpc('app_update_election_settings', {
+      p_token: req.authToken,
+      p_id: req.params.id,
+      p_data: updateData,
+    });
 
-    if (error) throw error;
-    res.json({ success: true });
+    if (error) {
+      if (/admin access|authentication|invalid or expired/i.test(error.message || '')) {
+        return res.status(403).json({ error: error.message });
+      }
+      return res.status(400).json({ error: error.message || 'Election settings update failed' });
+    }
+    return res.json(data || { success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update election settings' });
   }
@@ -1230,15 +1251,39 @@ app.get('/api/stats', async (req, res) => {
 // 1. Auto-starts UPCOMING elections when current time reaches or passes voting_start.
 // 2. Auto-completes ONGOING elections when current time reaches or passes voting_end (if auto_end_enabled = true).
 
+// Return a bounded JSON error for body-parser/multer failures instead of an
+// HTML response or a stack trace.
+app.use((err, req, res, next) => {
+  if (err?.type === 'entity.too.large' || err?.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: 'Request payload is too large' });
+  }
+  if (err) {
+    console.error('Request error:', err.message);
+    return res.status(400).json({ error: 'Invalid request' });
+  }
+  return next();
+});
+
 function parseLocalDate(dateVal, timeVal) {
   if (!dateVal || !timeVal) return null;
   const dateStr = dateVal instanceof Date ? dateVal.toISOString().slice(0, 10) : String(dateVal).slice(0, 10);
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hours, minutes, seconds = 0] = String(timeVal).split(':').map(Number);
-  return new Date(year, month - 1, day, hours, minutes, seconds);
+  if (![year, month, day, hours, minutes, seconds].every(Number.isFinite)) return null;
+  // Supabase stores election date/time as Philippine local wall-clock values.
+  return new Date(Date.UTC(year, month - 1, day, hours, minutes, seconds) - (8 * 60 * 60 * 1000));
 }
 
 async function autoManageElections() {
+  try {
+    const { error } = await supabase.rpc('app_auto_manage_elections');
+    if (error) throw error;
+  } catch (err) {
+    console.error('[Auto-Scheduler] Error:', err.message);
+  }
+}
+
+async function legacyAutoManageElections() {
   try {
     const now = new Date();
 

@@ -1,57 +1,38 @@
-import jwt from 'jsonwebtoken';
 import supabase from '../db.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'batuan-voting-secret-key-2026';
+function getBearerToken(req) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) return null;
 
-export function generateToken(user) {
-  return jwt.sign(
-    { id: user.id, lrn: user.lrn },
-    JWT_SECRET,
-    { expiresIn: '7d' }
-  );
+  const token = header.slice('Bearer '.length).trim();
+  return token || null;
 }
 
+// The deployed frontend and the legacy Express server now use the same
+// database-issued token. The service-role client validates it through the
+// hardened app_get_me RPC, so this server has no duplicate JWT secret.
 export async function requireAuth(req, res, next) {
+  const token = getBearerToken(req);
+  if (!token) return res.status(401).json({ error: 'Authentication required' });
+
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Authentication required' });
+    const { data, error } = await supabase.rpc('app_get_me', { p_token: token });
+    if (error || !data?.user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
-
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('id, lrn, full_name, must_change_password')
-      .eq('id', decoded.id)
-      .single();
-
-    if (error || !user) {
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    req.user = user;
-    next();
-  } catch (err) {
+    req.authToken = token;
+    req.authData = data;
+    req.user = data.user;
+    req.profile = data.profile || null;
+    req.isAdmin = data.isAdmin === true;
+    return next();
+  } catch {
     return res.status(401).json({ error: 'Invalid or expired token' });
   }
 }
 
-export async function requireAdmin(req, res, next) {
-  try {
-    const { data: roles, error } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', req.user.id)
-      .eq('role', 'admin');
-
-    if (error || !roles || roles.length === 0) {
-      return res.status(403).json({ error: 'Admin access required' });
-    }
-    req.isAdmin = true;
-    next();
-  } catch (err) {
-    return res.status(500).json({ error: 'Server error' });
-  }
+export function requireAdmin(req, res, next) {
+  if (!req.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+  return next();
 }

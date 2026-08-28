@@ -1,67 +1,80 @@
-# Batuan National High School — SSLG Voting & Management System
+# Batuan National High School - SSLG Voting System
 
-A web-based voting system for the Supreme Student Learner Government (SSLG) election at Batuan National High School.
+This is a React/Vite voting application backed by Supabase PostgreSQL RPCs. The `server/` Express process is an optional local compatibility server and photo proxy; the deployed frontend normally calls Supabase directly.
 
-## Tech Stack
+## Requirements
 
-- **Frontend**: React + Vite
-- **Backend**: Express.js (Node.js)
-- **Database**: MySQL
+- Node.js 20 or newer
+- A Supabase project
+- A trusted scheduler for automatic election start/end (Supabase `pg_cron` is recommended)
 
-## Getting Started
+## Database setup
 
-### Prerequisites
+For a new Supabase project, run these files in order in the Supabase SQL Editor:
 
-- Node.js & npm
-- MySQL Server
-
-### 1. Set up the database
-
-```sql
-mysql -u root -p < server/schema.sql
+```text
+server/schema.sql
+server/migration-election-history.sql
+server/migration-security-hardening.sql
 ```
 
-### 2. Configure environment variables
+For an existing project that already has the base schema and RPC migration, run the last two files only. The security migration must be applied after the election-history migration because it protects the reset/start path with the archive table.
 
-Create a `.env` file in the root directory:
+The hardening migration makes the configured election window authoritative inside `app_submit_votes`. A stale `ongoing` status cannot accept a vote before the opening instant or, when automatic ending is enabled, at or after the closing instant. It also moves the custom-token signing key into Supabase Vault, creates an atomic ballot marker, removes anonymous candidate-photo uploads, and prevents an unarchived ballot from being silently deleted during a reset.
 
-```env
-VITE_API_URL=http://localhost:3001/api
+Applying it invalidates existing custom session tokens by changing the signing key; users must sign in again after the migration.
 
-# Database Configuration
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=batuan_voting
+## Environment variables
+
+Copy the safe templates and fill them locally or in your hosting provider:
+
+```text
+.env.example
+server/.env.example
 ```
 
-### 3. Install dependencies
+The browser may receive only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Keep `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, and all provider tokens in server/hosting secret storage. The deployment helper requires `VERCEL_TOKEN` in the process environment; it does not read tokens from `.env`.
+
+Never commit `.env` files. Rotate any PAT, service-role key, GitHub token, or Vercel token if this workspace has been shared or copied.
+
+## Local development
 
 ```sh
-# Frontend
 npm install
+npm run dev
+```
 
-# Backend
+To run the optional Express compatibility server and its local candidate-photo proxy:
+
+```sh
 cd server
 npm install
+npm run dev
 ```
 
-### 4. Run the application
+When using the local photo proxy, set `VITE_UPLOAD_API_URL=http://localhost:3001/api/candidate-photo` in the root environment. Production uses `/api/candidate-photo` from the Vercel Function.
+
+## Automatic election scheduling
+
+The vote RPC is safe even when a scheduler invocation is missed. To keep the displayed database status synchronized, configure one trusted scheduler after applying the hardening migration:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+SELECT cron.schedule(
+  'auto-manage-elections',
+  '* * * * *',
+  $$SELECT public.app_auto_manage_elections()$$
+);
+```
+
+Alternatively, deploy the included `/api/auto-manage-elections` function with `CRON_SECRET` configured. `vercel.json` declares a per-minute Vercel Cron; the hosting plan must support that frequency. Do not expose the scheduler endpoint without its secret.
+
+## Verification
 
 ```sh
-# Start backend (from /server)
-npm run dev
-
-# Start frontend (from root)
-npm run dev
+npm run build
+node --check server/server.js
+node --check server/middleware/auth.js
+node --check api/auto-manage-elections.js
+node --check api/candidate-photo.js
 ```
-
-## Default Admin Credentials
-
-| Field    | Value                |
-|----------|----------------------|
-| Email    | `admin@bnhs.edu.ph`  |
-| Password | `admin123`           |
-
-> **Note:** These credentials are seeded automatically when you run `schema.sql`. Change the password after your first login.

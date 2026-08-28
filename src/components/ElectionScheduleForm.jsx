@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Save, Clock, ToggleLeft, ToggleRight, AlertTriangle } from "lucide-react";
+import { getElectionWindowState } from "@/lib/election-time";
 
 export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
   const [form, setForm] = useState({
@@ -9,6 +10,7 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
     voting_end: "",
     auto_end_enabled: true,
   });
+  const [validationError, setValidationError] = useState("");
 
   // Populate form whenever settings change
   useEffect(() => {
@@ -27,17 +29,22 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
     });
   }, [settings]);
 
-  const isEndPast = (() => {
-    if (!form.election_date || !form.voting_end) return false;
-    const [year, month, day] = form.election_date.split('-').map(Number);
-    const [endH, endM, endS = 0] = form.voting_end.split(':').map(Number);
-    const endDateTime = new Date(year, month - 1, day, endH, endM, endS);
-    return new Date() >= endDateTime;
-  })();
+  const scheduleState = getElectionWindowState(form);
+  const isScheduleComplete = Boolean(form.election_date && form.voting_start && form.voting_end);
+  const isWindowInvalid = isScheduleComplete && scheduleState.state === "invalid";
+  const isEndPast = Boolean(scheduleState.endAt && new Date() >= scheduleState.endAt);
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (!form.election_date || !form.voting_start || !form.voting_end) return;
+    if (!form.election_date || !form.voting_start || !form.voting_end) {
+      setValidationError("Election date, opening time, and ending time are required.");
+      return;
+    }
+    if (isWindowInvalid) {
+      setValidationError("The ending time must be later than the opening time on the configured election date.");
+      return;
+    }
+    setValidationError("");
     onSave({
       name: form.name,
       election_date: form.election_date,
@@ -49,6 +56,11 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
+      {validationError && (
+        <p className="text-xs rounded-xl px-4 py-2.5 border text-destructive bg-destructive/10 border-destructive/20 font-medium" role="alert">
+          {validationError}
+        </p>
+      )}
       <div>
         <label className="block text-xs font-medium text-muted-foreground mb-1.5">Election Name</label>
         <input
