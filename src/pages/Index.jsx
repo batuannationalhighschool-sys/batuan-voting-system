@@ -1,6 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Users, Vote, BarChart3, Calendar, TrendingUp, CheckCircle, LogIn, Settings } from "lucide-react";
+import { Users, Vote, Calendar, TrendingUp, CheckCircle, LogIn, Trophy, User, Award } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -32,6 +32,11 @@ export default function Index() {
     queryFn: () => api.get('/stats'),
   });
 
+  const { data: candidates } = useQuery({
+    queryKey: ["candidates"],
+    queryFn: () => api.get('/candidates'),
+  });
+
   const profileCount = stats?.voterCount ?? 0;
   const votedCount = stats?.votedCount ?? 0;
   const totalVotes = stats?.totalVotes ?? 0;
@@ -39,7 +44,25 @@ export default function Index() {
 
   const turnout = profileCount && profileCount > 0 ? ((votedCount) / profileCount * 100).toFixed(1) : "0";
 
-  const topCandidates = [...(voteCounts ?? [])].sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0)).slice(0, 5);
+  const topCandidates = useMemo(() => {
+    return [...(voteCounts ?? [])].sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0)).slice(0, 6);
+  }, [voteCounts]);
+
+  const candidatesMap = useMemo(() => {
+    const map = new Map();
+    (candidates ?? []).forEach((c) => map.set(c.id, c));
+    return map;
+  }, [candidates]);
+
+  const maxLeadingVotes = useMemo(() => {
+    return Math.max(...topCandidates.map((c) => c.vote_count ?? 0), 1);
+  }, [topCandidates]);
+
+  const partyColors = {
+    Pagbabago: "bg-primary/10 text-primary border-primary/20",
+    "Bagong Pag-asa": "bg-success/10 text-success border-success/20",
+    Kabataan: "bg-accent/10 text-accent-foreground border-accent/20",
+  };
 
   const statusColors = {
     upcoming: "bg-muted text-muted-foreground",
@@ -139,53 +162,150 @@ export default function Index() {
         </div>
       </section>
 
-      {/* Top Candidates + Quick Actions */}
+      {/* Leading Candidates */}
       <section className="container py-12 md:py-16">
-        <div className="grid lg:grid-cols-5 gap-8">
-          <div className="lg:col-span-3">
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-6">Leading Candidates</h2>
-            <div className="space-y-3">
-              {topCandidates.length === 0 && <p className="text-muted-foreground text-sm">No votes cast yet.</p>}
-              {topCandidates.map((c, i) => (
-                <div key={c.candidate_id} className="flex items-center gap-4 bg-card rounded-xl border border-border p-4 shadow-elegant animate-slide-in-right" style={{ animationDelay: `${i * 80}ms` }}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${i === 0 ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{i + 1}</div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-foreground truncate uppercase">{c.candidate_name}</p>
-                    <p className="text-xs text-muted-foreground">{c.position_title} · {c.party_list}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-display font-bold text-foreground">{c.vote_count}</p>
-                    <p className="text-xs text-muted-foreground">votes</p>
-                  </div>
-                </div>
-              ))}
+        <div className="max-w-6xl mx-auto">
+          {/* Header */}
+          <div className="text-center max-w-2xl mx-auto mb-8 sm:mb-10">
+            <div className="inline-flex items-center justify-center gap-2 text-gold font-semibold text-xs sm:text-sm tracking-wider uppercase mb-1.5">
+              <Trophy className="w-4 h-4 text-gold animate-bounce" />
+              Live Standings
             </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-bold text-foreground">
+              Leading Candidates
+            </h2>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1.5">
+              Top candidates currently leading the vote counts
+            </p>
           </div>
 
-          <div className="lg:col-span-2">
-            <h2 className="text-2xl md:text-3xl font-display font-bold text-foreground mb-6">Quick Actions</h2>
-            <div className="space-y-3">
-              {[
-                ...(isAdmin 
-                  ? [{ to: "/admin", icon: Settings, label: "Admin Dashboard", desc: "Manage the election system", variant: "gold" }]
-                  : [{ to: user ? "/vote" : "/auth", icon: Vote, label: "Cast Your Vote", desc: "Select your preferred candidates", variant: "gold" }]
-                ),
-                { to: "/candidates", icon: Users, label: "View Candidates", desc: "Know your candidates better", variant: "default" },
-                { to: "/results", icon: BarChart3, label: "Live Results", desc: "See real-time election updates", variant: "default" },
-              ].map((action, i) => (
-                <Link key={action.to + i} to={action.to}
-                  className={`flex items-center gap-4 p-4 rounded-xl border transition-all hover:-translate-y-0.5 hover:shadow-elegant animate-fade-in ${
-                    action.variant === "gold" ? "gradient-gold text-accent-foreground border-transparent shadow-gold" : "bg-card border-border text-foreground"
-                  }`} style={{ animationDelay: `${i * 100}ms` }}>
-                  <action.icon className="w-5 h-5 shrink-0" />
-                  <div>
-                    <p className="font-semibold">{action.label}</p>
-                    <p className={`text-xs ${action.variant === "gold" ? "opacity-70" : "text-muted-foreground"}`}>{action.desc}</p>
-                  </div>
-                </Link>
-              ))}
+          {topCandidates.length === 0 ? (
+            <div className="bg-card rounded-2xl border border-border p-8 sm:p-12 text-center shadow-elegant">
+              <div className="w-16 h-16 rounded-full bg-gold/10 text-gold flex items-center justify-center mx-auto mb-4">
+                <Award className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-bold text-foreground font-display mb-1">No Votes Cast Yet</h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+                Be the first to vote for your preferred student leaders when voting is active!
+              </p>
+              <Link
+                to={user ? "/vote" : "/auth"}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-all"
+              >
+                <Vote className="w-4 h-4" />
+                {user ? "Cast Your Vote" : "Sign In to Vote"}
+              </Link>
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {topCandidates.map((c, i) => {
+                const fullCand = candidatesMap.get(c.candidate_id);
+                const avatar = fullCand?.avatar_url || c.avatar_url;
+                const votePercentage = maxLeadingVotes > 0 
+                  ? Math.min(Math.round(((c.vote_count ?? 0) / maxLeadingVotes) * 100), 100) 
+                  : 0;
+
+                const rankBadges = [
+                  { bg: "gradient-gold text-accent-foreground shadow-gold ring-2 ring-gold/40", label: "1st Place", shortLabel: "1st" },
+                  { bg: "bg-slate-300 text-slate-900 shadow-md ring-2 ring-slate-400/40", label: "2nd Place", shortLabel: "2nd" },
+                  { bg: "bg-amber-700 text-amber-100 shadow-md ring-2 ring-amber-600/40", label: "3rd Place", shortLabel: "3rd" },
+                ];
+                const rankInfo = rankBadges[i] || { bg: "bg-muted text-muted-foreground ring-1 ring-border", label: `Rank #${i + 1}`, shortLabel: `#${i + 1}` };
+
+                return (
+                  <div
+                    key={c.candidate_id}
+                    className="group relative bg-card rounded-2xl border border-border p-5 sm:p-6 shadow-elegant hover:shadow-2xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between overflow-hidden animate-fade-in"
+                    style={{ animationDelay: `${i * 80}ms` }}
+                  >
+                    {/* Ambient top glow on rank 1 */}
+                    {i === 0 && (
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 rounded-full blur-2xl -mr-10 -mt-10 pointer-events-none" />
+                    )}
+
+                    <div>
+                      {/* Top row: Rank badge + Party list badge */}
+                      <div className="flex items-center justify-between gap-2 mb-4">
+                        <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold ${rankInfo.bg}`}>
+                          {i === 0 && <Trophy className="w-3.5 h-3.5" />}
+                          {rankInfo.label}
+                        </span>
+
+                        {c.party_list && (
+                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border truncate max-w-[140px] ${
+                            partyColors[c.party_list] || "bg-muted text-muted-foreground border-border"
+                          }`}>
+                            {c.party_list}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Candidate Avatar & Info */}
+                      <div className="flex sm:flex-col items-center sm:text-center gap-4 sm:gap-3 mb-4">
+                        <div className="relative shrink-0">
+                          <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden flex items-center justify-center ring-4 transition-transform duration-300 group-hover:scale-105 ${
+                            i === 0 ? "ring-gold/60 shadow-gold" : "ring-border shadow-md"
+                          }`}>
+                            {avatar ? (
+                              <img
+                                src={avatar}
+                                alt={c.candidate_name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full gradient-navy flex items-center justify-center">
+                                <User className="w-9 h-9 text-gold" />
+                              </div>
+                            )}
+                          </div>
+                          {i === 0 && (
+                            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-gold text-accent-foreground p-1 rounded-full shadow">
+                              <Trophy className="w-3 h-3" />
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="flex-1 min-w-0 sm:w-full">
+                          <h3 className="font-display font-bold text-foreground text-base sm:text-lg uppercase tracking-tight truncate">
+                            {c.candidate_name}
+                          </h3>
+                          <p className="text-xs sm:text-sm font-semibold text-gold mt-0.5 truncate">
+                            {c.position_title}
+                          </p>
+                          {(c.grade_level || c.section) && (
+                            <p className="text-[11px] sm:text-xs text-muted-foreground mt-1 truncate">
+                              {[c.grade_level, c.section].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Vote progress & count */}
+                    <div className="mt-2 pt-3.5 border-t border-border/80">
+                      <div className="flex items-baseline justify-between mb-1.5">
+                        <span className="text-xs text-muted-foreground font-medium">Votes Cast</span>
+                        <div className="flex items-baseline gap-1">
+                          <span className="text-xl sm:text-2xl font-display font-extrabold text-foreground">
+                            {c.vote_count?.toLocaleString() ?? 0}
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">votes</span>
+                        </div>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-1000 ${
+                            i === 0 ? "gradient-gold shadow-gold" : "bg-primary"
+                          }`}
+                          style={{ width: `${votePercentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
     </div>
