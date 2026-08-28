@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Menu, X, Home, Users, Vote, BarChart3, Settings, Shield, LogOut, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useElection } from "@/contexts/ElectionContext";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import schoolSeal from "@/assets/school-seal.jpg";
@@ -12,6 +13,7 @@ export default function Layout({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, isAdmin, profile, mustChangePassword, signOut } = useAuth();
+  const { activeSchoolYear } = useElection();
 
   // Fetch election settings for dynamic footer year (shared across all users)
   const { data: electionSettings } = useQuery({
@@ -20,10 +22,11 @@ export default function Layout({ children }) {
     refetchInterval: 10000,
   });
 
-  // Derive the copyright year from school_year (e.g. "2025-2026" → "2026")
+  // Derive the copyright year from activeSchoolYear (e.g. from history filter)
+  // or school_year from settings (e.g. "2026-2027" → "2027", "2025-2026" → "2026")
   // Fall back to the current year if not set
   const copyrightYear = (() => {
-    const sy = electionSettings?.school_year;
+    const sy = activeSchoolYear || electionSettings?.school_year;
     if (!sy) return new Date().getFullYear();
     const parts = sy.split("-");
     const last = parseInt(parts[parts.length - 1], 10);

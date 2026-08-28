@@ -6,6 +6,7 @@ import api from "@/api/client";
 import { supabase } from "@/lib/supabase";
 import StatCard from "@/components/StatCard";
 import { useAuth } from "@/contexts/AuthContext";
+import { useElection } from "@/contexts/ElectionContext";
 import { useToast } from "@/hooks/use-toast";
 
 // Helper: check if a position title matches a specific grade level (word-boundary safe)
@@ -23,6 +24,7 @@ export default function Results() {
   const [voterGrade, setVoterGrade] = useState("all");
   const [voterSection, setVoterSection] = useState("all");
   const { user, profile, isAdmin } = useAuth();
+  const { setActiveSchoolYear } = useElection();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -125,6 +127,22 @@ export default function Results() {
       setSelectedYear(electionHistory[0].school_year);
     }
   }, [electionHistory, selectedYear]);
+
+  // Synchronize activeSchoolYear with ElectionContext so footer year reflects selected election / school year
+  useEffect(() => {
+    if (activeTab === "history" && selectedYear) {
+      setActiveSchoolYear(selectedYear);
+    } else if (activeTab === "live") {
+      setActiveSchoolYear(settings?.school_year || null);
+    }
+  }, [activeTab, selectedYear, settings?.school_year, setActiveSchoolYear]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      setActiveSchoolYear(null);
+    };
+  }, [setActiveSchoolYear]);
 
   const historyResultsParams = useMemo(() => {
     const p = new URLSearchParams();
@@ -390,9 +408,9 @@ export default function Results() {
             <BarChart3 className="w-8 h-8 text-gold" /> Election Results
           </h1>
 
-          {/* Subtitle — editable by admin, read-only for everyone else */}
+          {/* Subtitle — editable by admin for live election, shows selected archived election for past elections */}
           <div className="flex items-center gap-2 mt-1">
-            {editingName ? (
+            {activeTab === "live" && editingName ? (
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground text-sm">Live results for</span>
                 <input
@@ -423,8 +441,15 @@ export default function Results() {
               </div>
             ) : (
               <div className="flex items-center gap-2 group">
-                <p className="text-muted-foreground">Live results for <span className="font-medium text-foreground">{electionName}</span></p>
-                {isAdmin && (
+                <p className="text-muted-foreground">
+                  {activeTab === "history" ? "Archived results for " : "Live results for "}
+                  <span className="font-medium text-foreground">
+                    {activeTab === "history"
+                      ? (selectedElection?.election_name || (selectedYear ? `SSLG Election (${selectedYear})` : "Past Election"))
+                      : electionName}
+                  </span>
+                </p>
+                {activeTab === "live" && isAdmin && (
                   <button
                     onClick={handleStartEditName}
                     className="p-1 rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-gold hover:bg-gold/10 transition-all"
