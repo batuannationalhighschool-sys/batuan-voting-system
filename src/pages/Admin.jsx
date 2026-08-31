@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock } from "lucide-react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -118,6 +118,8 @@ export default function Admin() {
   const [bulkCandidatePreview, setBulkCandidatePreview] = useState(null);
   const [bulkCandidateResult, setBulkCandidateResult] = useState(null);
   const bulkCandidateFileInputRef = useRef(null);
+  const [isDraggingVoter, setIsDraggingVoter] = useState(false);
+  const [isDraggingCandidate, setIsDraggingCandidate] = useState(false);
 
   const openEditModal = (c) => {
     setEditCandidate({ id: c.id, name: c.name, position_id: c.position_id, grade_level: c.grade_level, section: c.section, party_list: c.party_list, motto: c.motto || '' });
@@ -706,6 +708,42 @@ export default function Admin() {
     URL.revokeObjectURL(url);
   };
 
+  // Drag-and-drop handlers for voter bulk upload
+  const handleVoterDragOver = useCallback((e) => { e.preventDefault(); e.stopPropagation(); }, []);
+  const handleVoterDragEnter = useCallback((e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingVoter(true); }, []);
+  const handleVoterDragLeave = useCallback((e) => { e.preventDefault(); e.stopPropagation(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDraggingVoter(false); }, []);
+  const handleVoterDrop = useCallback((e) => {
+    e.preventDefault(); e.stopPropagation(); setIsDraggingVoter(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+      toast({ title: "Invalid file", description: "Please drop a CSV file.", variant: "destructive" });
+      return;
+    }
+    setBulkFile(file);
+    setBulkResult(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => { setBulkPreview(parseCSV(ev.target.result)); };
+    reader.readAsText(file);
+  }, [toast]);
+
+  // Drag-and-drop handlers for candidate bulk upload
+  const handleCandidateDragOver = useCallback((e) => { e.preventDefault(); e.stopPropagation(); }, []);
+  const handleCandidateDragEnter = useCallback((e) => { e.preventDefault(); e.stopPropagation(); setIsDraggingCandidate(true); }, []);
+  const handleCandidateDragLeave = useCallback((e) => { e.preventDefault(); e.stopPropagation(); if (e.currentTarget.contains(e.relatedTarget)) return; setIsDraggingCandidate(false); }, []);
+  const handleCandidateDrop = useCallback((e) => {
+    e.preventDefault(); e.stopPropagation(); setIsDraggingCandidate(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.name.toLowerCase().endsWith('.csv')) {
+      toast({ title: "Invalid file", description: "Please drop a CSV file.", variant: "destructive" });
+      return;
+    }
+    setBulkCandidateFile(file);
+    setBulkCandidateResult(null);
+    const reader = new FileReader();
+    reader.onload = (ev) => { setBulkCandidatePreview(parseCandidateCSV(ev.target.result)); };
+    reader.readAsText(file);
+  }, [toast]);
+
   if (!isAdmin) {
     return (
       <div className="container py-16 text-center animate-fade-in">
@@ -806,9 +844,38 @@ export default function Admin() {
               Upload a CSV file with columns: <span className="font-mono text-foreground">lrn, full_name, grade_level, section</span>. Existing LRNs are automatically skipped. Default password is the LRN.
             </p>
 
-            <label className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed border-border hover:border-ring cursor-pointer transition-colors bg-background">
-              <Upload className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm text-muted-foreground">{bulkFile ? bulkFile.name : 'Click to select a CSV file…'}</span>
+            <div
+              onDragOver={handleVoterDragOver}
+              onDragEnter={handleVoterDragEnter}
+              onDragLeave={handleVoterDragLeave}
+              onDrop={handleVoterDrop}
+              className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 ${isDraggingVoter ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 scale-[1.01]' : 'border-border hover:border-ring bg-muted/30'}`}
+            >
+              <div className="flex flex-col items-center justify-center py-10 px-6">
+                <div className={`mb-4 transition-transform duration-300 ${isDraggingVoter ? 'scale-110 -translate-y-1' : ''}`}>
+                  <CloudUpload className={`w-14 h-14 ${isDraggingVoter ? 'text-blue-500' : 'text-emerald-500'}`} strokeWidth={1.5} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => bulkFileInputRef.current?.click()}
+                  className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  Browse
+                </button>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  or drag files to upload <span className="font-medium text-foreground">CSV</span> and select
+                </p>
+                {bulkFile && (
+                  <div className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border">
+                    <File className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm text-foreground font-medium">{bulkFile.name}</span>
+                    <span className="text-xs text-muted-foreground">({(bulkFile.size / 1024).toFixed(1)} KB)</span>
+                    <button onClick={(e) => { e.stopPropagation(); setBulkFile(null); setBulkPreview(null); if (bulkFileInputRef.current) bulkFileInputRef.current.value = ''; }} className="ml-1 p-0.5 rounded-full hover:bg-muted transition-colors">
+                      <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </div>
+                )}
+              </div>
               <input
                 ref={bulkFileInputRef}
                 type="file"
@@ -816,7 +883,7 @@ export default function Admin() {
                 className="hidden"
                 onChange={handleBulkFileChange}
               />
-            </label>
+            </div>
 
             {/* Preview table */}
             {bulkPreview && bulkPreview.length > 0 && (
@@ -1038,9 +1105,38 @@ export default function Admin() {
               Upload a CSV file with columns: <span className="font-mono text-foreground">name, position, grade_level, section, party_list, motto</span>. Existing candidate entries are automatically skipped. Position names must match available positions.
             </p>
 
-            <label className="flex items-center gap-3 px-4 py-3 rounded-xl border-2 border-dashed border-border hover:border-ring cursor-pointer transition-colors bg-background">
-              <Upload className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm text-muted-foreground">{bulkCandidateFile ? bulkCandidateFile.name : 'Click to select a CSV file…'}</span>
+            <div
+              onDragOver={handleCandidateDragOver}
+              onDragEnter={handleCandidateDragEnter}
+              onDragLeave={handleCandidateDragLeave}
+              onDrop={handleCandidateDrop}
+              className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 ${isDraggingCandidate ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 scale-[1.01]' : 'border-border hover:border-ring bg-muted/30'}`}
+            >
+              <div className="flex flex-col items-center justify-center py-10 px-6">
+                <div className={`mb-4 transition-transform duration-300 ${isDraggingCandidate ? 'scale-110 -translate-y-1' : ''}`}>
+                  <CloudUpload className={`w-14 h-14 ${isDraggingCandidate ? 'text-blue-500' : 'text-emerald-500'}`} strokeWidth={1.5} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => bulkCandidateFileInputRef.current?.click()}
+                  className="px-6 py-2.5 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-md hover:shadow-lg transition-all duration-200"
+                >
+                  Browse
+                </button>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  or drag files to upload <span className="font-medium text-foreground">CSV</span> and select
+                </p>
+                {bulkCandidateFile && (
+                  <div className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border">
+                    <File className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm text-foreground font-medium">{bulkCandidateFile.name}</span>
+                    <span className="text-xs text-muted-foreground">({(bulkCandidateFile.size / 1024).toFixed(1)} KB)</span>
+                    <button onClick={(e) => { e.stopPropagation(); setBulkCandidateFile(null); setBulkCandidatePreview(null); if (bulkCandidateFileInputRef.current) bulkCandidateFileInputRef.current.value = ''; }} className="ml-1 p-0.5 rounded-full hover:bg-muted transition-colors">
+                      <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
+                    </button>
+                  </div>
+                )}
+              </div>
               <input
                 ref={bulkCandidateFileInputRef}
                 type="file"
@@ -1048,7 +1144,7 @@ export default function Admin() {
                 className="hidden"
                 onChange={handleBulkCandidateFileChange}
               />
-            </label>
+            </div>
 
             {/* Preview table */}
             {bulkCandidatePreview && bulkCandidatePreview.length > 0 && (
@@ -1205,7 +1301,7 @@ export default function Admin() {
                     <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm cursor-pointer hover:bg-muted transition-colors">
                       <ImagePlus className="w-4 h-4 text-muted-foreground" />
                       <span>{photoFile ? 'Change Photo' : 'Upload Photo'}</span>
-                      <input ref={fileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                      <input ref={fileInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.jfif,.pjpeg,.avif,.bmp,.svg,.heic" className="hidden"
                         onChange={(e) => {
                           const file = e.target.files[0];
                           if (file) { setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); }
@@ -1491,7 +1587,7 @@ export default function Admin() {
                 <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm cursor-pointer hover:bg-muted transition-colors">
                   <ImagePlus className="w-4 h-4 text-muted-foreground" />
                   <span>{editPhotoFile ? 'Change Photo' : editPhotoPreview ? 'Replace Photo' : 'Upload Photo'}</span>
-                  <input ref={editFileInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                  <input ref={editFileInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.jfif,.pjpeg,.avif,.bmp,.svg,.heic" className="hidden"
                     onChange={(e) => {
                       const file = e.target.files[0];
                       if (file) { setEditPhotoFile(file); setEditPhotoPreview(URL.createObjectURL(file)); }

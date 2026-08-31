@@ -11,23 +11,81 @@ import { requireAuth, requireAdmin } from './middleware/auth.js';
 // Multer config — temporary in-memory storage before uploading to Supabase Storage
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
   fileFilter: (req, file, cb) => {
-    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.jfif', '.pjpeg', '.avif', '.bmp', '.svg', '.heic'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext)) cb(null, true);
-    else cb(new Error('Only .jpg, .jpeg, .png, and .webp files are allowed'));
+    if (allowed.includes(ext) || file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Please upload a valid image file'));
   },
 });
 
+function detectImageType(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 2) return null;
+
+  // JPEG / JPG / JFIF (FF D8)
+  if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+    return { extension: 'jpg', mimeType: 'image/jpeg' };
+  }
+
+  // PNG (89 50 4E 47 0D 0A 1A 0A)
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47 &&
+    buffer[4] === 0x0d && buffer[5] === 0x0a && buffer[6] === 0x1a && buffer[7] === 0x0a
+  ) {
+    return { extension: 'png', mimeType: 'image/png' };
+  }
+
+  // GIF (GIF87a or GIF89a)
+  if (buffer.length >= 6 && buffer.toString('ascii', 0, 3) === 'GIF') {
+    return { extension: 'gif', mimeType: 'image/gif' };
+  }
+
+  // WebP (RIFF .... WEBP)
+  if (
+    buffer.length >= 12 &&
+    buffer.toString('ascii', 0, 4) === 'RIFF' &&
+    buffer.toString('ascii', 8, 12) === 'WEBP'
+  ) {
+    return { extension: 'webp', mimeType: 'image/webp' };
+  }
+
+  // AVIF / HEIC / HEIF (.... ftyp avif/avis/heic/heix/mif1)
+  if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp') {
+    const brand = buffer.toString('ascii', 8, 12).toLowerCase();
+    if (brand === 'avif' || brand === 'avis') {
+      return { extension: 'avif', mimeType: 'image/avif' };
+    }
+    if (brand === 'heic' || brand === 'heix' || brand === 'mif1' || brand === 'msf1') {
+      return { extension: 'heic', mimeType: 'image/heic' };
+    }
+  }
+
+  // BMP (BM)
+  if (buffer[0] === 0x42 && buffer[1] === 0x4d) {
+    return { extension: 'bmp', mimeType: 'image/bmp' };
+  }
+
+  // SVG (<svg or <?xml)
+  const prefix = buffer.subarray(0, 100).toString('utf8').trim().toLowerCase();
+  if (prefix.startsWith('<svg') || (prefix.startsWith('<?xml') && prefix.includes('<svg'))) {
+    return { extension: 'svg', mimeType: 'image/svg+xml' };
+  }
+
+  return null;
+}
+
 // Helper: upload file buffer to Supabase Storage
 async function uploadToSupabaseStorage(fileBuffer, originalName) {
-  const ext = path.extname(originalName).toLowerCase();
-  const fileName = `${randomUUID()}${ext}`;
+  const detected = detectImageType(fileBuffer);
+  const ext = detected ? `.${detected.extension}` : path.extname(originalName).toLowerCase() || '.jpg';
+  const mimeType = detected ? detected.mimeType : 'image/jpeg';
+  const fileName = `candidates/${randomUUID()}${ext}`;
   const { data, error } = await supabase.storage
     .from('candidate-photos')
     .upload(fileName, fileBuffer, {
-      contentType: `image/${ext.replace('.', '')}`,
+      contentType: mimeType,
       upsert: false,
     });
 
@@ -38,23 +96,6 @@ async function uploadToSupabaseStorage(fileBuffer, originalName) {
     .getPublicUrl(fileName);
 
   return urlData.publicUrl;
-}
-
-function detectImageType(buffer) {
-  if (!Buffer.isBuffer(buffer)) return null;
-  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
-    return { extension: 'jpg', mimeType: 'image/jpeg' };
-  }
-  if (
-    buffer.length >= 8
-    && buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
-  ) {
-    return { extension: 'png', mimeType: 'image/png' };
-  }
-  if (buffer.length >= 12 && buffer.toString('ascii', 0, 4) === 'RIFF' && buffer.toString('ascii', 8, 12) === 'WEBP') {
-    return { extension: 'webp', mimeType: 'image/webp' };
-  }
-  return null;
 }
 
 const app = express();
@@ -136,12 +177,15 @@ app.post(
   '/api/candidate-photo',
   requireAuth,
   requireAdmin,
-  express.raw({ type: /^image\/(jpeg|png|webp)$/, limit: '5mb' }),
+  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '10mb' }),
   async (req, res) => {
     try {
+      if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+        return res.status(400).json({ error: 'No image data received' });
+      }
+
       const image = detectImageType(req.body);
-      const contentType = req.headers['content-type']?.split(';')[0]?.toLowerCase();
-      if (!image || image.mimeType !== contentType) {
+      if (!image) {
         return res.status(400).json({ error: 'The uploaded file is not a supported image' });
       }
 
@@ -149,7 +193,7 @@ app.post(
       return res.json({ url });
     } catch (err) {
       console.error('Candidate photo upload error:', err.message);
-      return res.status(400).json({ error: 'Candidate photo upload failed' });
+      return res.status(400).json({ error: err.message || 'Candidate photo upload failed' });
     }
   },
 );
