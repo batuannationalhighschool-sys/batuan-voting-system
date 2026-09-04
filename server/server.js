@@ -603,16 +603,22 @@ app.get('/api/positions', async (req, res) => {
 
     if (error) throw error;
 
-    let filtered = rows;
+    // Next-Grade Representative Logic:
+    // Voters vote for the representative of the subsequent grade level
+    const NEXT_GRADE_REP_MAP = {
+      'grade 7': 'grade 8 representative',
+      'grade 8': 'grade 9 representative',
+      'grade 9': 'grade 10 representative',
+      'grade 10': 'grade 11 representative',
+      'grade 11': 'grade 12 representative',
+    };
 
-    // If grade_level provided, filter Grade Representative positions
-    // so voters only see the representative slot for their own grade
     if (grade_level) {
+      const allowedRep = NEXT_GRADE_REP_MAP[grade_level.trim().toLowerCase()];
       filtered = rows.filter(p => {
-        // Keep non-representative positions as-is
         if (!p.title.toLowerCase().includes('representative')) return true;
-        // For representative positions, only keep the one matching the voter's grade
-        return p.title.toLowerCase().includes(grade_level.toLowerCase());
+        if (!allowedRep) return false;
+        return p.title.toLowerCase() === allowedRep;
       });
     }
 
@@ -1003,12 +1009,25 @@ app.post('/api/votes', requireAuth, async (req, res) => {
         });
       }
 
-      // ── Grade Representative restriction ────────────────────────────
+      // ── Grade Representative restriction (Next-Grade Logic) ─────────
       if (pos.title.toLowerCase().includes('representative')) {
         if (!voterProfile.grade_level) {
           return res.status(403).json({ error: 'Your grade level must be set to vote for Grade Representatives' });
         }
-        // Verify each candidate for this position matches voter's grade level
+
+        const NEXT_GRADE_MAP = {
+          'Grade 7': 'Grade 8',
+          'Grade 8': 'Grade 9',
+          'Grade 9': 'Grade 10',
+          'Grade 10': 'Grade 11',
+          'Grade 11': 'Grade 12',
+        };
+        const allowedGrade = NEXT_GRADE_MAP[voterProfile.grade_level];
+        if (!allowedGrade) {
+          return res.status(403).json({ error: `Voters from ${voterProfile.grade_level} are not eligible to vote for a Grade Representative` });
+        }
+
+        // Verify each candidate for this position matches the allowed next grade
         for (const candId of candIds) {
           const { data: cands } = await supabase
             .from('candidates')
@@ -1016,9 +1035,10 @@ app.post('/api/votes', requireAuth, async (req, res) => {
             .eq('id', candId);
 
           if (!cands || cands.length === 0) return res.status(400).json({ error: 'Invalid candidate' });
-          if (cands[0].grade_level !== voterProfile.grade_level) {
+          const candGrade = cands[0].grade_level;
+          if (candGrade !== allowedGrade && candGrade !== voterProfile.grade_level) {
             return res.status(403).json({
-              error: `Grade Representatives: you may only vote for candidates from your grade level (${voterProfile.grade_level})`
+              error: `Grade Representatives: voters from ${voterProfile.grade_level} may only vote for ${allowedGrade} Representative candidates`
             });
           }
         }

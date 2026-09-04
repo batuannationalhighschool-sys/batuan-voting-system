@@ -182,12 +182,11 @@ INSERT INTO positions (title, display_order, max_votes) VALUES
   ('Auditor',                    5, 1),
   ('Public Information Officer', 6, 2),
   ('Peace Officer',              7, 2),
-  ('Grade 7 Representative',     8, 1),
-  ('Grade 8 Representative',     9, 1),
-  ('Grade 9 Representative',    10, 1),
-  ('Grade 10 Representative',   11, 1),
-  ('Grade 11 Representative',   12, 1),
-  ('Grade 12 Representative',   13, 1);
+  ('Grade 8 Representative',     8, 1),
+  ('Grade 9 Representative',     9, 1),
+  ('Grade 10 Representative',   10, 1),
+  ('Grade 11 Representative',   11, 1),
+  ('Grade 12 Representative',   12, 1);
 
 -- ─── Seed: default admin user (username: admin, password: admin123) ─
 -- bcrypt hash for 'admin123'
@@ -966,16 +965,39 @@ BEGIN
       RAISE EXCEPTION 'You can only vote for up to % candidate(s) for %', v_position.max_votes, v_position.title;
     END IF;
 
-    -- Grade Representative restriction
+    -- Next-grade representative voting logic
     IF lower(v_position.title) LIKE '%representative%' THEN
-      IF v_profile.grade_level IS NULL THEN
-        RAISE EXCEPTION 'Your grade level must be set to vote for Grade Representatives';
-      END IF;
-      SELECT grade_level INTO v_candidate FROM candidates WHERE id = (v_vote->>'candidate_id')::uuid;
-      IF v_candidate IS NULL THEN RAISE EXCEPTION 'Invalid candidate'; END IF;
-      IF v_candidate.grade_level != v_profile.grade_level THEN
-        RAISE EXCEPTION 'Grade Representatives: you may only vote for candidates from your grade level (%)', v_profile.grade_level;
-      END IF;
+      DECLARE
+        v_allowed_grade TEXT;
+      BEGIN
+        IF v_profile.grade_level IS NULL THEN
+          RAISE EXCEPTION 'Your grade level must be set to vote for Grade Representatives';
+        END IF;
+
+        v_allowed_grade := CASE v_profile.grade_level
+          WHEN 'Grade 7' THEN 'Grade 8'
+          WHEN 'Grade 8' THEN 'Grade 9'
+          WHEN 'Grade 9' THEN 'Grade 10'
+          WHEN 'Grade 10' THEN 'Grade 11'
+          WHEN 'Grade 11' THEN 'Grade 12'
+          ELSE NULL
+        END;
+
+        IF v_allowed_grade IS NULL THEN
+          RAISE EXCEPTION 'Voters from % are not eligible to vote for a Grade Representative', v_profile.grade_level;
+        END IF;
+
+        SELECT grade_level INTO v_candidate FROM candidates WHERE id = (v_vote->>'candidate_id')::uuid;
+        IF v_candidate IS NULL THEN RAISE EXCEPTION 'Invalid candidate'; END IF;
+
+        IF v_candidate.grade_level NOT IN (v_profile.grade_level, v_allowed_grade) THEN
+          RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative candidates', v_profile.grade_level, v_allowed_grade;
+        END IF;
+
+        IF lower(v_position.title) NOT LIKE '%' || lower(v_allowed_grade) || '%' THEN
+          RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative', v_profile.grade_level, v_allowed_grade;
+        END IF;
+      END;
     END IF;
   END LOOP;
 
@@ -1021,9 +1043,26 @@ BEGIN
       AND (p_voter_section IS NULL OR p.section = p_voter_section);
   END IF;
 
-  SELECT COUNT(*) INTO v_position_count FROM positions
-  WHERE p_voter_grade IS NULL OR NOT starts_with(title, 'Grade ')
-    OR lower(title) LIKE '%' || lower(COALESCE(p_voter_grade, '')) || '%';
+  IF p_voter_grade IS NOT NULL THEN
+    DECLARE
+      v_allowed_rep_grade TEXT;
+    BEGIN
+      v_allowed_rep_grade := CASE p_voter_grade
+        WHEN 'Grade 7' THEN 'Grade 8'
+        WHEN 'Grade 8' THEN 'Grade 9'
+        WHEN 'Grade 9' THEN 'Grade 10'
+        WHEN 'Grade 10' THEN 'Grade 11'
+        WHEN 'Grade 11' THEN 'Grade 12'
+        ELSE NULL
+      END;
+
+      SELECT COUNT(*) INTO v_position_count FROM positions
+      WHERE lower(title) NOT LIKE '%representative%'
+         OR (v_allowed_rep_grade IS NOT NULL AND lower(title) LIKE '%' || lower(v_allowed_rep_grade) || '%');
+    END;
+  ELSE
+    SELECT COUNT(*) INTO v_position_count FROM positions;
+  END IF;
 
   RETURN jsonb_build_object('voterCount', v_voter_count, 'votedCount', v_voted_count,
     'totalVotes', v_total_votes, 'positionCount', v_position_count);

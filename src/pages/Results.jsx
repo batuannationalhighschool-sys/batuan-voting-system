@@ -9,14 +9,23 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useElection } from "@/contexts/ElectionContext";
 import { useToast } from "@/hooks/use-toast";
 
-// Helper: check if a position title matches a specific grade level (word-boundary safe)
-function gradeMatchesPosition(grade, positionTitle) {
-  if (!grade || grade === "all") return true;
+const NEXT_GRADE_REP_MAP = {
+  'grade 7': 'grade 8 representative',
+  'grade 8': 'grade 9 representative',
+  'grade 9': 'grade 10 representative',
+  'grade 10': 'grade 11 representative',
+  'grade 11': 'grade 12 representative',
+};
+
+// Helper: check if a position title matches a specific voter grade level (next-grade representative mapping)
+function gradeMatchesPosition(voterGrade, positionTitle) {
+  if (!voterGrade || voterGrade === "all") return true;
   const title = positionTitle.toLowerCase();
   if (!title.includes('representative')) return true;
-  const gradeNum = grade.replace(/\D/g, '');
-  if (!gradeNum) return title.includes(grade.toLowerCase());
-  return new RegExp(`grade\\s*${gradeNum}\\b`, 'i').test(title);
+  const key = voterGrade.trim().toLowerCase();
+  const allowedRep = NEXT_GRADE_REP_MAP[key];
+  if (!allowedRep) return false;
+  return title === allowedRep || title.includes(allowedRep.replace(' representative', ''));
 }
 
 export default function Results() {

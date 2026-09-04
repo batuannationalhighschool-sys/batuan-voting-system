@@ -8,6 +8,14 @@ import CandidateCard from "@/components/CandidateCard";
 import { useNavigate } from "react-router-dom";
 import { ELECTION_TIME_ZONE, formatElectionDate, getElectionWindowState } from "@/lib/election-time";
 
+const NEXT_GRADE_REP_MAP = {
+  'Grade 7': 'Grade 8 Representative',
+  'Grade 8': 'Grade 9 Representative',
+  'Grade 9': 'Grade 10 Representative',
+  'Grade 10': 'Grade 11 Representative',
+  'Grade 11': 'Grade 12 Representative',
+};
+
 export default function VotePage() {
   const [selections, setSelections] = useState({});
   const [submitted, setSubmitted] = useState(false);
@@ -257,7 +265,12 @@ export default function VotePage() {
           </h1>
           <p className="text-muted-foreground mt-1">Select your preferred candidate for each position</p>
           {gradeLevel && (
-            <p className="text-xs text-gold mt-1">Grade Representative shown for your grade: <span className="font-semibold">{gradeLevel}</span></p>
+            <p className="text-xs text-gold mt-1">
+              Your Grade: <span className="font-semibold">{gradeLevel}</span>
+              {NEXT_GRADE_REP_MAP[gradeLevel] ? (
+                <> · Assigned Representative: <span className="font-semibold">{NEXT_GRADE_REP_MAP[gradeLevel]}</span></>
+              ) : null}
+            </p>
           )}
         </div>
 

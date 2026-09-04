@@ -262,10 +262,6 @@ const candidatesByPosition = {
     { name: 'Ella Joy Domingo',         grade_level: 'Grade 11', section: 'Cookery',    party_list: 'Pagbabago',     motto: 'A safer school for everyone.' },
     { name: 'Miguel Santos Cruz',       grade_level: 'Grade 10', section: 'Fortitude',  party_list: 'Kabataan',      motto: 'Discipline with compassion.' },
   ],
-  'Grade 7 Representative': [
-    { name: 'Leo Gabriel Bernardo',     grade_level: 'Grade 7',  section: 'Gold',       party_list: 'Kabataan',      motto: 'The future begins in Grade 7.' },
-    { name: 'Trisha Mae Bautista',      grade_level: 'Grade 7',  section: 'Silver',     party_list: 'Pagbabago',     motto: 'Small steps, big dreams.' },
-  ],
   'Grade 8 Representative': [
     { name: 'Mark Angelo Salazar',      grade_level: 'Grade 8',  section: 'Pearl',      party_list: 'Bagong Pag-asa', motto: 'Rising stronger in Grade 8.' },
     { name: 'Kaye Louise Villafuerte',  grade_level: 'Grade 8',  section: 'Ruby',       party_list: 'Kabataan',      motto: 'For a brighter Grade 8.' },
@@ -404,10 +400,17 @@ async function seed() {
     for (const [posTitle, cands] of Object.entries(candidateRecords)) {
       if (!cands || cands.length === 0) continue;
 
-      // Grade representatives: only vote for your own grade
+      // Next-grade representatives logic:
       if (posTitle.includes('Representative')) {
-        const gradeNum = voter.grade_level.replace('Grade ', '');
-        if (!posTitle.includes(`Grade ${gradeNum}`)) continue;
+        const nextGradeMap = {
+          'Grade 7': 'Grade 8 Representative',
+          'Grade 8': 'Grade 9 Representative',
+          'Grade 9': 'Grade 10 Representative',
+          'Grade 10': 'Grade 11 Representative',
+          'Grade 11': 'Grade 12 Representative',
+        };
+        const allowedRepTitle = nextGradeMap[voter.grade_level];
+        if (!allowedRepTitle || posTitle !== allowedRepTitle) continue;
       }
 
       const posId = posMap[posTitle];

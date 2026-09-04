@@ -447,6 +447,7 @@ DECLARE
   v_now TIMESTAMPTZ;
   v_start_at TIMESTAMPTZ;
   v_end_at TIMESTAMPTZ;
+  v_allowed_grade TEXT;
 BEGIN
   v_payload := public.verify_app_token(p_token);
   v_user_id := (v_payload->>'id')::UUID;
@@ -565,8 +566,29 @@ BEGIN
     END IF;
 
     IF lower(v_position.title) LIKE '%representative%' THEN
-      IF v_profile.grade_level IS NULL OR v_candidate.grade_level <> v_profile.grade_level THEN
-        RAISE EXCEPTION 'You may only vote for a representative from your grade level';
+      IF v_profile.grade_level IS NULL THEN
+        RAISE EXCEPTION 'Your grade level must be set to vote for Grade Representatives';
+      END IF;
+
+      v_allowed_grade := CASE v_profile.grade_level
+        WHEN 'Grade 7' THEN 'Grade 8'
+        WHEN 'Grade 8' THEN 'Grade 9'
+        WHEN 'Grade 9' THEN 'Grade 10'
+        WHEN 'Grade 10' THEN 'Grade 11'
+        WHEN 'Grade 11' THEN 'Grade 12'
+        ELSE NULL
+      END;
+
+      IF v_allowed_grade IS NULL THEN
+        RAISE EXCEPTION 'Voters from % are not eligible to vote for a Grade Representative', v_profile.grade_level;
+      END IF;
+
+      IF v_candidate.grade_level <> v_allowed_grade THEN
+        RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative candidates', v_profile.grade_level, v_allowed_grade;
+      END IF;
+
+      IF lower(v_position.title) NOT LIKE '%' || lower(v_allowed_grade) || '%' THEN
+        RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative', v_profile.grade_level, v_allowed_grade;
       END IF;
     END IF;
   END LOOP;
@@ -809,6 +831,7 @@ DECLARE
   v_voted_count INTEGER;
   v_total_votes BIGINT;
   v_position_count INTEGER;
+  v_allowed_rep_grade TEXT;
 BEGIN
   SELECT COUNT(*)::INTEGER
   INTO v_voter_count
@@ -838,12 +861,23 @@ BEGIN
     AND (p_voter_grade IS NULL OR p.grade_level = p_voter_grade)
     AND (p_voter_section IS NULL OR p.section = p_voter_section);
 
+  IF p_voter_grade IS NOT NULL THEN
+    v_allowed_rep_grade := CASE p_voter_grade
+      WHEN 'Grade 7' THEN 'Grade 8'
+      WHEN 'Grade 8' THEN 'Grade 9'
+      WHEN 'Grade 9' THEN 'Grade 10'
+      WHEN 'Grade 10' THEN 'Grade 11'
+      WHEN 'Grade 11' THEN 'Grade 12'
+      ELSE NULL
+    END;
+  END IF;
+
   SELECT COUNT(*)::INTEGER
   INTO v_position_count
   FROM public.positions AS pos
   WHERE p_voter_grade IS NULL
-     OR left(pos.title, 6) <> 'Grade '
-     OR lower(pos.title) LIKE '%' || lower(p_voter_grade) || '%';
+     OR lower(pos.title) NOT LIKE '%representative%'
+     OR (v_allowed_rep_grade IS NOT NULL AND lower(pos.title) LIKE '%' || lower(v_allowed_rep_grade) || '%');
 
   RETURN jsonb_build_object(
     'voterCount', COALESCE(v_voter_count, 0),

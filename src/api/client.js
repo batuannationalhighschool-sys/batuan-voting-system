@@ -20,6 +20,20 @@ function isMissingRpc(error) {
     || /function .* does not exist/i.test(error?.message ?? '');
 }
 
+const NEXT_GRADE_REP_MAP = {
+  'grade 7': 'grade 8 representative',
+  'grade 8': 'grade 9 representative',
+  'grade 9': 'grade 10 representative',
+  'grade 10': 'grade 11 representative',
+  'grade 11': 'grade 12 representative',
+};
+
+function getNextGradeRepresentativeTitle(gradeLevel) {
+  if (!gradeLevel) return null;
+  const key = gradeLevel.trim().toLowerCase();
+  return NEXT_GRADE_REP_MAP[key] || null;
+}
+
 // ─── GET Router ─────────────────────────────────────────────────────
 async function handleGet(path) {
   const qIdx = path.indexOf('?');
@@ -31,9 +45,11 @@ async function handleGet(path) {
     const { data, error } = await supabase.from('positions').select('*').order('display_order');
     if (error) throw new Error(error.message);
     if (params.grade_level) {
+      const allowedRep = getNextGradeRepresentativeTitle(params.grade_level);
       return data.filter(p => {
         if (!p.title.toLowerCase().includes('representative')) return true;
-        return p.title.toLowerCase().includes(params.grade_level.toLowerCase());
+        if (!allowedRep) return false;
+        return p.title.toLowerCase() === allowedRep;
       });
     }
     return data;

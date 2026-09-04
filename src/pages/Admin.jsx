@@ -57,7 +57,6 @@ const CSV_TEMPLATE = `lrn,full_name,grade_level,section
 `;
 
 const CANDIDATE_CSV_TEMPLATE = `name,position,grade_level,section,party_list,motto
-Juan Dela Cruz,President,Grade 12,ICT,Agila Party,Lead with integrity and action
 Maria Santos,Vice President,Grade 11,Cookery,Siklab Party,Service for all
 `;
 
@@ -66,8 +65,7 @@ const GRADE_SECTIONS = {
   "Grade 8": ["Pearl", "Ruby", "Diamond"],
   "Grade 9": ["Wisdom", "Excellence", "Integrity"],
   "Grade 10": ["Fortitude", "Resilience", "Leadership"],
-  "Grade 11": ["ICT", "Cookery", "Tourism"],
-  "Grade 12": ["ICT", "Cookery", "Tourism"]
+  "Grade 11": ["ICT", "Cookery", "Tourism"]
 };
 
 export default function Admin() {
