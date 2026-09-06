@@ -899,13 +899,20 @@ BEGIN
     'gradeLevels', COALESCE((
       SELECT jsonb_agg(t.gl) FROM (
         SELECT DISTINCT grade_level AS gl FROM profiles
-        WHERE grade_level IS NOT NULL AND grade_level != '' ORDER BY grade_level
+        WHERE grade_level IS NOT NULL AND grade_level != ''
+        UNION
+        SELECT DISTINCT grade_level AS gl FROM candidates
+        WHERE grade_level IS NOT NULL AND grade_level != ''
+        ORDER BY gl
       ) t
     ), '[]'::jsonb),
     'sections', COALESCE((
       SELECT jsonb_agg(jsonb_build_object('grade_level', t.grade_level, 'section', t.section))
       FROM (
         SELECT DISTINCT grade_level, section FROM profiles
+        WHERE grade_level IS NOT NULL AND grade_level != '' AND section IS NOT NULL AND section != ''
+        UNION
+        SELECT DISTINCT grade_level, section FROM candidates
         WHERE grade_level IS NOT NULL AND grade_level != '' AND section IS NOT NULL AND section != ''
         ORDER BY grade_level, section
       ) t

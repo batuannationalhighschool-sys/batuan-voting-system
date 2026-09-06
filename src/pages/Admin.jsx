@@ -179,12 +179,12 @@ const CANDIDATE_CSV_TEMPLATE = `name,position,grade_level,section,party_list,mot
 Maria Santos,Vice President,Grade 11,Cookery,Siklab Party,Service for all
 `;
 
-const GRADE_SECTIONS = {
+const DEFAULT_GRADE_SECTIONS = {
   "Grade 7": ["Gold", "Silver", "Bronze"],
   "Grade 8": ["Pearl", "Ruby", "Diamond"],
   "Grade 9": ["Wisdom", "Excellence", "Integrity"],
   "Grade 10": ["Fortitude", "Resilience", "Leadership"],
-  "Grade 11": ["ICT", "Cookery", "Tourism"]
+  "Grade 11": ["ICT", "Cookery", "Tourism"],
 };
 
 export default function Admin() {
@@ -196,6 +196,7 @@ export default function Admin() {
 
   // Add candidate form state
   const [newCandidate, setNewCandidate] = useState({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
+  const [customCandidateSection, setCustomCandidateSection] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
   const fileInputRef = useRef(null);
@@ -204,10 +205,15 @@ export default function Admin() {
 
   // Edit candidate state
   const [editCandidate, setEditCandidate] = useState(null);
+  const [customEditCandidateSection, setCustomEditCandidateSection] = useState(false);
   const [editPhotoFile, setEditPhotoFile] = useState(null);
   const [editPhotoPreview, setEditPhotoPreview] = useState(null);
   const editFileInputRef = useRef(null);
   const [candidateSearch, setCandidateSearch] = useState("");
+  const [candidatePositionFilter, setCandidatePositionFilter] = useState("all");
+  const [candidateGradeFilter, setCandidateGradeFilter] = useState("all");
+  const [candidateSectionFilter, setCandidateSectionFilter] = useState("all");
+  const [candidatePartyFilter, setCandidatePartyFilter] = useState("all");
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -220,9 +226,14 @@ export default function Admin() {
 
   // Voter management state
   const [newVoter, setNewVoter] = useState({ lrn: "", full_name: "", grade_level: "", section: "" });
+  const [customVoterSection, setCustomVoterSection] = useState(false);
   const [editVoter, setEditVoter] = useState(null);
+  const [customEditVoterSection, setCustomEditVoterSection] = useState(false);
   const [resetTarget, setResetTarget] = useState(null);
   const [voterSearch, setVoterSearch] = useState("");
+  const [voterGradeFilter, setVoterGradeFilter] = useState("all");
+  const [voterSectionFilter, setVoterSectionFilter] = useState("all");
+  const [voterStatusFilter, setVoterStatusFilter] = useState("all");
 
   // Bulk upload state
   const [bulkFile, setBulkFile] = useState(null);
@@ -240,12 +251,14 @@ export default function Admin() {
 
   const openEditModal = (c) => {
     setEditCandidate({ id: c.id, name: c.name, position_id: c.position_id, grade_level: c.grade_level, section: c.section, party_list: c.party_list, motto: c.motto || '' });
+    setCustomEditCandidateSection(false);
     setEditPhotoFile(null);
     setEditPhotoPreview(c.avatar_url ? c.avatar_url : null);
   };
 
   const closeEditModal = () => {
     setEditCandidate(null);
+    setCustomEditCandidateSection(false);
     setEditPhotoFile(null);
     setEditPhotoPreview(null);
     setEditFormErrors({});
@@ -256,6 +269,91 @@ export default function Admin() {
   const { data: settings } = useQuery({ queryKey: ["election-settings"], queryFn: () => api.get('/election-settings'), refetchInterval: 10000 });
   const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: () => api.get('/stats') });
   const { data: voters } = useQuery({ queryKey: ["voters"], queryFn: () => api.get('/voters'), enabled: isAdmin });
+  const { data: voterGroups } = useQuery({ queryKey: ["voter-groups"], queryFn: () => api.get('/voters/groups') });
+
+  // Dynamically merge sections & grade levels from defaults, voter groups, voters, candidates, and form inputs
+  const dynamicGradeSections = useMemo(() => {
+    const map = {};
+    const isExcludedGrade = (g) => !g || g.trim().toLowerCase() === "grade 12" || g.trim() === "12";
+
+    for (const [grade, secs] of Object.entries(DEFAULT_GRADE_SECTIONS)) {
+      if (!isExcludedGrade(grade)) {
+        map[grade] = new Set(secs);
+      }
+    }
+    if (voterGroups?.sections) {
+      for (const item of voterGroups.sections) {
+        if (item.grade_level && item.section && !isExcludedGrade(item.grade_level)) {
+          if (!map[item.grade_level]) map[item.grade_level] = new Set();
+          map[item.grade_level].add(item.section);
+        }
+      }
+    }
+    if (voters) {
+      for (const v of voters) {
+        if (v.grade_level && v.section && !isExcludedGrade(v.grade_level)) {
+          if (!map[v.grade_level]) map[v.grade_level] = new Set();
+          map[v.grade_level].add(v.section);
+        }
+      }
+    }
+    if (candidates) {
+      for (const c of candidates) {
+        if (c.grade_level && c.section && !isExcludedGrade(c.grade_level)) {
+          if (!map[c.grade_level]) map[c.grade_level] = new Set();
+          map[c.grade_level].add(c.section);
+        }
+      }
+    }
+    if (editVoter?.grade_level && editVoter?.section && !isExcludedGrade(editVoter.grade_level)) {
+      if (!map[editVoter.grade_level]) map[editVoter.grade_level] = new Set();
+      map[editVoter.grade_level].add(editVoter.section);
+    }
+    if (editCandidate?.grade_level && editCandidate?.section && !isExcludedGrade(editCandidate.grade_level)) {
+      if (!map[editCandidate.grade_level]) map[editCandidate.grade_level] = new Set();
+      map[editCandidate.grade_level].add(editCandidate.section);
+    }
+    if (newVoter.grade_level && newVoter.section && !isExcludedGrade(newVoter.grade_level)) {
+      if (!map[newVoter.grade_level]) map[newVoter.grade_level] = new Set();
+      map[newVoter.grade_level].add(newVoter.section);
+    }
+    if (newCandidate.grade_level && newCandidate.section && !isExcludedGrade(newCandidate.grade_level)) {
+      if (!map[newCandidate.grade_level]) map[newCandidate.grade_level] = new Set();
+      map[newCandidate.grade_level].add(newCandidate.section);
+    }
+
+    const result = {};
+    const sortedGrades = Object.keys(map).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ''), 10);
+      const numB = parseInt(b.replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+    for (const g of sortedGrades) {
+      result[g] = Array.from(map[g]).sort((a, b) => a.localeCompare(b));
+    }
+    return result;
+  }, [voterGroups, voters, candidates, editVoter?.grade_level, editVoter?.section, editCandidate?.grade_level, editCandidate?.section, newVoter.grade_level, newVoter.section, newCandidate.grade_level, newCandidate.section]);
+
+  const allAvailableGrades = useMemo(() => Object.keys(dynamicGradeSections), [dynamicGradeSections]);
+
+  const voterFilterSections = useMemo(() => {
+    if (voterGradeFilter === "all") {
+      const allSecs = new Set();
+      Object.values(dynamicGradeSections).forEach(secs => secs.forEach(s => allSecs.add(s)));
+      return Array.from(allSecs).sort((a, b) => a.localeCompare(b));
+    }
+    return dynamicGradeSections[voterGradeFilter] || [];
+  }, [dynamicGradeSections, voterGradeFilter]);
+
+  const candidateFilterSections = useMemo(() => {
+    if (candidateGradeFilter === "all") {
+      const allSecs = new Set();
+      Object.values(dynamicGradeSections).forEach(secs => secs.forEach(s => allSecs.add(s)));
+      return Array.from(allSecs).sort((a, b) => a.localeCompare(b));
+    }
+    return dynamicGradeSections[candidateGradeFilter] || [];
+  }, [dynamicGradeSections, candidateGradeFilter]);
 
   const profileCount = stats?.voterCount ?? 0;
   const votedCount = stats?.votedCount ?? 0;
@@ -287,11 +385,14 @@ export default function Admin() {
     onSuccess: () => {
       toast({ title: "Candidate added!" });
       setNewCandidate({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
+      setCustomCandidateSection(false);
       setFormErrors({});
       setPhotoFile(null);
       setPhotoPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
     },
     onError: (err) => { if (err.message !== "Please fill in all required fields.") toast({ title: "Failed", description: err.message, variant: "destructive" }); },
   });
@@ -304,6 +405,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -337,6 +439,8 @@ export default function Admin() {
       toast({ title: "Candidate updated!" });
       closeEditModal();
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
     },
     onError: (err) => { if (err.message !== "Please fill in all required fields.") toast({ title: "Failed", description: err.message, variant: "destructive" }); },
   });
@@ -621,8 +725,10 @@ export default function Admin() {
     onSuccess: () => {
       toast({ title: "Voter added!", description: "Default password is the LRN." });
       setNewVoter({ lrn: "", full_name: "", grade_level: "", section: "" });
+      setCustomVoterSection(false);
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -635,7 +741,9 @@ export default function Admin() {
     onSuccess: () => {
       toast({ title: "Voter updated!" });
       setEditVoter(null);
+      setCustomEditVoterSection(false);
       queryClient.invalidateQueries({ queryKey: ["voters"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -647,6 +755,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -670,6 +779,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -680,6 +790,7 @@ export default function Admin() {
       toast({ title: "Voter permanently deleted", description: "The voter has been permanently removed from the system." });
       queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -691,6 +802,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -702,6 +814,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
@@ -734,6 +847,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["stats"] });
       queryClient.invalidateQueries({ queryKey: ["election-history"] });
       queryClient.invalidateQueries({ queryKey: ["archived-results"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
       setShowResetAllVotedConfirm(false);
     },
     onError: (err) => toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
@@ -751,6 +865,7 @@ export default function Admin() {
       if (bulkFileInputRef.current) bulkFileInputRef.current.value = '';
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
       const parts = [];
       if (data.inserted) parts.push(`${data.inserted} added`);
       if (data.updated) parts.push(`${data.updated} updated`);
@@ -799,6 +914,8 @@ export default function Admin() {
       if (bulkCandidateFileInputRef.current) bulkCandidateFileInputRef.current.value = '';
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["stats"] });
       toast({
         title: `Bulk upload complete`,
         description: `${data.inserted} inserted, ${data.skipped} skipped, ${data.errors} errors`,
@@ -885,34 +1002,48 @@ export default function Admin() {
     { id: "settings",    label: "Settings",    icon: Settings },
   ];
 
+  const candidatePartyLists = Array.from(new Set((candidates ?? []).map(c => c.party_list).filter(Boolean))).sort();
+
   const turnout = profileCount && profileCount > 0 ? ((votedCount) / profileCount * 100).toFixed(1) : "0";
 
   const filteredVoters = (voters ?? []).filter((v) => {
+    if (voterGradeFilter !== "all" && v.grade_level !== voterGradeFilter) return false;
+    if (voterSectionFilter !== "all" && v.section !== voterSectionFilter) return false;
+    if (voterStatusFilter === "voted" && !v.has_voted) return false;
+    if (voterStatusFilter === "not_voted" && v.has_voted) return false;
     if (!voterSearch) return true;
     const q = voterSearch.toLowerCase();
-    return v.lrn?.toLowerCase().includes(q) || v.full_name?.toLowerCase().includes(q) || v.section?.toLowerCase().includes(q);
+    return v.lrn?.toLowerCase().includes(q) ||
+           v.full_name?.toLowerCase().includes(q) ||
+           v.section?.toLowerCase().includes(q) ||
+           v.grade_level?.toLowerCase().includes(q);
   });
 
   const filteredCandidates = (candidates ?? []).filter((c) => {
+    if (candidatePositionFilter !== "all" && String(c.position_id) !== String(candidatePositionFilter)) return false;
+    if (candidateGradeFilter !== "all" && c.grade_level !== candidateGradeFilter) return false;
+    if (candidateSectionFilter !== "all" && c.section !== candidateSectionFilter) return false;
+    if (candidatePartyFilter !== "all" && c.party_list !== candidatePartyFilter) return false;
     if (!candidateSearch) return true;
     const q = candidateSearch.toLowerCase();
-    const pos = (positions ?? []).find((p) => p.id === c.position_id);
+    const pos = (positions ?? []).find((p) => String(p.id) === String(c.position_id));
     return c.name?.toLowerCase().includes(q) ||
            pos?.title?.toLowerCase().includes(q) ||
            c.party_list?.toLowerCase().includes(q) ||
-           c.section?.toLowerCase().includes(q);
+           c.section?.toLowerCase().includes(q) ||
+           c.grade_level?.toLowerCase().includes(q);
   });
 
   const filteredArchived = (archivedVoters ?? []).filter((v) => {
     if (!archiveSearch) return true;
     const q = archiveSearch.toLowerCase();
-    return v.lrn?.toLowerCase().includes(q) || v.full_name?.toLowerCase().includes(q) || v.section?.toLowerCase().includes(q);
+    return v.lrn?.toLowerCase().includes(q) || v.full_name?.toLowerCase().includes(q) || v.section?.toLowerCase().includes(q) || v.grade_level?.toLowerCase().includes(q);
   });
 
   const filteredArchivedCandidates = (archivedCandidates ?? []).filter((c) => {
     if (!archiveCandidateSearch) return true;
     const q = archiveCandidateSearch.toLowerCase();
-    return c.name?.toLowerCase().includes(q) || c.position_title?.toLowerCase().includes(q) || c.party_list?.toLowerCase().includes(q);
+    return c.name?.toLowerCase().includes(q) || c.position_title?.toLowerCase().includes(q) || c.party_list?.toLowerCase().includes(q) || c.section?.toLowerCase().includes(q) || c.grade_level?.toLowerCase().includes(q);
   });
 
   return (
@@ -1104,23 +1235,51 @@ export default function Admin() {
                 className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
               <select
                 value={newVoter.grade_level}
-                onChange={(e) => setNewVoter(p => ({ ...p, grade_level: e.target.value, section: "" }))}
+                onChange={(e) => { setNewVoter(p => ({ ...p, grade_level: e.target.value, section: "" })); setCustomVoterSection(false); }}
                 className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Select Grade Level</option>
-                {Object.keys(GRADE_SECTIONS).map(g => <option key={g} value={g}>{g}</option>)}
+                {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
-              <select
-                value={newVoter.section}
-                onChange={(e) => setNewVoter(p => ({ ...p, section: e.target.value }))}
-                disabled={!newVoter.grade_level}
-                className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              >
-                <option value="">{newVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
-                {newVoter.grade_level && (GRADE_SECTIONS[newVoter.grade_level] || []).map(s => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              {customVoterSection ? (
+                <div className="flex gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Enter custom section..."
+                    value={newVoter.section}
+                    onChange={(e) => setNewVoter(p => ({ ...p, section: e.target.value }))}
+                    className="flex-1 px-3 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => { setCustomVoterSection(false); setNewVoter(p => ({ ...p, section: "" })); }}
+                    className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
+                    title="Select from list"
+                  >
+                    List
+                  </button>
+                </div>
+              ) : (
+                <select
+                  value={newVoter.section}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setCustomVoterSection(true);
+                      setNewVoter(p => ({ ...p, section: "" }));
+                    } else {
+                      setNewVoter(p => ({ ...p, section: e.target.value }));
+                    }
+                  }}
+                  disabled={!newVoter.grade_level}
+                  className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                >
+                  <option value="">{newVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
+                  {newVoter.grade_level && (dynamicGradeSections[newVoter.grade_level] || []).map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                  {newVoter.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
+                </select>
+              )}
             </div>
             <div className="flex items-center gap-4 mt-4">
               <button onClick={() => addVoter.mutate()} disabled={addVoter.isPending}
@@ -1131,22 +1290,75 @@ export default function Admin() {
             </div>
           </div>
 
-          {/* Search & Actions */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <input type="text" placeholder="Search by LRN, name, or section..." value={voterSearch} onChange={(e) => setVoterSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+          {/* Search & Filters */}
+          <div className="bg-card border border-border rounded-xl p-4 shadow-elegant space-y-3">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input type="text" placeholder="Search by LRN, name, grade, or section..." value={voterSearch} onChange={(e) => setVoterSearch(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+              </div>
+
+              <button
+                onClick={() => setShowResetAllVotedConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted text-foreground text-xs font-semibold hover:bg-muted/80 transition-colors border border-border shrink-0 justify-center"
+                title="Reset voting status for all registered voters"
+              >
+                <RotateCcw className="w-4 h-4 text-gold" />
+                Reset All Voting Statuses
+              </button>
             </div>
 
-            <button
-              onClick={() => setShowResetAllVotedConfirm(true)}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-muted text-foreground text-xs font-semibold hover:bg-muted/80 transition-colors border border-border shrink-0 justify-center"
-              title="Reset voting status for all registered voters"
-            >
-              <RotateCcw className="w-4 h-4 text-gold" />
-              Reset All Voting Statuses
-            </button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-border/60">
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Grade Level</label>
+                <select
+                  value={voterGradeFilter}
+                  onChange={(e) => { setVoterGradeFilter(e.target.value); setVoterSectionFilter("all"); }}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Grade Levels</option>
+                  {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Section</label>
+                <select
+                  value={voterSectionFilter}
+                  onChange={(e) => setVoterSectionFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Sections</option>
+                  {voterFilterSections.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Voting Status</label>
+                <select
+                  value={voterStatusFilter}
+                  onChange={(e) => setVoterStatusFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="voted">Voted</option>
+                  <option value="not_voted">Not Voted</option>
+                </select>
+              </div>
+            </div>
+
+            {(voterGradeFilter !== "all" || voterSectionFilter !== "all" || voterStatusFilter !== "all" || voterSearch) && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                <span>Active filters applied</span>
+                <button
+                  onClick={() => { setVoterGradeFilter("all"); setVoterSectionFilter("all"); setVoterStatusFilter("all"); setVoterSearch(""); }}
+                  className="text-gold hover:underline font-medium"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Voters table */}
@@ -1399,27 +1611,63 @@ export default function Admin() {
                   <div>
                     <select
                       value={newCandidate.grade_level}
-                      onChange={(e) => { setNewCandidate(p => ({ ...p, grade_level: e.target.value, section: "" })); if (formErrors.grade_level) setFormErrors(p => ({ ...p, grade_level: undefined })); }}
+                      onChange={(e) => {
+                        setNewCandidate(p => ({ ...p, grade_level: e.target.value, section: "" }));
+                        setCustomCandidateSection(false);
+                        if (formErrors.grade_level) setFormErrors(p => ({ ...p, grade_level: undefined }));
+                      }}
                       className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${formErrors.grade_level ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
                     >
                       <option value="">Select Grade Level</option>
-                      {Object.keys(GRADE_SECTIONS).map(g => <option key={g} value={g}>{g}</option>)}
+                      {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
                     </select>
                     {formErrors.grade_level && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.grade_level}</p>}
                   </div>
                   {/* Section */}
                   <div>
-                    <select
-                      value={newCandidate.section}
-                      onChange={(e) => { setNewCandidate(p => ({ ...p, section: e.target.value })); if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined })); }}
-                      disabled={!newCandidate.grade_level}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                    >
-                      <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
-                      {newCandidate.grade_level && (GRADE_SECTIONS[newCandidate.grade_level] || []).map(s => (
-                        <option key={s} value={s}>{s}</option>
-                      ))}
-                    </select>
+                    {customCandidateSection ? (
+                      <div className="flex gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Enter custom section..."
+                          value={newCandidate.section}
+                          onChange={(e) => {
+                            setNewCandidate(p => ({ ...p, section: e.target.value }));
+                            if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
+                          }}
+                          className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => { setCustomCandidateSection(false); setNewCandidate(p => ({ ...p, section: "" })); }}
+                          className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
+                          title="Select from list"
+                        >
+                          List
+                        </button>
+                      </div>
+                    ) : (
+                      <select
+                        value={newCandidate.section}
+                        onChange={(e) => {
+                          if (e.target.value === "__custom__") {
+                            setCustomCandidateSection(true);
+                            setNewCandidate(p => ({ ...p, section: "" }));
+                          } else {
+                            setNewCandidate(p => ({ ...p, section: e.target.value }));
+                            if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
+                          }
+                        }}
+                        disabled={!newCandidate.grade_level}
+                        className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                      >
+                        <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
+                        {newCandidate.grade_level && (dynamicGradeSections[newCandidate.grade_level] || []).map(s => (
+                          <option key={s} value={s}>{s}</option>
+                        ))}
+                        {newCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
+                      </select>
+                    )}
                     {formErrors.section && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.section}</p>}
                   </div>
                   {/* Party List */}
@@ -1465,11 +1713,81 @@ export default function Admin() {
               </>
           </div>
 
-          {/* Search */}
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="text" placeholder="Search by name, position, party, or section..." value={candidateSearch} onChange={(e) => setCandidateSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-card border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+          {/* Search & Filters */}
+          <div className="bg-card border border-border rounded-xl p-4 shadow-elegant space-y-3">
+            <div className="relative max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input type="text" placeholder="Search by name, position, party, grade, or section..." value={candidateSearch} onChange={(e) => setCandidateSearch(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring text-sm" />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-2 border-t border-border/60">
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Position</label>
+                <select
+                  value={candidatePositionFilter}
+                  onChange={(e) => setCandidatePositionFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Positions</option>
+                  {(positions ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Grade Level</label>
+                <select
+                  value={candidateGradeFilter}
+                  onChange={(e) => { setCandidateGradeFilter(e.target.value); setCandidateSectionFilter("all"); }}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Grade Levels</option>
+                  {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Section</label>
+                <select
+                  value={candidateSectionFilter}
+                  onChange={(e) => setCandidateSectionFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Sections</option>
+                  {candidateFilterSections.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Party List</label>
+                <select
+                  value={candidatePartyFilter}
+                  onChange={(e) => setCandidatePartyFilter(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="all">All Parties</option>
+                  {candidatePartyLists.map(party => <option key={party} value={party}>{party}</option>)}
+                </select>
+              </div>
+            </div>
+
+            {(candidatePositionFilter !== "all" || candidateGradeFilter !== "all" || candidateSectionFilter !== "all" || candidatePartyFilter !== "all" || candidateSearch) && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+                <span>Active filters applied</span>
+                <button
+                  onClick={() => {
+                    setCandidatePositionFilter("all");
+                    setCandidateGradeFilter("all");
+                    setCandidateSectionFilter("all");
+                    setCandidatePartyFilter("all");
+                    setCandidateSearch("");
+                  }}
+                  className="text-gold hover:underline font-medium"
+                >
+                  Clear all filters
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Table */}
@@ -1481,7 +1799,7 @@ export default function Admin() {
                     <th className="text-left p-4 font-semibold text-foreground">Name</th>
                     <th className="text-left p-4 font-semibold text-foreground">Position</th>
                     <th className="text-left p-4 font-semibold text-foreground hidden sm:table-cell">Party</th>
-                    <th className="text-left p-4 font-semibold text-foreground hidden md:table-cell">Section</th>
+                    <th className="text-left p-4 font-semibold text-foreground hidden md:table-cell">Grade &amp; Section</th>
                     <th className="text-right p-4 font-semibold text-foreground">Actions</th>
                   </tr>
                 </thead>
@@ -1493,7 +1811,17 @@ export default function Admin() {
                         <td className="p-4 font-medium text-foreground uppercase">{c.name}</td>
                         <td className="p-4 text-muted-foreground">{pos?.title}</td>
                         <td className="p-4 text-muted-foreground hidden sm:table-cell">{c.party_list}</td>
-                        <td className="p-4 text-muted-foreground hidden md:table-cell">{c.section}</td>
+                        <td className="p-4 text-muted-foreground hidden md:table-cell">
+                          {c.grade_level || c.section ? (
+                            <span>
+                              {c.grade_level && <span className="font-medium text-foreground">{c.grade_level}</span>}
+                              {c.grade_level && c.section && <span> — </span>}
+                              {c.section && <span>{c.section}</span>}
+                            </span>
+                          ) : (
+                            <span className="text-xs italic text-muted-foreground/60">Not set</span>
+                          )}
+                        </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button onClick={() => openEditModal(c)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
@@ -1513,6 +1841,11 @@ export default function Admin() {
                 </tbody>
               </table>
             </div>
+            {(candidates ?? []).length > 0 && (
+              <div className="px-4 py-3 border-t border-border bg-muted/30 text-xs text-muted-foreground">
+                Showing {filteredCandidates.length} of {(candidates ?? []).length} candidates
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1625,24 +1958,52 @@ export default function Admin() {
               <div className="grid grid-cols-2 gap-3">
                 <select
                   value={editVoter.grade_level}
-                  onChange={(e) => setEditVoter(p => ({ ...p, grade_level: e.target.value, section: "" }))}
+                  onChange={(e) => { setEditVoter(p => ({ ...p, grade_level: e.target.value, section: "" })); setCustomEditVoterSection(false); }}
                   className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Grade Level</option>
-                  {Object.keys(GRADE_SECTIONS).map(g => <option key={g} value={g}>{g}</option>)}
+                  {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
                 <div>
-                  <select
-                    value={editVoter.section}
-                    onChange={(e) => setEditVoter(p => ({ ...p, section: e.target.value }))}
-                    disabled={!editVoter.grade_level}
-                    className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                  >
-                    <option value="">{editVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
-                    {editVoter.grade_level && (GRADE_SECTIONS[editVoter.grade_level] || []).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  {customEditVoterSection ? (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Custom section..."
+                        value={editVoter.section}
+                        onChange={(e) => setEditVoter(p => ({ ...p, section: e.target.value }))}
+                        className="flex-1 px-3 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setCustomEditVoterSection(false); setEditVoter(p => ({ ...p, section: "" })); }}
+                        className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
+                        title="Select from list"
+                      >
+                        List
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editVoter.section}
+                      onChange={(e) => {
+                        if (e.target.value === "__custom__") {
+                          setCustomEditVoterSection(true);
+                          setEditVoter(p => ({ ...p, section: "" }));
+                        } else {
+                          setEditVoter(p => ({ ...p, section: e.target.value }));
+                        }
+                      }}
+                      disabled={!editVoter.grade_level}
+                      className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                    >
+                      <option value="">{editVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
+                      {editVoter.grade_level && (dynamicGradeSections[editVoter.grade_level] || []).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                      {editVoter.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
@@ -1691,26 +2052,62 @@ export default function Admin() {
                 <div>
                   <select
                     value={editCandidate.grade_level}
-                    onChange={(e) => { setEditCandidate(p => ({ ...p, grade_level: e.target.value, section: "" })); if (editFormErrors.grade_level) setEditFormErrors(p => ({ ...p, grade_level: undefined })); }}
+                    onChange={(e) => {
+                      setEditCandidate(p => ({ ...p, grade_level: e.target.value, section: "" }));
+                      setCustomEditCandidateSection(false);
+                      if (editFormErrors.grade_level) setEditFormErrors(p => ({ ...p, grade_level: undefined }));
+                    }}
                     className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${editFormErrors.grade_level ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
                   >
                     <option value="">Grade Level</option>
-                    {Object.keys(GRADE_SECTIONS).map(g => <option key={g} value={g}>{g}</option>)}
+                    {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                   {editFormErrors.grade_level && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{editFormErrors.grade_level}</p>}
                 </div>
                 <div>
-                  <select
-                    value={editCandidate.section}
-                    onChange={(e) => { setEditCandidate(p => ({ ...p, section: e.target.value })); if (editFormErrors.section) setEditFormErrors(p => ({ ...p, section: undefined })); }}
-                    disabled={!editCandidate.grade_level}
-                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${editFormErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                  >
-                    <option value="">{editCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
-                    {editCandidate.grade_level && (GRADE_SECTIONS[editCandidate.grade_level] || []).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                  {customEditCandidateSection ? (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Custom section..."
+                        value={editCandidate.section}
+                        onChange={(e) => {
+                          setEditCandidate(p => ({ ...p, section: e.target.value }));
+                          if (editFormErrors.section) setEditFormErrors(p => ({ ...p, section: undefined }));
+                        }}
+                        className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${editFormErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setCustomEditCandidateSection(false); setEditCandidate(p => ({ ...p, section: "" })); }}
+                        className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
+                        title="Select from list"
+                      >
+                        List
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={editCandidate.section}
+                      onChange={(e) => {
+                        if (e.target.value === "__custom__") {
+                          setCustomEditCandidateSection(true);
+                          setEditCandidate(p => ({ ...p, section: "" }));
+                        } else {
+                          setEditCandidate(p => ({ ...p, section: e.target.value }));
+                          if (editFormErrors.section) setEditFormErrors(p => ({ ...p, section: undefined }));
+                        }
+                      }}
+                      disabled={!editCandidate.grade_level}
+                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${editFormErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                    >
+                      <option value="">{editCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
+                      {editCandidate.grade_level && (dynamicGradeSections[editCandidate.grade_level] || []).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                      {editCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
+                    </select>
+                  )}
                   {editFormErrors.section && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{editFormErrors.section}</p>}
                 </div>
               </div>

@@ -22,7 +22,12 @@ export default function Candidates() {
   const partyLists = Array.from(new Set((candidates ?? []).map((c) => c.party_list).filter(Boolean)));
 
   const filtered = (candidates ?? []).filter((c) => {
-    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || c.party_list.toLowerCase().includes(search.toLowerCase());
+    const q = search.toLowerCase();
+    const matchesSearch = !search ||
+      c.name.toLowerCase().includes(q) ||
+      c.party_list?.toLowerCase().includes(q) ||
+      c.section?.toLowerCase().includes(q) ||
+      c.grade_level?.toLowerCase().includes(q);
     const matchesPosition = activePosition === "all" || c.position_id === activePosition;
     const matchesParty = activeParty === "all" || c.party_list === activeParty;
     return matchesSearch && matchesPosition && matchesParty;
