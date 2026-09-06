@@ -13,47 +13,166 @@ import { ELECTION_TIME_ZONE, parseElectionDateTime } from "@/lib/election-time";
 
 
 // ─── CSV parsers ─────────────────────────────────────────────────────────────
+function splitCSVLine(line, delimiter = ',') {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const char = line[i];
+    if (char === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (char === delimiter && !inQuotes) {
+      values.push(current.trim().replace(/^"|"$/g, ''));
+      current = '';
+    } else {
+      current += char;
+    }
+  }
+  values.push(current.trim().replace(/^"|"$/g, ''));
+  return values;
+}
+
+function detectDelimiter(headerLine) {
+  const counts = {
+    ',': (headerLine.match(/,/g) || []).length,
+    ';': (headerLine.match(/;/g) || []).length,
+    '\t': (headerLine.match(/\t/g) || []).length,
+  };
+  let best = ',';
+  let max = 0;
+  for (const [delim, count] of Object.entries(counts)) {
+    if (count > max) {
+      max = count;
+      best = delim;
+    }
+  }
+  return best;
+}
+
+function cleanHeader(h) {
+  return h.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function formatGradeLevel(val) {
+  if (!val) return '';
+  const clean = String(val).trim();
+  if (/^\d+$/.test(clean)) return `Grade ${clean}`;
+  if (/^(?:grade|gr|g|baitang)\s*[-.]?\s*(\d+)$/i.test(clean)) {
+    const num = clean.match(/\d+/)[0];
+    return `Grade ${num}`;
+  }
+  return clean;
+}
+
+function extractGradeAndSection(rawGrade = '', rawSection = '', rawCombined = '') {
+  let grade = String(rawGrade || '').trim();
+  let sec = String(rawSection || '').trim();
+  const combined = String(rawCombined || '').trim();
+
+  // If a combined column or string was provided (e.g. "Grade 7 - Gold" or "7-Gold")
+  const toInspect = combined || (!sec && (grade.includes('-') || grade.includes('/')) ? grade : '') || (!grade && (sec.includes('-') || sec.includes('/')) ? sec : '');
+  if (toInspect) {
+    const match = toInspect.match(/^(?:grade|gr|g|baitang)?\s*(\d+)\s*[-/:\s]+\s*(.+)$/i);
+    if (match) {
+      if (!grade || grade === toInspect) grade = `Grade ${match[1]}`;
+      if (!sec || sec === toInspect) sec = match[2].trim();
+    }
+  }
+
+  grade = formatGradeLevel(grade);
+  return { grade_level: grade, section: sec };
+}
+
 function parseCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
+  if (!text) return [];
+  const cleanText = text.replace(/^\uFEFF/, '').trim();
+  const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, '_'));
+
+  const delimiter = detectDelimiter(lines[0]);
+  const rawHeaders = splitCSVLine(lines[0], delimiter);
+  const headers = rawHeaders.map(cleanHeader);
+
   return lines.slice(1).map(line => {
-    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const vals = splitCSVLine(line, delimiter);
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
-    // Normalise column aliases
+    headers.forEach((h, i) => {
+      if (h) obj[h] = vals[i] ?? '';
+    });
+
+    const lrn = obj.lrn || obj.learnerreferencenumber || obj.lrnno || obj.lrnnumber || obj.studentid || obj.studentlrn || obj.idnumber || obj.id || obj.studentno || obj.no || '';
+    
+    let fullName = obj.fullname || obj.name || obj.studentname || obj.learnername || obj.completename || obj.nameofstudent || obj.nameoflearner || obj.pangalan || obj.pangalanngmagaaral || '';
+    if (!fullName && (obj.lastname || obj.firstname || obj.apelyido || obj.unangpangalan)) {
+      const last = obj.lastname || obj.apelyido || '';
+      const first = obj.firstname || obj.unangpangalan || '';
+      const middle = obj.middlename || obj.gitnangpangalan || '';
+      const ext = obj.extensionname || obj.ext || '';
+      fullName = [first, middle, last, ext].filter(Boolean).join(' ');
+    }
+
+    const rawGrade = obj.gradelevel || obj.grade || obj.yearlevel || obj.year || obj.level || obj.baitang || obj.gr || obj.gradelvl || obj.lvl || '';
+    const rawSection = obj.section || obj.sectionname || obj.sec || obj.seksyon || obj.pangkat || obj.strand || obj.track || obj.secname || obj.pangkatseksyon || '';
+    const rawCombined = obj.gradesection || obj.gradeandsection || obj.gradelevelsection || obj.grandsec || obj.grsec || obj.gradeorsection || obj.class || obj.classroom || '';
+
+    const { grade_level, section } = extractGradeAndSection(rawGrade, rawSection, rawCombined);
+
     return {
-      lrn: obj.lrn ?? obj.learner_reference_number ?? '',
-      full_name: obj.full_name ?? obj.name ?? obj.fullname ?? '',
-      grade_level: obj.grade_level ?? obj.grade ?? '',
-      section: obj.section ?? '',
+      lrn: lrn.replace(/\D/g, '').slice(0, 12),
+      full_name: fullName.trim(),
+      grade_level: grade_level,
+      section: section.trim(),
     };
-  });
+  }).filter(r => r.lrn || r.full_name);
 }
 
 function parseCandidateCSV(text) {
-  const lines = text.trim().split(/\r?\n/);
+  if (!text) return [];
+  const cleanText = text.replace(/^\uFEFF/, '').trim();
+  const lines = cleanText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
   if (lines.length < 2) return [];
-  const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/[^a-z_]/g, '_'));
+
+  const delimiter = detectDelimiter(lines[0]);
+  const rawHeaders = splitCSVLine(lines[0], delimiter);
+  const headers = rawHeaders.map(cleanHeader);
+
   return lines.slice(1).map(line => {
-    const vals = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+    const vals = splitCSVLine(line, delimiter);
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = vals[i] ?? ''; });
+    headers.forEach((h, i) => {
+      if (h) obj[h] = vals[i] ?? '';
+    });
+
+    const name = obj.name || obj.fullname || obj.candidate || obj.candidatename || obj.pangalan || '';
+    const position = obj.position || obj.positiontitle || obj.title || obj.pos || obj.posisyon || '';
+    const rawGrade = obj.gradelevel || obj.grade || obj.yearlevel || obj.year || obj.level || obj.baitang || obj.gr || '';
+    const rawSection = obj.section || obj.sectionname || obj.sec || obj.seksyon || obj.pangkat || obj.strand || obj.track || '';
+    const rawCombined = obj.gradesection || obj.gradeandsection || obj.gradelevelsection || obj.grandsec || obj.grsec || obj.class || '';
+    const partyList = obj.partylist || obj.party || obj.partylistname || obj.partido || '';
+    const motto = obj.motto || obj.platform || obj.quote || obj.advocacy || '';
+
+    const { grade_level, section } = extractGradeAndSection(rawGrade, rawSection, rawCombined);
+
     return {
-      name: obj.name ?? obj.full_name ?? obj.fullname ?? '',
-      position: obj.position ?? obj.position_title ?? obj.title ?? '',
-      grade_level: obj.grade_level ?? obj.grade ?? '',
-      section: obj.section ?? '',
-      party_list: obj.party_list ?? obj.party ?? '',
-      motto: obj.motto ?? '',
+      name: name.trim(),
+      position: position.trim(),
+      grade_level: grade_level,
+      section: section.trim(),
+      party_list: partyList.trim(),
+      motto: motto.trim(),
     };
-  });
+  }).filter(r => r.name || r.position);
 }
 
 // ─── CSV template contents ───────────────────────────────────────────────────
 const CSV_TEMPLATE = `lrn,full_name,grade_level,section
-123456789012,Juan dela Cruz,Grade 7,Sampaguita
-234567890123,Maria Santos,Grade 8,Rosal
+123456789012,Juan dela Cruz,Grade 7,Gold
+234567890123,Maria Santos,Grade 8,Pearl
 `;
 
 const CANDIDATE_CSV_TEMPLATE = `name,position,grade_level,section,party_list,motto
@@ -632,9 +751,14 @@ export default function Admin() {
       if (bulkFileInputRef.current) bulkFileInputRef.current.value = '';
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      const parts = [];
+      if (data.inserted) parts.push(`${data.inserted} added`);
+      if (data.updated) parts.push(`${data.updated} updated`);
+      if (data.skipped) parts.push(`${data.skipped} skipped`);
+      if (data.errors) parts.push(`${data.errors} errors`);
       toast({
         title: `Bulk upload complete`,
-        description: `${data.inserted} inserted, ${data.skipped} skipped, ${data.errors} errors`,
+        description: parts.join(', ') || 'All rows processed successfully',
       });
     },
     onError: (err) => toast({ title: "Bulk upload failed", description: err.message, variant: "destructive" }),
@@ -945,8 +1069,15 @@ export default function Admin() {
                   <CheckCircle2 className="w-4 h-4 text-success" /> Upload Summary
                 </p>
                 <div className="flex gap-4 text-xs flex-wrap">
-                  <span className="flex items-center gap-1.5 text-success font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> {bulkResult.inserted} inserted</span>
-                  <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><AlertCircle className="w-3.5 h-3.5" /> {bulkResult.skipped} skipped (duplicate LRN)</span>
+                  {bulkResult.inserted > 0 && (
+                    <span className="flex items-center gap-1.5 text-success font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> {bulkResult.inserted} added</span>
+                  )}
+                  {bulkResult.updated > 0 && (
+                    <span className="flex items-center gap-1.5 text-blue-500 font-medium"><CheckCircle2 className="w-3.5 h-3.5" /> {bulkResult.updated} updated</span>
+                  )}
+                  {bulkResult.skipped > 0 && (
+                    <span className="flex items-center gap-1.5 text-muted-foreground font-medium"><AlertCircle className="w-3.5 h-3.5" /> {bulkResult.skipped} skipped</span>
+                  )}
                   {bulkResult.errors > 0 && (
                     <span className="flex items-center gap-1.5 text-destructive font-medium"><X className="w-3.5 h-3.5" /> {bulkResult.errors} errors</span>
                   )}
@@ -985,8 +1116,8 @@ export default function Admin() {
                 disabled={!newVoter.grade_level}
                 className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               >
-                <option value="">Select Section</option>
-                {newVoter.grade_level && GRADE_SECTIONS[newVoter.grade_level]?.map(s => (
+                <option value="">{newVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
+                {newVoter.grade_level && (GRADE_SECTIONS[newVoter.grade_level] || []).map(s => (
                   <option key={s} value={s}>{s}</option>
                 ))}
               </select>
@@ -1036,7 +1167,17 @@ export default function Admin() {
                     <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
                       <td className="p-4 font-mono text-foreground text-xs">{v.lrn}</td>
                       <td className="p-4 font-medium text-foreground uppercase">{v.full_name}</td>
-                      <td className="p-4 text-muted-foreground hidden sm:table-cell">{v.grade_level && v.section ? `${v.grade_level} — ${v.section}` : <span className="text-xs italic">Not set</span>}</td>
+                      <td className="p-4 text-muted-foreground hidden sm:table-cell">
+                        {v.grade_level || v.section ? (
+                          <span>
+                            {v.grade_level && <span className="font-medium text-foreground">{v.grade_level}</span>}
+                            {v.grade_level && v.section && <span> — </span>}
+                            {v.section && <span>{v.section}</span>}
+                          </span>
+                        ) : (
+                          <span className="text-xs italic text-muted-foreground/60">Not set</span>
+                        )}
+                      </td>
                       <td className="p-4 hidden md:table-cell">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           {v.has_voted ? (
@@ -1274,8 +1415,8 @@ export default function Admin() {
                       disabled={!newCandidate.grade_level}
                       className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
                     >
-                      <option value="">Select Section</option>
-                      {newCandidate.grade_level && GRADE_SECTIONS[newCandidate.grade_level]?.map(s => (
+                      <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
+                      {newCandidate.grade_level && (GRADE_SECTIONS[newCandidate.grade_level] || []).map(s => (
                         <option key={s} value={s}>{s}</option>
                       ))}
                     </select>
@@ -1490,17 +1631,19 @@ export default function Admin() {
                   <option value="">Grade Level</option>
                   {Object.keys(GRADE_SECTIONS).map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
-                <select
-                  value={editVoter.section}
-                  onChange={(e) => setEditVoter(p => ({ ...p, section: e.target.value }))}
-                  disabled={!editVoter.grade_level}
-                  className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-                >
-                  <option value="">Section</option>
-                  {editVoter.grade_level && GRADE_SECTIONS[editVoter.grade_level]?.map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                <div>
+                  <select
+                    value={editVoter.section}
+                    onChange={(e) => setEditVoter(p => ({ ...p, section: e.target.value }))}
+                    disabled={!editVoter.grade_level}
+                    className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+                  >
+                    <option value="">{editVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
+                    {editVoter.grade_level && (GRADE_SECTIONS[editVoter.grade_level] || []).map(s => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
             <div className="flex items-center justify-end gap-3 mt-6 pt-4 border-t border-border">
@@ -1563,8 +1706,8 @@ export default function Admin() {
                     disabled={!editCandidate.grade_level}
                     className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${editFormErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
                   >
-                    <option value="">Section</option>
-                    {editCandidate.grade_level && GRADE_SECTIONS[editCandidate.grade_level]?.map(s => (
+                    <option value="">{editCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
+                    {editCandidate.grade_level && (GRADE_SECTIONS[editCandidate.grade_level] || []).map(s => (
                       <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
@@ -1807,7 +1950,15 @@ export default function Admin() {
                           <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{v.lrn}</td>
                           <td className="py-3 px-3 font-medium text-foreground uppercase">{v.full_name}</td>
                           <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">
-                            {v.grade_level && v.section ? `${v.grade_level} — ${v.section}` : <span className="italic text-xs">Not set</span>}
+                            {v.grade_level || v.section ? (
+                              <span>
+                                {v.grade_level && <span className="font-medium text-foreground">{v.grade_level}</span>}
+                                {v.grade_level && v.section && <span> — </span>}
+                                {v.section && <span>{v.section}</span>}
+                              </span>
+                            ) : (
+                              <span className="italic text-xs text-muted-foreground/60">Not set</span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-xs text-muted-foreground">
                             {v.archived_at ? new Date(v.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}

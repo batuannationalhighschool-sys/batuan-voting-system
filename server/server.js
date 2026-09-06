@@ -488,6 +488,7 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
     }
 
     const inserted = [];
+    const updated = [];
     const skipped = [];
     const errors = [];
 
@@ -505,14 +506,52 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
         continue;
       }
 
-      // Skip existing LRNs
+      const cleanName = String(full_name).trim().slice(0, 100);
+      const cleanGrade = grade_level && String(grade_level).trim() ? String(grade_level).trim().slice(0, 50) : null;
+      const cleanSection = section && String(section).trim() ? String(section).trim().slice(0, 50) : null;
+
+      // Check if user already exists
       const { data: existing } = await supabase
         .from('users')
         .select('id')
         .eq('lrn', cleanLrn);
 
       if (existing && existing.length > 0) {
-        skipped.push({ lrn: cleanLrn, full_name });
+        const existingUserId = existing[0].id;
+        // Update user full_name
+        await supabase
+          .from('users')
+          .update({ full_name: cleanName })
+          .eq('id', existingUserId);
+
+        // Check profile
+        const { data: existingProf } = await supabase
+          .from('profiles')
+          .select('id, grade_level, section')
+          .eq('user_id', existingUserId);
+
+        if (existingProf && existingProf.length > 0) {
+          const profUpdates = { full_name: cleanName, archived: false };
+          if (cleanGrade) profUpdates.grade_level = cleanGrade;
+          if (cleanSection) profUpdates.section = cleanSection;
+          await supabase
+            .from('profiles')
+            .update(profUpdates)
+            .eq('user_id', existingUserId);
+        } else {
+          await supabase
+            .from('profiles')
+            .insert({
+              id: randomUUID(),
+              user_id: existingUserId,
+              full_name: cleanName,
+              grade_level: cleanGrade,
+              section: cleanSection,
+              archived: false,
+            });
+        }
+
+        updated.push({ lrn: cleanLrn, full_name: cleanName });
         continue;
       }
 
@@ -521,7 +560,7 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
 
       const { error: userError } = await supabase
         .from('users')
-        .insert({ id, lrn: cleanLrn, password_hash, full_name: String(full_name).slice(0, 100), must_change_password: true });
+        .insert({ id, lrn: cleanLrn, password_hash, full_name: cleanName, must_change_password: true });
 
       if (userError) {
         errors.push({ row: rowLabel, lrn: cleanLrn, reason: userError.message });
@@ -533,9 +572,10 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
         .insert({
           id: randomUUID(),
           user_id: id,
-          full_name: String(full_name).slice(0, 100),
-          grade_level: grade_level ? String(grade_level).slice(0, 50) : null,
-          section: section ? String(section).slice(0, 50) : null,
+          full_name: cleanName,
+          grade_level: cleanGrade,
+          section: cleanSection,
+          archived: false,
         });
 
       if (profileError) {
@@ -552,10 +592,18 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
         continue;
       }
 
-      inserted.push({ lrn: cleanLrn, full_name });
+      inserted.push({ lrn: cleanLrn, full_name: cleanName });
     }
 
-    res.json({ inserted: inserted.length, skipped: skipped.length, errors: errors.length, skippedList: skipped, errorList: errors });
+    res.json({
+      inserted: inserted.length,
+      updated: updated.length,
+      skipped: skipped.length,
+      errors: errors.length,
+      skippedList: skipped,
+      errorList: errors,
+      updatedList: updated,
+    });
   } catch (err) {
     console.error('Bulk upload error:', err);
     res.status(500).json({ error: 'Bulk upload failed' });
