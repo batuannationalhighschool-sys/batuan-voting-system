@@ -36,18 +36,18 @@ No automated scan can prove literal 100% coverage of every runtime path or exter
 
 ## Production hosting status
 
-Vercel read-only preflight confirmed the `batuan-voting` project and Hobby plan. Only the public Vite environment keys were present. The per-minute Vercel Cron configuration was removed because Hobby plans reject schedules more frequent than daily; Supabase `pg_cron` is the active production scheduler.
+Vercel is linked to the GitHub repository and production branch `main`. Production commit `02b52c6` is `READY`. The canonical live URL `https://batuan-voting-bnhs.vercel.app` returns HTTP 200 with the new bundle; its scheduler returns 401 without the secret and 200 with the configured secret. The candidate-photo API also rejects unauthenticated requests with 401. `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `CRON_SECRET` are configured for production only.
 
-The new frontend/API deployment is not yet verified in this pass: placing `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`, and a generated `CRON_SECRET` into Vercel would transmit a server-only credential to that provider and requires explicit approval. Until that approval is given, the current live Vercel bundle must not be described as the newly verified build.
+The Vercel Hobby plan is not used for minute-level Cron; Supabase `pg_cron` is the active production scheduler. The additional `batuan-voting.vercel.app` and `batuan-voting-bnhs2.vercel.app` hostnames are Vercel redirects to the canonical URL, so authenticated API callers should use the canonical hostname after redirects are followed.
 
 ## Remaining risks or limitations
 
 1. The original voting-window gap is fixed in Supabase and covered by the active scheduler. The vote RPC remains safe if a scheduler invocation is missed because it checks the time window itself.
 2. `.env` contains sensitive provider credentials by design. They were not exposed or committed, but should be rotated if this machine or repository copy was shared.
-3. The production Vercel API/frontend deployment is pending the explicit credential-placement approval described above.
+3. Legacy Vercel aliases redirect to the canonical hostname; this is expected routing behavior, not a database or application failure.
 4. Older bootstrap SQL files remain alongside the canonical ordered migrations; use `server/schema.sql`, `server/migration-election-history.sql`, `server/migration-security-hardening.sql`, and `server/migration-election-scheduler.sql` in that order for a fresh setup.
 5. The production JavaScript bundle remains above Vite’s 500 kB warning threshold; this is a performance improvement, not a correctness failure.
 
 ## Bottom line
 
-The previously reported active issue #1 was real and is now implemented and verified live. The Supabase election and security core is operational. A truthful “fully completed end-to-end” claim still waits for explicit approval to place the server-only credential in Vercel and deploy/verify the new bundle; no claim stronger than that is made here.
+The previously reported active issue #1 was real and is now implemented and verified live. The Supabase election and security core and the canonical production frontend/API are operational. Literal 100% coverage cannot be mathematically claimed, but all listed findings were rechecked and no known required implementation remains pending.
