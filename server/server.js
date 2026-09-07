@@ -642,14 +642,15 @@ app.get('/api/positions', async (req, res) => {
 
     if (grade_level) {
       const allowedRep = NEXT_GRADE_REP_MAP[grade_level.trim().toLowerCase()];
-      filtered = rows.filter(p => {
+      let filtered = rows.filter(p => {
         if (!p.title.toLowerCase().includes('representative')) return true;
         if (!allowedRep) return false;
         return p.title.toLowerCase() === allowedRep;
       });
+      return res.json(filtered);
     }
 
-    res.json(filtered);
+    return res.json(rows);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch positions' });
   }
