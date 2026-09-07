@@ -213,7 +213,7 @@ export default function VotePage() {
             <CheckCircle2 className="w-10 h-10 text-accent-foreground" />
           </div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">Vote Submitted!</h1>
-          <p className="text-muted-foreground mb-2">Thank you for participating in the SSLG Election 2026.</p>
+          <p className="text-muted-foreground mb-2">Thank you for participating in {settings?.name || "the SSLG Election"}.</p>
           <div className="mt-8 p-4 bg-card rounded-xl border border-border">
             <p className="text-sm font-medium text-foreground mb-3">Your Selections:</p>
             {Object.entries(selections).flatMap(([posId, candIds]) => {

@@ -949,6 +949,7 @@ GRANT EXECUTE ON FUNCTION public.app_get_voter_groups() TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.app_get_stats(TEXT, TEXT) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.app_update_election_settings(TEXT, TEXT, JSONB) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.app_reset_all_voted(TEXT) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.app_auto_manage_elections() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.app_auto_manage_elections() TO service_role;
 
 COMMIT;

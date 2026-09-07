@@ -1302,3 +1302,5 @@ GRANT EXECUTE ON FUNCTION app_submit_votes TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_get_stats TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_get_filtered_vote_counts TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION app_get_voter_groups TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.app_auto_manage_elections() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.app_auto_manage_elections() TO service_role;
