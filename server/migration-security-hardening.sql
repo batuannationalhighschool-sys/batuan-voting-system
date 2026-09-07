@@ -23,7 +23,7 @@ BEGIN
     WHERE name = 'batuan-voting-app-jwt-secret'
   ) THEN
     PERFORM vault.create_secret(
-      encode(public.gen_random_bytes(32), 'hex'),
+      encode(extensions.gen_random_bytes(32), 'hex'),
       'batuan-voting-app-jwt-secret',
       'Signing key for Batuan Voting custom session tokens',
       NULL::uuid
@@ -231,7 +231,7 @@ BEGIN
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Invalid LRN or password';
   END IF;
-  IF crypt(p_password, v_user.password_hash) <> v_user.password_hash THEN
+  IF extensions.crypt(p_password, v_user.password_hash) <> v_user.password_hash THEN
     RAISE EXCEPTION 'Invalid LRN or password';
   END IF;
 
@@ -337,7 +337,7 @@ BEGIN
   END IF;
 
   UPDATE public.users
-  SET password_hash = crypt(p_new_password, gen_salt('bf', 10)),
+  SET password_hash = extensions.crypt(p_new_password, extensions.gen_salt('bf', 10)),
       must_change_password = false,
       token_version = token_version + 1
   WHERE id = (v_payload->>'id')::UUID
@@ -407,7 +407,7 @@ BEGIN
   IF NOT FOUND THEN RAISE EXCEPTION 'Voter not found'; END IF;
 
   UPDATE public.users
-  SET password_hash = crypt(v_lrn, gen_salt('bf', 10)),
+  SET password_hash = extensions.crypt(v_lrn, extensions.gen_salt('bf', 10)),
       must_change_password = true,
       token_version = token_version + 1
   WHERE id = p_id::UUID;
@@ -620,7 +620,7 @@ BEGIN
   LOOP
     INSERT INTO public.votes (id, voter_id, candidate_id, position_id)
     VALUES (
-      public.gen_random_uuid(),
+      extensions.gen_random_uuid(),
       p_voter_id,
       (v_vote->>'candidate_id')::UUID,
       (v_vote->>'position_id')::UUID
@@ -956,6 +956,6 @@ COMMIT;
 -- Scheduler choices (run one after enabling/configuring the chosen service):
 -- Supabase pg_cron:
 --   CREATE EXTENSION IF NOT EXISTS pg_cron;
---   SELECT cron.schedule('auto-manage-elections', '* * * * *', $$SELECT public.app_auto_manage_elections()$$);
+--   SELECT cron.schedule('batuan-voting-auto-manage-elections', '* * * * *', $$SELECT public.app_auto_manage_elections()$$);
 -- Vercel Cron or another trusted scheduler:
 --   GET /api/auto-manage-elections with Authorization: Bearer <CRON_SECRET>

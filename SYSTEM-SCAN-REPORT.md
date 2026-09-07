@@ -1,66 +1,53 @@
-# 🔍 Full-System Deep Scan Report — Batuan Voting System
+# Full-System Deep Scan Report — Batuan Voting System
 
-> **Scan date:** August 26, 2026
-> **Scope:** Every project file, config, database object, live backend, git history, and production deployment.
-> All findings below were **live-tested**, not assumed.
+> Scan date: 2026-09-07
+> Scope: local source/configuration, dependency tree, SQL migrations, live Supabase schema/RPCs/storage/public REST, Vercel project metadata, and production-readiness checks.
 
----
+## Coverage and honesty
 
-## ✅ VERIFIED WORKING (tested against the LIVE production system)
+No automated scan can prove literal 100% coverage of every runtime path or external state. This report labels each result as observed, structurally verified, or still pending; no secret values are included.
 
-| Area | Test Performed | Result |
-|---|---|---|
-| **Frontend build** | `npm run build` | ✅ Passes — 1726 modules, built in 20s |
-| **Production deployment** | Fetched `https://batuan-voting-bnhs.vercel.app` | ✅ HTTP 200, serving bundle `index-DUezbwuo.js` — **identical to a fresh local build**, so prod = latest code |
-| **Database tables** | Live REST queries | ✅ All exist: `users` (189 rows), `user_roles` (189), `positions` (13), `candidates` (29, incl. archived flag), `votes` (7 cast), `election_settings` (1) |
-| **All 31 RPC functions** | Called every single one with the exact signatures `src/api/client.js` uses | ✅ **31/31 deployed** — auth-gated ones correctly reject invalid tokens ("User not found"), login correctly rejects bad credentials |
-| **Storage** | Listed buckets + fetched a real photo | ✅ `candidate-photos` bucket public, photos serve HTTP 200 |
-| **RLS security** | Anonymous reads on `users` and `votes` | ✅ Correctly return **0 visible rows** to anonymous callers |
-| **Realtime (live results)** | Opened a websocket subscription to `votes` | ✅ Connected & subscribed — the Results page live-update feature works |
-| **Election history/archive** | Called `app_get_election_history` + `app_get_archived_results` | ✅ Returns real archived data for school year 2025-2026 |
-| **Secrets in git history** | `git log -S` searched all commits for actual secret strings (`sbp_`, `ghp_`, `vcp_`, service-role JWT signature) | ✅ **None ever committed.** Only the public anon key appeared once (harmless by design). `.env` is properly gitignored |
-| **Vote integrity logic** | Reviewed `app_submit_votes` | ✅ Enforces: admin-block, election-status gate, max_votes per position, Grade Rep restriction to own grade, duplicate-vote prevention |
+## Verified locally
 
----
+| Area | Result |
+|---|---|
+| Production build | `npm run build` passes with Vite 8.2.2; 1,716 modules transformed. |
+| JavaScript syntax | Server, middleware, API functions, and deployment helper pass `node --check`. |
+| Dependency audit | Root app and optional Express server both report zero vulnerabilities. |
+| Election-time logic | Asia/Manila conversion and before/start/end boundary tests pass. |
+| Security migration structure | Transaction, dollar quoting, Vault, token versioning, atomic ballot marker, time-window checks, and raw-submit revoke checks pass. |
+| Candidate photos | Both upload paths enforce 5 MB, JPEG/PNG/WebP only, file-byte detection, matching content type, and bounded errors. |
+| Secret-safety scan | No high-confidence secret values were found in tracked source; `.env` remains ignored and was never printed. |
 
-## ❌ ISSUES FOUND
+## Live Supabase verification
 
-### 1. 🔴 ACTIVE ISSUE: Voting window enforcement has a gap
-- Election settings say: date **2026-08-25**, voting window **11:45–12:50**, `auto_end_enabled: true`.
-- As of Aug 26, `status` is **still `"ongoing"`**.
-- `app_submit_votes` only checks `status = 'ongoing'` — it does **not** itself check start/end times.
-- Times are enforced by `app_auto_manage_elections()` via **pg_cron, whose schedule line is commented out** in `supabase-migration.sql` (line 861, with a note to enable the extension manually). The stale status suggests the cron job is **not running** in the database.
-- **Impact:** voting may still be accepted after the election window closed.
-- **Fix:** either set status to `'completed'` in Admin → Settings, or run in Supabase SQL editor (after enabling pg_cron):
+| Area | Result |
+|---|---|
+| Original issue #1 | Confirmed true before the fix: live `app_submit_votes` lacked independent start/end checks and no scheduler existed. |
+| Hardening migration | Applied successfully as one transaction. The signing secret is in Supabase Vault; `users.token_version` is present for 191 users. |
+| Authoritative voting gate | Live `app_submit_votes` now includes the Manila-time window, status gate, automatic-end gate, candidate/position/grade validation, and atomic ballot marker. |
+| Scheduler | `pg_cron` is enabled; job `batuan-voting-auto-manage-elections` runs every minute and has a successful recorded run. |
+| Current election state | `status=completed`, date `2026-09-04`, automatic ending enabled. Live counts: 0 votes, 0 ballot markers, 12 positions, 25 active candidates. |
+| Authentication | Live token verification uses the Vault-backed signing key, expiry, LRN binding, token version, and archived-profile checks. |
+| Raw vote bypass | Anonymous/authenticated roles cannot execute `submit_votes` directly; they can execute only the validated `app_submit_votes`. |
+| Storage | `candidate-photos` is public-read, limited to 5 MB and JPEG/PNG/WebP; anonymous upload policy is absent. |
+| Public REST | Settings, positions, candidates, and the anonymous votes query returned the expected secured responses. |
+| Data cleanup | One pre-existing marker with no vote row and `has_voted=false` was removed under exact guards; no vote rows were deleted. |
 
-```sql
-SELECT cron.schedule('auto-manage-elections', '* * * * *', $$SELECT app_auto_manage_elections()$$);
-```
+## Production hosting status
 
-### 2. 🟡 Secrets sitting in plaintext `.env`
-`.env` contains a **service-role key** (bypasses all RLS), a **Supabase PAT**, a **GitHub token**, and a **Vercel token**. They never leaked into git (good), but treat them as sensitive — anyone with file access gets full admin control of the database. Consider rotating them if this machine is shared.
+Vercel read-only preflight confirmed the `batuan-voting` project and Hobby plan. Only the public Vite environment keys were present. The per-minute Vercel Cron configuration was removed because Hobby plans reject schedules more frequent than daily; Supabase `pg_cron` is the active production scheduler.
 
-### 3. 🟡 Legacy/dead code kept alongside the real backend
-- `server/server.js` (~45KB Express API), `server/middleware/auth.js`, `server/db.js`, `seed.js`, `server/schema.sql` are from the pre-Supabase era. Nothing in the deployed frontend calls them anymore (the frontend talks straight to Supabase). Also `middleware/auth.js` has a **hardcoded JWT fallback secret** (`'batuan-voting-secret-key-2026'`).
-- Three overlapping SQL files exist (`supabase-migration.sql`, `server/schema.sql`, `server/migration-election-history.sql`) — drift risk if you edit one but not the others.
+The new frontend/API deployment is not yet verified in this pass: placing `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_URL`, and a generated `CRON_SECRET` into Vercel would transmit a server-only credential to that provider and requires explicit approval. Until that approval is given, the current live Vercel bundle must not be described as the newly verified build.
 
-### 4. 🟡 README is outdated/wrong
-It documents a **MySQL + Express** stack and `admin@bnhs.edu.ph` / `admin123` credentials — none of which match the actual Supabase-based system. Misleading for anyone inheriting the project.
+## Remaining risks or limitations
 
-### 5. ⚪ Minor
-- JS bundle is 728 KB (Vite warns >500 KB) — works fine, but code-splitting Admin/Recharts would speed first load.
-- Only 4 of 29 candidates have photos uploaded so far (cosmetic, not a fault).
-
----
-
-## Honest coverage disclosure
-Fully read: entry points, App routing, the entire API client router, AuthContext/ElectionContext, Layout, AuthPage, Candidates, ChangePassword, VotePage, Index, deployment.js, configs, middleware — plus live tests of every backend function/table/storage/realtime path.
-
-Files reviewed via targeted structural analysis rather than line-by-line (due to size): `Admin.jsx` (113 KB), rest of `Results.jsx`, `server.js`, `seed.js` — however, every API route those pages call was confirmed present in the client router, every backing RPC confirmed live-deployed, and the successful production build proves no broken imports/syntax anywhere.
-
----
+1. The original voting-window gap is fixed in Supabase and covered by the active scheduler. The vote RPC remains safe if a scheduler invocation is missed because it checks the time window itself.
+2. `.env` contains sensitive provider credentials by design. They were not exposed or committed, but should be rotated if this machine or repository copy was shared.
+3. The production Vercel API/frontend deployment is pending the explicit credential-placement approval described above.
+4. Older bootstrap SQL files remain alongside the canonical ordered migrations; use `server/schema.sql`, `server/migration-election-history.sql`, `server/migration-security-hardening.sql`, and `server/migration-election-scheduler.sql` in that order for a fresh setup.
+5. The production JavaScript bundle remains above Vite’s 500 kB warning threshold; this is a performance improvement, not a correctness failure.
 
 ## Bottom line
-**Is it fully functional and operational? Yes — right now, end-to-end**: login, voting, live results, realtime updates, archiving/history, photo storage, and production hosting all work against the live database, and prod matches the latest code.
 
-**Is it 100% complete and safe to walk away from? No** — Issue #1 (election stuck `ongoing` with no independent time-window enforcement) needs one action before the next election; items #2–#4 are hardening/cleanup worth doing.
+The previously reported active issue #1 was real and is now implemented and verified live. The Supabase election and security core is operational. A truthful “fully completed end-to-end” claim still waits for explicit approval to place the server-only credential in Vercel and deploy/verify the new bundle; no claim stronger than that is made here.

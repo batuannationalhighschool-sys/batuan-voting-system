@@ -11,20 +11,20 @@ import { requireAuth, requireAdmin } from './middleware/auth.js';
 // Multer config — temporary in-memory storage before uploading to Supabase Storage
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (req, file, cb) => {
-    const allowed = ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.jfif', '.pjpeg', '.avif', '.bmp', '.svg', '.heic'];
+    const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
     const ext = path.extname(file.originalname).toLowerCase();
-    if (allowed.includes(ext) || file.mimetype.startsWith('image/')) cb(null, true);
-    else cb(new Error('Please upload a valid image file'));
+    if (allowed.includes(ext) && ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only JPEG, PNG, and WebP images are allowed'));
   },
 });
 
 function detectImageType(buffer) {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 2) return null;
 
-  // JPEG / JPG / JFIF (FF D8)
-  if (buffer[0] === 0xff && buffer[1] === 0xd8) {
+  // JPEG / JPG / JFIF (FF D8 FF)
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return { extension: 'jpg', mimeType: 'image/jpeg' };
   }
 
@@ -37,11 +37,6 @@ function detectImageType(buffer) {
     return { extension: 'png', mimeType: 'image/png' };
   }
 
-  // GIF (GIF87a or GIF89a)
-  if (buffer.length >= 6 && buffer.toString('ascii', 0, 3) === 'GIF') {
-    return { extension: 'gif', mimeType: 'image/gif' };
-  }
-
   // WebP (RIFF .... WEBP)
   if (
     buffer.length >= 12 &&
@@ -51,36 +46,15 @@ function detectImageType(buffer) {
     return { extension: 'webp', mimeType: 'image/webp' };
   }
 
-  // AVIF / HEIC / HEIF (.... ftyp avif/avis/heic/heix/mif1)
-  if (buffer.length >= 12 && buffer.toString('ascii', 4, 8) === 'ftyp') {
-    const brand = buffer.toString('ascii', 8, 12).toLowerCase();
-    if (brand === 'avif' || brand === 'avis') {
-      return { extension: 'avif', mimeType: 'image/avif' };
-    }
-    if (brand === 'heic' || brand === 'heix' || brand === 'mif1' || brand === 'msf1') {
-      return { extension: 'heic', mimeType: 'image/heic' };
-    }
-  }
-
-  // BMP (BM)
-  if (buffer[0] === 0x42 && buffer[1] === 0x4d) {
-    return { extension: 'bmp', mimeType: 'image/bmp' };
-  }
-
-  // SVG (<svg or <?xml)
-  const prefix = buffer.subarray(0, 100).toString('utf8').trim().toLowerCase();
-  if (prefix.startsWith('<svg') || (prefix.startsWith('<?xml') && prefix.includes('<svg'))) {
-    return { extension: 'svg', mimeType: 'image/svg+xml' };
-  }
-
   return null;
 }
 
 // Helper: upload file buffer to Supabase Storage
 async function uploadToSupabaseStorage(fileBuffer, originalName) {
   const detected = detectImageType(fileBuffer);
-  const ext = detected ? `.${detected.extension}` : path.extname(originalName).toLowerCase() || '.jpg';
-  const mimeType = detected ? detected.mimeType : 'image/jpeg';
+  if (!detected) throw new Error('The uploaded file is not a supported image');
+  const ext = `.${detected.extension}`;
+  const mimeType = detected.mimeType;
   const fileName = `candidates/${randomUUID()}${ext}`;
   const { data, error } = await supabase.storage
     .from('candidate-photos')
@@ -177,7 +151,7 @@ app.post(
   '/api/candidate-photo',
   requireAuth,
   requireAdmin,
-  express.raw({ type: ['image/*', 'application/octet-stream'], limit: '10mb' }),
+  express.raw({ type: ['image/jpeg', 'image/png', 'image/webp'], limit: '5mb' }),
   async (req, res) => {
     try {
       if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) {
@@ -189,11 +163,16 @@ app.post(
         return res.status(400).json({ error: 'The uploaded file is not a supported image' });
       }
 
+      const contentType = String(req.headers['content-type'] || '').split(';', 1)[0].trim().toLowerCase();
+      if (contentType !== image.mimeType) {
+        return res.status(400).json({ error: 'The image content type does not match its file data' });
+      }
+
       const url = await uploadToSupabaseStorage(req.body, `candidate.${image.extension}`);
       return res.json({ url });
     } catch (err) {
       console.error('Candidate photo upload error:', err.message);
-      return res.status(400).json({ error: err.message || 'Candidate photo upload failed' });
+      return res.status(400).json({ error: 'Candidate photo upload failed' });
     }
   },
 );

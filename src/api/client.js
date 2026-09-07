@@ -343,47 +343,22 @@ async function handleDelete(path) {
 async function uploadPhotoToStorage(file) {
   if (!file || !(file instanceof File)) return null;
 
-  if (file.size > 10 * 1024 * 1024) {
-    throw new Error('Candidate photos must be 10 MB or smaller');
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Candidate photos must be 5 MB or smaller');
   }
 
-  // Check file type or extension
-  const isImageMime = file.type && file.type.startsWith('image/');
-  const isImageExt = /\.(jpe?g|png|webp|gif|avif|bmp|svg|jfif|pjpeg|heic)$/i.test(file.name);
-  if (!isImageMime && !isImageExt) {
-    throw new Error('Please select a valid image file (JPG, PNG, WebP, GIF, etc.)');
+  const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+  if (!allowedTypes.has(file.type)) {
+    throw new Error('Only JPEG, PNG, and WebP images are allowed');
   }
 
-  // 1. Direct upload to Supabase storage bucket
-  try {
-    const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-    const filePath = `candidates/${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('candidate-photos')
-      .upload(filePath, file, {
-        contentType: file.type || 'image/jpeg',
-        upsert: false,
-      });
-
-    if (!uploadError && uploadData?.path) {
-      const { data: urlData } = supabase.storage.from('candidate-photos').getPublicUrl(uploadData.path);
-      if (urlData?.publicUrl) {
-        return urlData.publicUrl;
-      }
-    }
-  } catch (err) {
-    console.warn('Direct storage upload failed, trying proxy...', err);
-  }
-
-  // 2. Fallback to proxy endpoint if direct upload fails
   const endpoint = import.meta.env.VITE_UPLOAD_API_URL
     || (import.meta.env.DEV ? 'http://localhost:3001/api/candidate-photo' : '/api/candidate-photo');
   const response = await fetch(endpoint, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${getToken()}`,
-      'Content-Type': file.type || 'application/octet-stream',
+      'Content-Type': file.type,
     },
     body: file,
   });

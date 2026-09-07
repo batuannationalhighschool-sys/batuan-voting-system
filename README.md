@@ -16,11 +16,12 @@ For a new Supabase project, run these files in order in the Supabase SQL Editor:
 server/schema.sql
 server/migration-election-history.sql
 server/migration-security-hardening.sql
+server/migration-election-scheduler.sql
 ```
 
-For an existing project that already has the base schema and RPC migration, run the last two files only. The security migration must be applied after the election-history migration because it protects the reset/start path with the archive table.
+For an existing project that already has the base schema and RPC migration, run the last three files only. The security migration must be applied after the election-history migration because it protects the reset/start path with the archive table.
 
-The hardening migration makes the configured election window authoritative inside `app_submit_votes`. A stale `ongoing` status cannot accept a vote before the opening instant or, when automatic ending is enabled, at or after the closing instant. It also moves the custom-token signing key into Supabase Vault, creates an atomic ballot marker, removes anonymous candidate-photo uploads, and prevents an unarchived ballot from being silently deleted during a reset.
+The hardening migration makes the configured election window authoritative inside `app_submit_votes`. A stale `ongoing` status cannot accept a vote before the opening instant or, when automatic ending is enabled, at or after the closing instant. It also moves the custom-token signing key into Supabase Vault, creates an atomic ballot marker, removes anonymous candidate-photo uploads, and prevents an unarchived ballot from being silently deleted during a reset. The scheduler migration keeps the displayed election status synchronized every minute.
 
 Applying it invalidates existing custom session tokens by changing the signing key; users must sign in again after the migration.
 
@@ -61,13 +62,13 @@ The vote RPC is safe even when a scheduler invocation is missed. To keep the dis
 ```sql
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 SELECT cron.schedule(
-  'auto-manage-elections',
+  'batuan-voting-auto-manage-elections',
   '* * * * *',
   $$SELECT public.app_auto_manage_elections()$$
 );
 ```
 
-Alternatively, deploy the included `/api/auto-manage-elections` function with `CRON_SECRET` configured. `vercel.json` declares a per-minute Vercel Cron; the hosting plan must support that frequency. Do not expose the scheduler endpoint without its secret.
+Alternatively, use the included `/api/auto-manage-elections` function with `CRON_SECRET` configured behind a trusted scheduler. Vercel Hobby plans only allow daily Cron jobs, so they are not suitable for minute-level election status updates; Supabase `pg_cron` is the configured production scheduler here. Do not expose the scheduler endpoint without its secret.
 
 ## Verification
 
