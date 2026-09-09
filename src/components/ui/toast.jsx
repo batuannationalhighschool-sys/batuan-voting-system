@@ -20,15 +20,15 @@ const ToastViewport = React.forwardRef(({ className, ...props }, ref) => (
 ToastViewport.displayName = ToastPrimitives.Viewport.displayName;
 
 const toastVariants = cva(
-  "group pointer-events-auto relative isolate flex w-full items-start gap-3 overflow-hidden rounded-2xl border p-4 pr-12 shadow-[0_18px_50px_-18px_hsl(var(--foreground)/0.35)] backdrop-blur-xl transition-all duration-300 ease-out before:absolute before:inset-y-0 before:left-0 before:w-1 before:rounded-l-2xl data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-right-2",
+  "group pointer-events-auto relative isolate flex w-full items-start gap-3 overflow-hidden rounded-2xl border p-4 pr-12 shadow-[0_18px_50px_-18px_hsl(var(--foreground)/0.35)] backdrop-blur-xl will-change-transform data-[swipe=cancel]:translate-x-0 data-[swipe=end]:translate-x-[var(--radix-toast-swipe-end-x)] data-[swipe=move]:translate-x-[var(--radix-toast-swipe-move-x)] data-[swipe=move]:transition-none data-[state=open]:animate-toast-enter data-[state=closed]:animate-toast-exit",
   {
     variants: {
       variant: {
-        default: "border-border/80 bg-card/95 text-card-foreground before:bg-primary",
-        info: "info border-primary/30 bg-card/95 text-card-foreground before:bg-primary",
-        success: "success border-success/30 bg-card/95 text-card-foreground before:bg-success",
-        warning: "warning border-gold/40 bg-card/95 text-card-foreground before:bg-gold",
-        destructive: "destructive border-destructive/35 bg-card/95 text-card-foreground before:bg-destructive",
+        default: "border-border/80 bg-card/95 text-card-foreground",
+        info: "info border-primary/30 bg-card/95 text-card-foreground",
+        success: "success border-success/30 bg-card/95 text-card-foreground",
+        warning: "warning border-gold/40 bg-card/95 text-card-foreground",
+        destructive: "destructive border-destructive/35 bg-card/95 text-card-foreground",
       },
     },
     defaultVariants: {
