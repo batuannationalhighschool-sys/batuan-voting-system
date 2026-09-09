@@ -564,7 +564,7 @@ export default function Results() {
                 >
                   <option value="all">All Sections</option>
                   {sections.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>{s?.toUpperCase()}</option>
                   ))}
                 </select>
               </div>
@@ -575,7 +575,7 @@ export default function Results() {
                 <p className="text-xs text-muted-foreground italic">
                   Showing votes cast by: <span className="text-foreground font-medium">
                     {voterGrade !== "all" ? voterGrade : "All Grades"}
-                    {voterSection !== "all" ? ` · ${voterSection}` : ""}
+                    {voterSection !== "all" ? ` · ${voterSection.toUpperCase()}` : ""}
                   </span>
                 </p>
                 <button
@@ -807,7 +807,7 @@ export default function Results() {
                     >
                       <option value="all">All Sections</option>
                       {archivedSections.map((s) => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>{s?.toUpperCase()}</option>
                       ))}
                     </select>
                   </div>
@@ -824,7 +824,7 @@ export default function Results() {
                     <p className="text-xs text-muted-foreground italic">
                       Showing votes cast by: <span className="text-foreground font-medium">
                         {historyGradeFilter !== "all" ? historyGradeFilter : "All Grades"}
-                        {historySectionFilter !== "all" ? ` · ${historySectionFilter}` : ""}
+                        {historySectionFilter !== "all" ? ` · ${historySectionFilter.toUpperCase()}` : ""}
                       </span>
                     </p>
                     <button
@@ -847,7 +847,7 @@ export default function Results() {
                         —{" "}
                         {historyPositionFilter !== "all" ? historyPositionFilter : "All Positions"}
                         {historyGradeFilter !== "all" ? ` · ${historyGradeFilter}` : ""}
-                        {historySectionFilter !== "all" ? ` · ${historySectionFilter}` : ""}
+                        {historySectionFilter !== "all" ? ` · ${historySectionFilter.toUpperCase()}` : ""}
                       </span>
                     )}
                   </h3>
@@ -874,7 +874,7 @@ export default function Results() {
                                     {(w.vote_count ?? 0).toLocaleString()} vote{(w.vote_count ?? 0) !== 1 ? "s" : ""}
                                     {runnerUp?.candidate_name
                                       ? ` · vs ${runnerUp.candidate_name.toUpperCase()} (${(runnerUp.vote_count ?? 0).toLocaleString()})`
-                                      : (w.candidate_grade || w.candidate_section ? ` · ${w.candidate_grade ?? ""}${w.candidate_section ? ` — ${w.candidate_section}` : ""}` : "")}
+                                      : (w.candidate_grade || w.candidate_section ? ` · ${w.candidate_grade ?? ""}${w.candidate_section ? ` — ${w.candidate_section.toUpperCase()}` : ""}` : "")}
                                   </p>
                                 </div>
                               ))
@@ -952,7 +952,7 @@ export default function Results() {
                                     <p className="text-xs text-muted-foreground">
                                       {c.candidate_party}
                                       {c.candidate_grade && ` · ${c.candidate_grade}`}
-                                      {c.candidate_section && ` — ${c.candidate_section}`}
+                                      {c.candidate_section && ` — ${c.candidate_section.toUpperCase()}`}
                                     </p>
                                   </div>
                                 </div>

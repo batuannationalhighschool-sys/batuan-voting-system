@@ -257,7 +257,7 @@ const candidatesByPosition = {
     { name: 'James Ryan Evangelista',   grade_level: 'Grade 11', section: 'ICT',        party_list: 'Kabataan',      motto: 'Your news, your voice, your school.' },
     { name: 'Patricia Anne Bernardo',   grade_level: 'Grade 12', section: 'Cookery',    party_list: 'Bagong Pag-asa', motto: 'Transparency builds trust.' },
   ],
-  'Peace Officer': [
+  'Protocol Officer': [
     { name: 'Vincent Raul Padilla',     grade_level: 'Grade 12', section: 'Tourism',    party_list: 'Bagong Pag-asa', motto: 'Peace starts with one step.' },
     { name: 'Ella Joy Domingo',         grade_level: 'Grade 11', section: 'Cookery',    party_list: 'Pagbabago',     motto: 'A safer school for everyone.' },
     { name: 'Miguel Santos Cruz',       grade_level: 'Grade 10', section: 'Fortitude',  party_list: 'Kabataan',      motto: 'Discipline with compassion.' },
@@ -414,7 +414,7 @@ async function seed() {
       }
 
       const posId = posMap[posTitle];
-      const maxVotes = (posTitle === 'Public Information Officer' || posTitle === 'Peace Officer') ? 2 : 1;
+      const maxVotes = (posTitle === 'Public Information Officer' || posTitle === 'Protocol Officer') ? 2 : 1;
       const numVotes = Math.min(maxVotes, cands.length);
 
       const shuffled = [...cands];

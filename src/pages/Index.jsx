@@ -274,7 +274,7 @@ export default function Index() {
                           </p>
                           {(c.grade_level || c.section) && (
                             <p className="text-[11px] sm:text-xs text-muted-foreground mt-1 truncate">
-                              {[c.grade_level, c.section].filter(Boolean).join(" · ")}
+                              {[c.grade_level, c.section ? c.section.toUpperCase() : null].filter(Boolean).join(" · ")}
                             </p>
                           )}
                         </div>

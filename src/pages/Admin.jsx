@@ -86,7 +86,7 @@ function extractGradeAndSection(rawGrade = '', rawSection = '', rawCombined = ''
   }
 
   grade = formatGradeLevel(grade);
-  return { grade_level: grade, section: sec };
+  return { grade_level: grade, section: sec.toUpperCase() };
 }
 
 function parseCSV(text) {
@@ -179,14 +179,6 @@ const CSV_TEMPLATE = `lrn,full_name,grade_level,section
 const CANDIDATE_CSV_TEMPLATE = `name,position,grade_level,section,party_list,motto
 Maria Santos,Vice President,Grade 11,Cookery,Siklab Party,Service for all
 `;
-
-const DEFAULT_GRADE_SECTIONS = {
-  "Grade 7": ["Gold", "Silver", "Bronze"],
-  "Grade 8": ["Pearl", "Ruby", "Diamond"],
-  "Grade 9": ["Wisdom", "Excellence", "Integrity"],
-  "Grade 10": ["Fortitude", "Resilience", "Leadership"],
-  "Grade 11": ["ICT", "Cookery", "Tourism"],
-};
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -330,55 +322,64 @@ export default function Admin() {
   const { data: voters } = useQuery({ queryKey: ["voters"], queryFn: () => api.get('/voters'), enabled: isAdmin });
   const { data: voterGroups } = useQuery({ queryKey: ["voter-groups"], queryFn: () => api.get('/voters/groups') });
 
-  // Dynamically merge sections & grade levels from defaults, voter groups, voters, candidates, and form inputs
+  // Dynamically extract sections & grade levels strictly from Supabase (voterGroups, voters, candidates) and form inputs
   const dynamicGradeSections = useMemo(() => {
     const map = {};
     const isExcludedGrade = (g) => !g || g.trim().toLowerCase() === "grade 12" || g.trim() === "12";
 
-    for (const [grade, secs] of Object.entries(DEFAULT_GRADE_SECTIONS)) {
-      if (!isExcludedGrade(grade)) {
-        map[grade] = new Set(secs);
-      }
-    }
     if (voterGroups?.sections) {
       for (const item of voterGroups.sections) {
         if (item.grade_level && item.section && !isExcludedGrade(item.grade_level)) {
-          if (!map[item.grade_level]) map[item.grade_level] = new Set();
-          map[item.grade_level].add(item.section);
+          const gl = item.grade_level.trim();
+          const sec = item.section.trim();
+          if (!map[gl]) map[gl] = new Set();
+          map[gl].add(sec);
         }
       }
     }
     if (voters) {
       for (const v of voters) {
         if (v.grade_level && v.section && !isExcludedGrade(v.grade_level)) {
-          if (!map[v.grade_level]) map[v.grade_level] = new Set();
-          map[v.grade_level].add(v.section);
+          const gl = v.grade_level.trim();
+          const sec = v.section.trim();
+          if (!map[gl]) map[gl] = new Set();
+          map[gl].add(sec);
         }
       }
     }
     if (candidates) {
       for (const c of candidates) {
         if (c.grade_level && c.section && !isExcludedGrade(c.grade_level)) {
-          if (!map[c.grade_level]) map[c.grade_level] = new Set();
-          map[c.grade_level].add(c.section);
+          const gl = c.grade_level.trim();
+          const sec = c.section.trim();
+          if (!map[gl]) map[gl] = new Set();
+          map[gl].add(sec);
         }
       }
     }
     if (editVoter?.grade_level && editVoter?.section && !isExcludedGrade(editVoter.grade_level)) {
-      if (!map[editVoter.grade_level]) map[editVoter.grade_level] = new Set();
-      map[editVoter.grade_level].add(editVoter.section);
+      const gl = editVoter.grade_level.trim();
+      const sec = editVoter.section.trim();
+      if (!map[gl]) map[gl] = new Set();
+      map[gl].add(sec);
     }
     if (editCandidate?.grade_level && editCandidate?.section && !isExcludedGrade(editCandidate.grade_level)) {
-      if (!map[editCandidate.grade_level]) map[editCandidate.grade_level] = new Set();
-      map[editCandidate.grade_level].add(editCandidate.section);
+      const gl = editCandidate.grade_level.trim();
+      const sec = editCandidate.section.trim();
+      if (!map[gl]) map[gl] = new Set();
+      map[gl].add(sec);
     }
     if (newVoter.grade_level && newVoter.section && !isExcludedGrade(newVoter.grade_level)) {
-      if (!map[newVoter.grade_level]) map[newVoter.grade_level] = new Set();
-      map[newVoter.grade_level].add(newVoter.section);
+      const gl = newVoter.grade_level.trim();
+      const sec = newVoter.section.trim();
+      if (!map[gl]) map[gl] = new Set();
+      map[gl].add(sec);
     }
     if (newCandidate.grade_level && newCandidate.section && !isExcludedGrade(newCandidate.grade_level)) {
-      if (!map[newCandidate.grade_level]) map[newCandidate.grade_level] = new Set();
-      map[newCandidate.grade_level].add(newCandidate.section);
+      const gl = newCandidate.grade_level.trim();
+      const sec = newCandidate.section.trim();
+      if (!map[gl]) map[gl] = new Set();
+      map[gl].add(sec);
     }
 
     const result = {};
@@ -394,26 +395,125 @@ export default function Admin() {
     return result;
   }, [voterGroups, voters, candidates, editVoter?.grade_level, editVoter?.section, editCandidate?.grade_level, editCandidate?.section, newVoter.grade_level, newVoter.section, newCandidate.grade_level, newCandidate.section]);
 
-  const allAvailableGrades = useMemo(() => Object.keys(dynamicGradeSections), [dynamicGradeSections]);
+  const allAvailableGrades = useMemo(() => {
+    const grades = new Set(["Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11"]);
+    if (voterGroups?.gradeLevels) {
+      voterGroups.gradeLevels.forEach(g => {
+        if (g && g.trim().toLowerCase() !== "grade 12" && g.trim() !== "12") grades.add(g.trim());
+      });
+    }
+    Object.keys(dynamicGradeSections).forEach(g => {
+      if (g && g.trim().toLowerCase() !== "grade 12" && g.trim() !== "12") grades.add(g.trim());
+    });
+    return Array.from(grades).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ''), 10);
+      const numB = parseInt(b.replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+  }, [voterGroups, dynamicGradeSections]);
+
+  // Grade levels present in Supabase for voters
+  const voterAvailableGrades = useMemo(() => {
+    const isExcludedGrade = (g) => !g || g.trim().toLowerCase() === "grade 12" || g.trim() === "12";
+    const grades = new Set();
+    if (voters && voters.length > 0) {
+      for (const v of voters) {
+        if (v.grade_level && v.grade_level.trim() && !isExcludedGrade(v.grade_level)) {
+          grades.add(v.grade_level.trim());
+        }
+      }
+    } else if (voterGroups?.gradeLevels) {
+      for (const g of voterGroups.gradeLevels) {
+        if (g && g.trim() && !isExcludedGrade(g)) {
+          grades.add(g.trim());
+        }
+      }
+    }
+    if (grades.size === 0) {
+      ["Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11"].forEach(g => grades.add(g));
+    }
+    return Array.from(grades).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ''), 10);
+      const numB = parseInt(b.replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+  }, [voters, voterGroups]);
+
+  // Grade levels present in Supabase for candidates
+  const candidateAvailableGrades = useMemo(() => {
+    const isExcludedGrade = (g) => !g || g.trim().toLowerCase() === "grade 12" || g.trim() === "12";
+    const grades = new Set();
+    if (candidates && candidates.length > 0) {
+      for (const c of candidates) {
+        if (c.grade_level && c.grade_level.trim() && !isExcludedGrade(c.grade_level)) {
+          grades.add(c.grade_level.trim());
+        }
+      }
+    } else if (voterGroups?.gradeLevels) {
+      for (const g of voterGroups.gradeLevels) {
+        if (g && g.trim() && !isExcludedGrade(g)) {
+          grades.add(g.trim());
+        }
+      }
+    }
+    if (grades.size === 0) {
+      ["Grade 7", "Grade 8", "Grade 9", "Grade 10", "Grade 11"].forEach(g => grades.add(g));
+    }
+    return Array.from(grades).sort((a, b) => {
+      const numA = parseInt(a.replace(/\D/g, ''), 10);
+      const numB = parseInt(b.replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB)) return numA - numB;
+      return a.localeCompare(b);
+    });
+  }, [candidates, voterGroups]);
 
   const voterFilterSections = useMemo(() => {
-    if (voterGradeFilter === "all") {
-      const allSecs = new Set();
-      Object.values(dynamicGradeSections).forEach(secs => secs.forEach(s => allSecs.add(s)));
-      return Array.from(allSecs).sort((a, b) => a.localeCompare(b));
+    const isExcludedGrade = (g) => !g || g.trim().toLowerCase() === "grade 12" || g.trim() === "12";
+    const allSecs = new Set();
+    if (voters && voters.length > 0) {
+      for (const v of voters) {
+        if (v.section && v.section.trim() && !isExcludedGrade(v.grade_level)) {
+          if (voterGradeFilter === "all" || v.grade_level === voterGradeFilter) {
+            allSecs.add(v.section.trim());
+          }
+        }
+      }
+    } else if (voterGroups?.sections) {
+      for (const s of voterGroups.sections) {
+        if (s.section && s.section.trim() && !isExcludedGrade(s.grade_level)) {
+          if (voterGradeFilter === "all" || s.grade_level === voterGradeFilter) {
+            allSecs.add(s.section.trim());
+          }
+        }
+      }
     }
-    return dynamicGradeSections[voterGradeFilter] || [];
-  }, [dynamicGradeSections, voterGradeFilter]);
+    return Array.from(allSecs).sort((a, b) => a.localeCompare(b));
+  }, [voters, voterGroups, voterGradeFilter]);
 
   const candidateFilterSections = useMemo(() => {
-    if (candidateGradeFilter === "all") {
-      const allSecs = new Set();
-      Object.values(dynamicGradeSections).forEach(secs => secs.forEach(s => allSecs.add(s)));
-      return Array.from(allSecs).sort((a, b) => a.localeCompare(b));
+    const isExcludedGrade = (g) => !g || g.trim().toLowerCase() === "grade 12" || g.trim() === "12";
+    const allSecs = new Set();
+    if (candidates && candidates.length > 0) {
+      for (const c of candidates) {
+        if (c.section && c.section.trim() && !isExcludedGrade(c.grade_level)) {
+          if (candidateGradeFilter === "all" || c.grade_level === candidateGradeFilter) {
+            allSecs.add(c.section.trim());
+          }
+        }
+      }
+    } else if (voterGroups?.sections) {
+      for (const s of voterGroups.sections) {
+        if (s.section && s.section.trim() && !isExcludedGrade(s.grade_level)) {
+          if (candidateGradeFilter === "all" || s.grade_level === candidateGradeFilter) {
+            allSecs.add(s.section.trim());
+          }
+        }
+      }
     }
-    return dynamicGradeSections[candidateGradeFilter] || [];
-  }, [dynamicGradeSections, candidateGradeFilter]);
-
+    return Array.from(allSecs).sort((a, b) => a.localeCompare(b));
+  }, [candidates, voterGroups, candidateGradeFilter]);
   const profileCount = stats?.voterCount ?? 0;
   const votedCount = stats?.votedCount ?? 0;
 
@@ -1227,7 +1327,7 @@ export default function Admin() {
                             <td className={`p-2.5 font-mono ${hasError ? 'text-destructive' : 'text-foreground'}`}>{row.lrn || <span className="italic text-destructive">missing</span>}</td>
                             <td className={`p-2.5 uppercase ${!row.full_name ? 'text-destructive italic' : 'text-foreground'}`}>{row.full_name || 'missing'}</td>
                             <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.grade_level || '—'}</td>
-                            <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.section || '—'}</td>
+                            <td className="p-2.5 text-muted-foreground hidden sm:table-cell uppercase">{row.section || '—'}</td>
                           </tr>
                         );
                       })}
@@ -1310,7 +1410,7 @@ export default function Admin() {
                     type="text"
                     placeholder="Enter custom section..."
                     value={newVoter.section}
-                    onChange={(e) => setNewVoter(p => ({ ...p, section: e.target.value }))}
+                    onChange={(e) => setNewVoter(p => ({ ...p, section: e.target.value.toUpperCase() }))}
                     className="flex-1 px-3 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
                   />
                   <button
@@ -1338,7 +1438,7 @@ export default function Admin() {
                 >
                   <option value="">{newVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
                   {newVoter.grade_level && (dynamicGradeSections[newVoter.grade_level] || []).map(s => (
-                    <option key={s} value={s}>{s}</option>
+                    <option key={s} value={s}>{s?.toUpperCase()}</option>
                   ))}
                   {newVoter.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
                 </select>
@@ -1381,7 +1481,7 @@ export default function Admin() {
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Grade Levels</option>
-                  {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                  {voterAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
 
@@ -1393,7 +1493,7 @@ export default function Admin() {
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Sections</option>
-                  {voterFilterSections.map(s => <option key={s} value={s}>{s}</option>)}
+                  {voterFilterSections.map(s => <option key={s} value={s}>{s?.toUpperCase()}</option>)}
                 </select>
               </div>
 
@@ -1447,7 +1547,7 @@ export default function Admin() {
                           <span>
                             {v.grade_level && <span className="font-medium text-foreground">{v.grade_level}</span>}
                             {v.grade_level && v.section && <span> — </span>}
-                            {v.section && <span>{v.section}</span>}
+                            {v.section && <span className="uppercase">{v.section}</span>}
                           </span>
                         ) : (
                           <span className="text-xs italic text-muted-foreground/60">Not set</span>
@@ -1592,7 +1692,7 @@ export default function Admin() {
                               {row.position && !posValid && <span className="text-[10px] block text-destructive">(invalid position)</span>}
                             </td>
                             <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.grade_level || '—'}</td>
-                            <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.section || '—'}</td>
+                            <td className="p-2.5 text-muted-foreground hidden sm:table-cell uppercase">{row.section || '—'}</td>
                             <td className="p-2.5 text-muted-foreground">{row.party_list || '—'}</td>
                           </tr>
                         );
@@ -1695,7 +1795,7 @@ export default function Admin() {
                           placeholder="Enter custom section..."
                           value={newCandidate.section}
                           onChange={(e) => {
-                            setNewCandidate(p => ({ ...p, section: e.target.value }));
+                            setNewCandidate(p => ({ ...p, section: e.target.value.toUpperCase() }));
                             if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
                           }}
                           className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
@@ -1726,7 +1826,7 @@ export default function Admin() {
                       >
                         <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
                         {newCandidate.grade_level && (dynamicGradeSections[newCandidate.grade_level] || []).map(s => (
-                          <option key={s} value={s}>{s}</option>
+                          <option key={s} value={s}>{s?.toUpperCase()}</option>
                         ))}
                         {newCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
                       </select>
@@ -1805,7 +1905,7 @@ export default function Admin() {
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Grade Levels</option>
-                  {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                  {candidateAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
                 </select>
               </div>
 
@@ -1817,7 +1917,7 @@ export default function Admin() {
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Sections</option>
-                  {candidateFilterSections.map(s => <option key={s} value={s}>{s}</option>)}
+                  {candidateFilterSections.map(s => <option key={s} value={s}>{s?.toUpperCase()}</option>)}
                 </select>
               </div>
 
@@ -1879,7 +1979,7 @@ export default function Admin() {
                             <span>
                               {c.grade_level && <span className="font-medium text-foreground">{c.grade_level}</span>}
                               {c.grade_level && c.section && <span> — </span>}
-                              {c.section && <span>{c.section}</span>}
+                              {c.section && <span className="uppercase">{c.section}</span>}
                             </span>
                           ) : (
                             <span className="text-xs italic text-muted-foreground/60">Not set</span>
@@ -2034,7 +2134,7 @@ export default function Admin() {
                         type="text"
                         placeholder="Custom section..."
                         value={editVoter.section}
-                        onChange={(e) => setEditVoter(p => ({ ...p, section: e.target.value }))}
+                        onChange={(e) => setEditVoter(p => ({ ...p, section: e.target.value.toUpperCase() }))}
                         className="flex-1 px-3 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
                       />
                       <button
@@ -2062,7 +2162,7 @@ export default function Admin() {
                     >
                       <option value="">{editVoter.grade_level ? "Select Section" : "Select Grade first"}</option>
                       {editVoter.grade_level && (dynamicGradeSections[editVoter.grade_level] || []).map(s => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>{s?.toUpperCase()}</option>
                       ))}
                       {editVoter.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
                     </select>
@@ -2135,7 +2235,7 @@ export default function Admin() {
                         placeholder="Custom section..."
                         value={editCandidate.section}
                         onChange={(e) => {
-                          setEditCandidate(p => ({ ...p, section: e.target.value }));
+                          setEditCandidate(p => ({ ...p, section: e.target.value.toUpperCase() }));
                           if (editFormErrors.section) setEditFormErrors(p => ({ ...p, section: undefined }));
                         }}
                         className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${editFormErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
@@ -2166,7 +2266,7 @@ export default function Admin() {
                     >
                       <option value="">{editCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
                       {editCandidate.grade_level && (dynamicGradeSections[editCandidate.grade_level] || []).map(s => (
-                        <option key={s} value={s}>{s}</option>
+                        <option key={s} value={s}>{s?.toUpperCase()}</option>
                       ))}
                       {editCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
                     </select>
@@ -2414,7 +2514,7 @@ export default function Admin() {
                               <span>
                                 {v.grade_level && <span className="font-medium text-foreground">{v.grade_level}</span>}
                                 {v.grade_level && v.section && <span> — </span>}
-                                {v.section && <span>{v.section}</span>}
+                                {v.section && <span className="uppercase">{v.section}</span>}
                               </span>
                             ) : (
                               <span className="italic text-xs text-muted-foreground/60">Not set</span>

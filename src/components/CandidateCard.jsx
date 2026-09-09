@@ -60,8 +60,12 @@ export default function CandidateCard({
           {positionTitle && <p className="text-sm font-semibold text-gold mt-0.5">{positionTitle}</p>}
           <div className="flex items-center justify-center gap-2 mt-2 text-xs text-muted-foreground">
             <span>{candidate.grade_level}</span>
-            <span>·</span>
-            <span>{candidate.section}</span>
+            {candidate.section && (
+              <>
+                <span>·</span>
+                <span className="uppercase">{candidate.section}</span>
+              </>
+            )}
           </div>
           {candidate.election_type !== 'classroom' && candidate.party_list && (
           <span className={`inline-block mt-2 px-3 py-0.5 rounded-full text-xs font-medium border ${partyColors[candidate.party_list] || "bg-muted text-muted-foreground border-border"}`}>
