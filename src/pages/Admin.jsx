@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File } from "lucide-react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File, Eye, EyeOff } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -197,6 +197,9 @@ export default function Admin() {
   const [adminNewPassword, setAdminNewPassword] = useState("");
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
   const [adminCurrentPassword, setAdminCurrentPassword] = useState("");
+  const [showAdminCurrentPassword, setShowAdminCurrentPassword] = useState(false);
+  const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
+  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
   const [adminPasswordSaving, setAdminPasswordSaving] = useState(false);
 
   // Add candidate form state
@@ -2540,39 +2543,63 @@ export default function Admin() {
                 <label htmlFor="admin-current-password" className="block text-sm font-medium text-foreground mb-1.5">Current password</label>
                 <input
                   id="admin-current-password"
-                  type="password"
+                  type={showAdminCurrentPassword ? "text" : "password"}
                   value={adminCurrentPassword}
                   onChange={(e) => setAdminCurrentPassword(e.target.value)}
                   autoComplete="current-password"
                   required
-                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+                <button
+                  type="button"
+                  aria-label={showAdminCurrentPassword ? "Hide current password" : "Show current password"}
+                  onClick={() => setShowAdminCurrentPassword((visible) => !visible)}
+                  className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showAdminCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               <div>
                 <label htmlFor="admin-new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
                 <input
                   id="admin-new-password"
-                  type="password"
+                  type={showAdminNewPassword ? "text" : "password"}
                   value={adminNewPassword}
                   onChange={(e) => setAdminNewPassword(e.target.value)}
                   minLength={ADMIN_PASSWORD_MIN_LENGTH}
                   autoComplete="new-password"
                   required
-                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+                <button
+                  type="button"
+                  aria-label={showAdminNewPassword ? "Hide new password" : "Show new password"}
+                  onClick={() => setShowAdminNewPassword((visible) => !visible)}
+                  className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showAdminNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               <div>
                 <label htmlFor="admin-confirm-password" className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
                 <input
                   id="admin-confirm-password"
-                  type="password"
+                  type={showAdminConfirmPassword ? "text" : "password"}
                   value={adminConfirmPassword}
                   onChange={(e) => setAdminConfirmPassword(e.target.value)}
                   minLength={ADMIN_PASSWORD_MIN_LENGTH}
                   autoComplete="new-password"
                   required
-                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
+                <button
+                  type="button"
+                  aria-label={showAdminConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                  onClick={() => setShowAdminConfirmPassword((visible) => !visible)}
+                  className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showAdminConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               <p className="text-xs text-muted-foreground">
                 Use at least {ADMIN_PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, a number, and a special character.
