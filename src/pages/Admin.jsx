@@ -201,6 +201,24 @@ export default function Admin() {
   const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
   const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
   const [adminPasswordSaving, setAdminPasswordSaving] = useState(false);
+  const adminPasswordChecks = [
+    { label: `At least ${ADMIN_PASSWORD_MIN_LENGTH} characters`, valid: adminNewPassword.length >= ADMIN_PASSWORD_MIN_LENGTH },
+    { label: "A lowercase letter", valid: /[a-z]/.test(adminNewPassword) },
+    { label: "An uppercase letter", valid: /[A-Z]/.test(adminNewPassword) },
+    { label: "A number", valid: /[0-9]/.test(adminNewPassword) },
+    { label: "A special character", valid: /[^A-Za-z0-9]/.test(adminNewPassword) },
+  ];
+  const adminPasswordIsStrong = adminPasswordChecks.every(({ valid }) => valid);
+  const adminPasswordsMatch = Boolean(adminConfirmPassword) && adminNewPassword === adminConfirmPassword;
+  const adminNewPasswordMatchesCurrent = Boolean(adminCurrentPassword && adminNewPassword) && adminCurrentPassword === adminNewPassword;
+  const adminNewPasswordHasError = Boolean(adminNewPassword) && (!adminPasswordIsStrong || adminNewPasswordMatchesCurrent);
+  const adminConfirmPasswordHasError = Boolean(adminConfirmPassword) && !adminPasswordsMatch;
+  const adminPasswordFormIsValid = Boolean(
+    adminCurrentPassword &&
+    adminPasswordIsStrong &&
+    adminPasswordsMatch &&
+    !adminNewPasswordMatchesCurrent
+  );
 
   // Add candidate form state
   const [newCandidate, setNewCandidate] = useState({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
@@ -2541,72 +2559,109 @@ export default function Admin() {
             <form onSubmit={handleAdminPasswordChange} className="space-y-4">
               <div>
                 <label htmlFor="admin-current-password" className="block text-sm font-medium text-foreground mb-1.5">Current password</label>
-                <input
-                  id="admin-current-password"
-                  type={showAdminCurrentPassword ? "text" : "password"}
-                  value={adminCurrentPassword}
-                  onChange={(e) => setAdminCurrentPassword(e.target.value)}
-                  autoComplete="current-password"
-                  required
-                  className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <button
-                  type="button"
-                  aria-label={showAdminCurrentPassword ? "Hide current password" : "Show current password"}
-                  onClick={() => setShowAdminCurrentPassword((visible) => !visible)}
-                  className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
-                >
-                  {showAdminCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                </button>
+                <div className="relative">
+                  <input
+                    id="admin-current-password"
+                    type={showAdminCurrentPassword ? "text" : "password"}
+                    value={adminCurrentPassword}
+                    onChange={(e) => setAdminCurrentPassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
+                    aria-describedby="admin-current-password-help"
+                    className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showAdminCurrentPassword ? "Hide current password" : "Show current password"}
+                    onClick={() => setShowAdminCurrentPassword((visible) => !visible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showAdminCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p id="admin-current-password-help" className="mt-1 text-xs text-muted-foreground">
+                  Required. It will be verified securely when you submit.
+                </p>
               </div>
               <div>
                 <label htmlFor="admin-new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
-                <input
-                  id="admin-new-password"
-                  type={showAdminNewPassword ? "text" : "password"}
-                  value={adminNewPassword}
-                  onChange={(e) => setAdminNewPassword(e.target.value)}
-                  minLength={ADMIN_PASSWORD_MIN_LENGTH}
-                  autoComplete="new-password"
-                  required
-                  className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <button
-                  type="button"
-                  aria-label={showAdminNewPassword ? "Hide new password" : "Show new password"}
-                  onClick={() => setShowAdminNewPassword((visible) => !visible)}
-                  className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
-                >
-                  {showAdminNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                </button>
+                <div className="relative">
+                  <input
+                    id="admin-new-password"
+                    type={showAdminNewPassword ? "text" : "password"}
+                    value={adminNewPassword}
+                    onChange={(e) => setAdminNewPassword(e.target.value)}
+                    minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                    autoComplete="new-password"
+                    required
+                    aria-invalid={adminNewPasswordHasError}
+                    aria-describedby="admin-new-password-requirements"
+                    className={`w-full px-4 pr-10 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${adminNewPasswordHasError ? 'border-red-500 focus:ring-red-500/40' : adminNewPassword && adminPasswordIsStrong ? 'border-success focus:ring-success/40' : 'border-border'}`}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showAdminNewPassword ? "Hide new password" : "Show new password"}
+                    onClick={() => setShowAdminNewPassword((visible) => !visible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showAdminNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </button>
+                </div>
+                <div id="admin-new-password-requirements" aria-live="polite" className="mt-2 rounded-lg border border-border bg-muted/20 p-3">
+                  <p className="text-xs font-medium text-foreground mb-2">Password requirements</p>
+                  <ul className="grid gap-1.5 sm:grid-cols-2">
+                    {adminPasswordChecks.map(({ label, valid }) => {
+                      const status = !adminNewPassword ? "neutral" : valid ? "valid" : "invalid";
+                      return (
+                        <li key={label} className={`flex items-center gap-1.5 text-xs ${status === "valid" ? "text-success" : status === "invalid" ? "text-red-500" : "text-muted-foreground"}`}>
+                          {status === "valid" ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : status === "invalid" ? <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <span className="w-3.5 h-3.5 shrink-0 rounded-full border border-current" aria-hidden="true" />}
+                          <span>{label}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  {adminNewPasswordMatchesCurrent && (
+                    <p className="mt-2 flex items-center gap-1.5 text-xs text-red-500">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      New password must be different from the current password.
+                    </p>
+                  )}
+                </div>
               </div>
               <div>
                 <label htmlFor="admin-confirm-password" className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
-                <input
-                  id="admin-confirm-password"
-                  type={showAdminConfirmPassword ? "text" : "password"}
-                  value={adminConfirmPassword}
-                  onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                  minLength={ADMIN_PASSWORD_MIN_LENGTH}
-                  autoComplete="new-password"
-                  required
-                  className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-                <button
-                  type="button"
-                  aria-label={showAdminConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
-                  onClick={() => setShowAdminConfirmPassword((visible) => !visible)}
-                  className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
-                >
-                  {showAdminConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                </button>
+                <div className="relative">
+                  <input
+                    id="admin-confirm-password"
+                    type={showAdminConfirmPassword ? "text" : "password"}
+                    value={adminConfirmPassword}
+                    onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                    minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                    autoComplete="new-password"
+                    required
+                    aria-invalid={adminConfirmPasswordHasError}
+                    aria-describedby={adminConfirmPassword ? "admin-confirm-password-feedback" : undefined}
+                    className={`w-full px-4 pr-10 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${adminConfirmPasswordHasError ? 'border-red-500 focus:ring-red-500/40' : adminPasswordsMatch ? 'border-success focus:ring-success/40' : 'border-border'}`}
+                  />
+                  <button
+                    type="button"
+                    aria-label={showAdminConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                    onClick={() => setShowAdminConfirmPassword((visible) => !visible)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showAdminConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                  </button>
+                </div>
+                {adminConfirmPassword && (
+                  <p id="admin-confirm-password-feedback" aria-live="polite" className={`mt-1 flex items-center gap-1.5 text-xs ${adminPasswordsMatch ? "text-success" : "text-red-500"}`}>
+                    {adminPasswordsMatch ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+                    {adminPasswordsMatch ? "Passwords match." : "Passwords do not match."}
+                  </p>
+                )}
               </div>
-              <p className="text-xs text-muted-foreground">
-                Use at least {ADMIN_PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, a number, and a special character.
-              </p>
               <button
                 type="submit"
-                disabled={adminPasswordSaving || !adminCurrentPassword || !adminNewPassword || !adminConfirmPassword}
+                disabled={adminPasswordSaving || !adminPasswordFormIsValid}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
