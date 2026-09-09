@@ -95,16 +95,17 @@ app.use(express.json({ limit: '1mb' }));
 
 // ─── Auth Routes ────────────────────────────────────────────────
 
-// Login with LRN (students) or username (admin)
+// Login with email (admins) or LRN (students)
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { lrn, password } = req.body;
-    if (!lrn || !password) {
-      return res.status(400).json({ error: 'LRN and password are required' });
+    const identifier = String(req.body.identifier ?? req.body.lrn ?? '').trim();
+    const { password } = req.body;
+    if (!identifier || !password) {
+      return res.status(400).json({ error: 'Email/LRN and password are required' });
     }
 
     const { data, error } = await supabase.rpc('app_login', {
-      p_lrn: lrn,
+      p_lrn: identifier,
       p_password: password,
     });
 

@@ -9,6 +9,7 @@ import ElectionScheduleForm from "@/components/ElectionScheduleForm";
 import ElectionInfoForm from "@/components/ElectionInfoForm";
 import { useNavigate } from "react-router-dom";
 import { ELECTION_TIME_ZONE, parseElectionDateTime } from "@/lib/election-time";
+import { ADMIN_PASSWORD_MIN_LENGTH, getAdminPasswordPolicyErrors } from "@/lib/password-policy";
 
 
 
@@ -189,10 +190,13 @@ const DEFAULT_GRADE_SECTIONS = {
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("overview");
-  const { isAdmin } = useAuth();
+  const { isAdmin, user, changePassword } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [adminNewPassword, setAdminNewPassword] = useState("");
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [adminPasswordSaving, setAdminPasswordSaving] = useState(false);
 
   // Add candidate form state
   const [newCandidate, setNewCandidate] = useState({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
@@ -248,6 +252,34 @@ export default function Admin() {
   const bulkCandidateFileInputRef = useRef(null);
   const [isDraggingVoter, setIsDraggingVoter] = useState(false);
   const [isDraggingCandidate, setIsDraggingCandidate] = useState(false);
+
+  const handleAdminPasswordChange = async (e) => {
+    e.preventDefault();
+    const policyErrors = getAdminPasswordPolicyErrors(adminNewPassword);
+    if (policyErrors.length > 0) {
+      toast({
+        title: "Password is not strong enough",
+        description: `Use ${policyErrors.join(", ")}.`,
+        variant: "destructive",
+      });
+      return;
+    }
+    if (adminNewPassword !== adminConfirmPassword) {
+      toast({ title: "Passwords do not match", description: "Enter the same password twice.", variant: "destructive" });
+      return;
+    }
+
+    setAdminPasswordSaving(true);
+    const { error } = await changePassword(adminNewPassword);
+    if (error) {
+      toast({ title: "Password change failed", description: error.message, variant: "destructive" });
+    } else {
+      setAdminNewPassword("");
+      setAdminConfirmPassword("");
+      toast({ title: "Admin password updated", description: "Your existing session remains active securely." });
+    }
+    setAdminPasswordSaving(false);
+  };
 
   const openEditModal = (c) => {
     setEditCandidate({ id: c.id, name: c.name, position_id: c.position_id, grade_level: c.grade_level, section: c.section, party_list: c.party_list, motto: c.motto || '' });
@@ -2490,6 +2522,54 @@ export default function Admin() {
 
       {activeTab === "settings" && (
         <div className="max-w-2xl space-y-6 animate-fade-in">
+          <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
+            <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-gold" /> Admin Account Security
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4">
+              Signed in as <span className="font-medium text-foreground">{user?.email || "admin account"}</span>. Change your administrator password here.
+            </p>
+            <form onSubmit={handleAdminPasswordChange} className="space-y-4">
+              <div>
+                <label htmlFor="admin-new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
+                <input
+                  id="admin-new-password"
+                  type="password"
+                  value={adminNewPassword}
+                  onChange={(e) => setAdminNewPassword(e.target.value)}
+                  minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                  autoComplete="new-password"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
+                <label htmlFor="admin-confirm-password" className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
+                <input
+                  id="admin-confirm-password"
+                  type="password"
+                  value={adminConfirmPassword}
+                  onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                  minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                  autoComplete="new-password"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Use at least {ADMIN_PASSWORD_MIN_LENGTH} characters with uppercase, lowercase, a number, and a special character.
+              </p>
+              <button
+                type="submit"
+                disabled={adminPasswordSaving || !adminNewPassword || !adminConfirmPassword}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                {adminPasswordSaving ? "Updating…" : "Change Admin Password"}
+              </button>
+            </form>
+          </div>
+
           {settings && (
             <>
               <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">

@@ -15,11 +15,16 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   lrn VARCHAR(255) NOT NULL UNIQUE,
+  email VARCHAR(320) DEFAULT NULL,
   password_hash VARCHAR(255) NOT NULL,
   full_name VARCHAR(100) NOT NULL,
   must_change_password BOOLEAN NOT NULL DEFAULT FALSE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_unique
+  ON users (lower(email))
+  WHERE email IS NOT NULL;
 
 -- ─── User roles ─────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS user_roles (
@@ -187,15 +192,15 @@ INSERT INTO positions (title, display_order, max_votes) VALUES
   ('Grade 10 Representative',   10, 1),
   ('Grade 11 Representative',   11, 1);
 
--- ─── Seed: default admin user (username: admin, password: admin123) ─
--- bcrypt hash for 'admin123'
-INSERT INTO users (id, lrn, password_hash, full_name, must_change_password)
+-- ─── Seed: bootstrap admin row; set a strong password immediately ───────
+INSERT INTO users (id, lrn, email, password_hash, full_name, must_change_password)
 VALUES (
   'a0000000-0000-0000-0000-000000000001',
   'admin',
+  'batuannationalhighschool@gmail.com',
   '$2a$10$qJuWvaZPekXNKtP8hr60SeYNgdeZVoze0/nRIQxgmWrglNH7ObvY.',
   'Administrator',
-  FALSE
+  TRUE
 );
 
 INSERT INTO profiles (user_id, full_name)

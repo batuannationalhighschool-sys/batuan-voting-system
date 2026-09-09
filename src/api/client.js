@@ -163,7 +163,7 @@ async function handlePost(path, body) {
 
   if (pathname === '/auth/login') {
     const { data, error } = await supabase.rpc('app_login', {
-      p_lrn: body.lrn, p_password: body.password,
+      p_lrn: body.identifier ?? body.lrn, p_password: body.password,
     });
     if (error) throw new Error(error.message);
     return data;

@@ -4,6 +4,7 @@ import { Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import schoolSeal from "@/assets/school-seal.jpg";
+import { ADMIN_PASSWORD_MIN_LENGTH, getAdminPasswordPolicyErrors } from "@/lib/password-policy";
 
 export default function ChangePassword() {
   const [newPassword, setNewPassword] = useState("");
@@ -11,7 +12,7 @@ export default function ChangePassword() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { changePassword, user, mustChangePassword } = useAuth();
+  const { changePassword, user, isAdmin, mustChangePassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -29,7 +30,17 @@ export default function ChangePassword() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (newPassword.length < 6) {
+    if (isAdmin) {
+      const policyErrors = getAdminPasswordPolicyErrors(newPassword);
+      if (policyErrors.length > 0) {
+        toast({
+          title: "Password is not strong enough",
+          description: `Use ${policyErrors.join(", ")}.`,
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (newPassword.length < 6) {
       toast({ title: "Password too short", description: "Must be at least 6 characters.", variant: "destructive" });
       return;
     }
@@ -85,7 +96,7 @@ export default function ChangePassword() {
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Enter new password"
                 required
-                minLength={6}
+                minLength={isAdmin ? ADMIN_PASSWORD_MIN_LENGTH : 6}
                 className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground pr-10"
               />
               <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -104,7 +115,7 @@ export default function ChangePassword() {
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm new password"
                 required
-                minLength={6}
+                minLength={isAdmin ? ADMIN_PASSWORD_MIN_LENGTH : 6}
                 className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground pr-10"
               />
               <button type="button" onClick={() => setShowConfirm(!showConfirm)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
@@ -115,6 +126,12 @@ export default function ChangePassword() {
 
           {newPassword && confirmPassword && newPassword !== confirmPassword && (
             <p className="text-xs text-destructive">Passwords do not match.</p>
+          )}
+
+          {isAdmin && (
+            <p className="text-xs text-muted-foreground">
+              Admin passwords must be at least {ADMIN_PASSWORD_MIN_LENGTH} characters and include uppercase, lowercase, a number, and a special character.
+            </p>
           )}
 
           <button

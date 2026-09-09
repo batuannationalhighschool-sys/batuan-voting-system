@@ -45,9 +45,9 @@ export function AuthProvider({ children }) {
     fetchMe();
   }, []);
 
-  const signIn = async (lrn, password) => {
+  const signIn = async (identifier, password) => {
     try {
-      const data = await api.post('/auth/login', { lrn, password });
+      const data = await api.post('/auth/login', { identifier, password });
       localStorage.setItem('auth_token', data.token);
       setUser(data.user);
       setMustChangePassword(!!data.must_change_password);
