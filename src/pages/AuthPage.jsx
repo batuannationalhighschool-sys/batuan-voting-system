@@ -53,7 +53,7 @@ export default function AuthPage() {
 
         <form onSubmit={handleSubmit} className="bg-card rounded-2xl border border-border p-6 md:p-8 shadow-elegant animate-scale-in space-y-4">
           <div>
-            <label htmlFor="login-identifier" className="block text-sm font-medium text-foreground mb-1.5">Admin email or voter LRN</label>
+            <label htmlFor="login-identifier" className="block text-sm font-medium text-foreground mb-1.5">LRN (Learner Reference Number)</label>
             <div className="relative">
               <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
