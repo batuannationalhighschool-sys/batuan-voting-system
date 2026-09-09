@@ -303,7 +303,7 @@ export default function Admin() {
       setAdminNewPassword("");
       setAdminConfirmPassword("");
       setAdminCurrentPassword("");
-      toast({ title: "Admin password updated", description: "Your existing session remains active securely." });
+      toast({ title: "Admin password updated", description: "Your existing session remains active securely.", variant: "success" });
     }
     setAdminPasswordSaving(false);
   };
@@ -442,7 +442,7 @@ export default function Admin() {
       await api.upload('/candidates', formData);
     },
     onSuccess: () => {
-      toast({ title: "Candidate added!" });
+      toast({ title: "Candidate added!", variant: "success" });
       setNewCandidate({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
       setCustomCandidateSection(false);
       setFormErrors({});
@@ -460,7 +460,7 @@ export default function Admin() {
   const archiveCandidate = useMutation({
     mutationFn: async (id) => { await api.patch(`/candidates/${id}/archive`); },
     onSuccess: () => {
-      toast({ title: "Candidate archived", description: "The candidate has been moved to the archive." });
+      toast({ title: "Candidate archived", description: "The candidate has been moved to the archive.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -495,7 +495,7 @@ export default function Admin() {
       await api.uploadPut(`/candidates/${editCandidate.id}`, formData);
     },
     onSuccess: () => {
-      toast({ title: "Candidate updated!" });
+      toast({ title: "Candidate updated!", variant: "success" });
       closeEditModal();
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
@@ -516,9 +516,10 @@ export default function Admin() {
         toast({
           title: "Election Started!",
           description: "Voting is now active. All voters can now cast their votes for the new election.",
+          variant: "success",
         });
       } else {
-        toast({ title: "Election status updated" });
+        toast({ title: "Election status updated", variant: "success" });
       }
       queryClient.invalidateQueries({ queryKey: ["election-settings"] });
       queryClient.invalidateQueries({ queryKey: ["voters"] });
@@ -729,7 +730,7 @@ export default function Admin() {
       if (!settings?.id) return;
       await api.put(`/election-settings/${settings.id}`, fields);
     },
-    onSuccess: () => { toast({ title: "Schedule saved!", description: "Election schedule updated." }); queryClient.invalidateQueries({ queryKey: ["election-settings"] }); },
+    onSuccess: () => { toast({ title: "Schedule saved!", description: "Election schedule updated.", variant: "success" }); queryClient.invalidateQueries({ queryKey: ["election-settings"] }); },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
@@ -739,7 +740,7 @@ export default function Admin() {
       await api.post('/election-history/archive');
     },
     onSuccess: (data) => {
-      toast({ title: "Results archived!", description: "Election results have been saved to history. Students can view them under Past Elections." });
+      toast({ title: "Results archived!", description: "Election results have been saved to history. Students can view them under Past Elections.", variant: "success" });
       setShowArchiveConfirm(false);
       queryClient.invalidateQueries({ queryKey: ["election-history"] });
     },
@@ -754,7 +755,7 @@ export default function Admin() {
       await api.delete(`/election-history/${encodeURIComponent(schoolYear)}`);
     },
     onSuccess: () => {
-      toast({ title: "Election history deleted" });
+      toast({ title: "Election history deleted", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["election-history"] });
       queryClient.invalidateQueries({ queryKey: ["archived-results"] });
     },
@@ -771,7 +772,7 @@ export default function Admin() {
       if (!settings?.id) return;
       await api.put(`/election-settings/${settings.id}`, fields);
     },
-    onSuccess: () => { toast({ title: "Info saved!", description: "Election info and footer school name updated." }); queryClient.invalidateQueries({ queryKey: ["election-settings"] }); },
+    onSuccess: () => { toast({ title: "Info saved!", description: "Election info and footer school name updated.", variant: "success" }); queryClient.invalidateQueries({ queryKey: ["election-settings"] }); },
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
@@ -782,7 +783,7 @@ export default function Admin() {
       await api.post('/voters', newVoter);
     },
     onSuccess: () => {
-      toast({ title: "Voter added!", description: "Default password is the LRN." });
+      toast({ title: "Voter added!", description: "Default password is the LRN.", variant: "success" });
       setNewVoter({ lrn: "", full_name: "", grade_level: "", section: "" });
       setCustomVoterSection(false);
       queryClient.invalidateQueries({ queryKey: ["voters"] });
@@ -798,7 +799,7 @@ export default function Admin() {
       await api.put(`/voters/${editVoter.id}`, editVoter);
     },
     onSuccess: () => {
-      toast({ title: "Voter updated!" });
+      toast({ title: "Voter updated!", variant: "success" });
       setEditVoter(null);
       setCustomEditVoterSection(false);
       queryClient.invalidateQueries({ queryKey: ["voters"] });
@@ -810,7 +811,7 @@ export default function Admin() {
   const deleteVoter = useMutation({
     mutationFn: async (id) => { await api.delete(`/voters/${id}`); },
     onSuccess: () => {
-      toast({ title: "Voter archived", description: "The voter has been moved to the Archive tab." });
+      toast({ title: "Voter archived", description: "The voter has been moved to the Archive tab.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -834,7 +835,7 @@ export default function Admin() {
   const restoreVoter = useMutation({
     mutationFn: async (id) => { await api.post(`/voters/${id}/restore`); },
     onSuccess: () => {
-      toast({ title: "Voter restored", description: "The voter has been moved back to the active voters list." });
+      toast({ title: "Voter restored", description: "The voter has been moved back to the active voters list.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -846,7 +847,7 @@ export default function Admin() {
   const permanentDeleteVoter = useMutation({
     mutationFn: async (id) => { await api.delete(`/voters/${id}/permanent`); },
     onSuccess: () => {
-      toast({ title: "Voter permanently deleted", description: "The voter has been permanently removed from the system." });
+      toast({ title: "Voter permanently deleted", description: "The voter has been permanently removed from the system.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
@@ -857,7 +858,7 @@ export default function Admin() {
   const restoreCandidate = useMutation({
     mutationFn: async (id) => { await api.post(`/candidates/${id}/restore`); },
     onSuccess: () => {
-      toast({ title: "Candidate restored", description: "The candidate has been moved back to the active candidates list." });
+      toast({ title: "Candidate restored", description: "The candidate has been moved back to the active candidates list.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -869,7 +870,7 @@ export default function Admin() {
   const permanentDeleteCandidate = useMutation({
     mutationFn: async (id) => { await api.delete(`/candidates/${id}/permanent`); },
     onSuccess: () => {
-      toast({ title: "Candidate permanently deleted", description: "The candidate has been permanently removed from the system." });
+      toast({ title: "Candidate permanently deleted", description: "The candidate has been permanently removed from the system.", variant: "success" });
       queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
       queryClient.invalidateQueries({ queryKey: ["candidates"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -881,7 +882,7 @@ export default function Admin() {
   const resetPassword = useMutation({
     mutationFn: async (id) => { await api.post(`/voters/${id}/reset-password`); },
     onSuccess: () => {
-      toast({ title: "Password reset!", description: "Password has been reset to the voter's LRN." });
+      toast({ title: "Password reset!", description: "Password has been reset to the voter's LRN.", variant: "success" });
       setResetTarget(null);
       queryClient.invalidateQueries({ queryKey: ["voters"] });
     },
@@ -898,6 +899,7 @@ export default function Admin() {
       toast({
         title: "All voting statuses reset!",
         description: "All voters can now cast a vote, and vote counts have been reset to 0.",
+        variant: "success",
       });
       queryClient.invalidateQueries({ queryKey: ["voters"] });
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
@@ -933,6 +935,7 @@ export default function Admin() {
       toast({
         title: `Bulk upload complete`,
         description: parts.join(', ') || 'All rows processed successfully',
+        variant: data.errors ? "warning" : "success",
       });
     },
     onError: (err) => toast({ title: "Bulk upload failed", description: err.message, variant: "destructive" }),
@@ -978,6 +981,7 @@ export default function Admin() {
       toast({
         title: `Bulk upload complete`,
         description: `${data.inserted} inserted, ${data.skipped} skipped, ${data.errors} errors`,
+        variant: data.errors ? "warning" : "success",
       });
     },
     onError: (err) => toast({ title: "Bulk upload failed", description: err.message, variant: "destructive" }),

@@ -188,7 +188,7 @@ export default function Results() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["election-settings"] });
-      toast({ title: "Election name updated!" });
+      toast({ title: "Election name updated!", variant: "success" });
       setEditingName(false);
     },
     onError: (err) => {

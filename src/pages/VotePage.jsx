@@ -71,7 +71,7 @@ export default function VotePage() {
       queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
       queryClient.invalidateQueries({ queryKey: ["vote-counts-home"] });
       queryClient.invalidateQueries({ queryKey: ["stats"] });
-      toast({ title: "Vote submitted!", description: `Your vote for ${settings?.name || "the election"} has been recorded securely.` });
+      toast({ title: "Vote submitted!", description: `Your vote for ${settings?.name || "the election"} has been recorded securely.`, variant: "success" });
     },
     onError: (err) => {
       const msg = err.message?.includes("duplicate") || err.message?.includes("already voted")

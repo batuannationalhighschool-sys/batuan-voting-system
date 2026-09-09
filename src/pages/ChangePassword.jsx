@@ -55,7 +55,7 @@ export default function ChangePassword() {
     if (error) {
       toast({ title: "Failed", description: error.message, variant: "destructive" });
     } else {
-      toast({ title: "Password updated!", description: "Your new password has been set successfully." });
+      toast({ title: "Password updated!", description: "Your new password has been set successfully.", variant: "success" });
       navigate("/");
     }
     setLoading(false);

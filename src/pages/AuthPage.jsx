@@ -22,10 +22,10 @@ export default function AuthPage() {
     if (error) {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
     } else if (must_change_password) {
-      toast({ title: "Welcome!", description: "Please change your password to continue." });
+      toast({ title: "Welcome!", description: "Please change your password to continue.", variant: "info" });
       navigate("/change-password");
     } else {
-      toast({ title: "Welcome back!" });
+      toast({ title: "Welcome back!", variant: "success" });
       if (isAdmin) {
         navigate("/admin");
       } else {
