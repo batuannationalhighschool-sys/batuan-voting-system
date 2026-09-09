@@ -2556,7 +2556,7 @@ export default function Admin() {
                   onClick={() => setShowAdminCurrentPassword((visible) => !visible)}
                   className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
                 >
-                  {showAdminCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showAdminCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
               <div>
@@ -2577,7 +2577,7 @@ export default function Admin() {
                   onClick={() => setShowAdminNewPassword((visible) => !visible)}
                   className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
                 >
-                  {showAdminNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showAdminNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
               <div>
@@ -2598,7 +2598,7 @@ export default function Admin() {
                   onClick={() => setShowAdminConfirmPassword((visible) => !visible)}
                   className="relative float-right -mt-8 mr-3 text-muted-foreground hover:text-foreground"
                 >
-                  {showAdminConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showAdminConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
