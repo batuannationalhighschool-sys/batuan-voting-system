@@ -141,6 +141,28 @@ app.post('/api/auth/change-password', requireAuth, async (req, res) => {
   }
 });
 
+// Change an administrator password after verifying the current password.
+app.post('/api/auth/admin/change-password', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { current_password, new_password } = req.body;
+    if (!current_password || !new_password) {
+      return res.status(400).json({ error: 'Current and new passwords are required' });
+    }
+
+    const { data, error } = await supabase.rpc('app_change_admin_password', {
+      p_token: req.authToken,
+      p_current_password: current_password,
+      p_new_password: new_password,
+    });
+
+    if (error) return res.status(400).json({ error: error.message });
+    return res.json(data);
+  } catch (err) {
+    console.error('Admin password change error:', err.message);
+    return res.status(500).json({ error: 'Failed to change admin password' });
+  }
+});
+
 app.get('/api/auth/me', requireAuth, async (req, res) => {
   return res.json(req.authData);
 });

@@ -17,10 +17,11 @@ server/schema.sql
 server/migration-election-history.sql
 server/migration-security-hardening.sql
 server/migration-admin-email.sql
+server/migration-admin-current-password.sql
 server/migration-election-scheduler.sql
 ```
 
-For an existing project that already has the base schema and RPC migration, run the migration files after `server/schema.sql` in order. The security migration must be applied after the election-history migration because it protects the reset/start path with the archive table. Apply `server/migration-admin-email.sql` after the security migration; it assigns the configured administrator email and forces a strong password change.
+For an existing project that already has the base schema and RPC migration, run the migration files after `server/schema.sql` in order. The security migration must be applied after the election-history migration because it protects the reset/start path with the archive table. Apply `server/migration-admin-email.sql` and then `server/migration-admin-current-password.sql` after the security migration; they assign the configured administrator email, force a strong password change, and require the current password for changes made from Admin Settings.
 
 The hardening migration makes the configured election window authoritative inside `app_submit_votes`. A stale `ongoing` status cannot accept a vote before the opening instant or, when automatic ending is enabled, at or after the closing instant. It also moves the custom-token signing key into Supabase Vault, creates an atomic ballot marker, removes anonymous candidate-photo uploads, and prevents an unarchived ballot from being silently deleted during a reset. The scheduler migration keeps the displayed election status synchronized every minute.
 

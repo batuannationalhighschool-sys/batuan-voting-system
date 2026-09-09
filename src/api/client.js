@@ -177,6 +177,16 @@ async function handlePost(path, body) {
     return data;
   }
 
+  if (pathname === '/auth/admin/change-password') {
+    const { data, error } = await supabase.rpc('app_change_admin_password', {
+      p_token: getToken(),
+      p_current_password: body.current_password,
+      p_new_password: body.new_password,
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
   if (pathname === '/voters') {
     const { data, error } = await supabase.rpc('app_add_voter', {
       p_token: getToken(), p_lrn: body.lrn, p_full_name: body.full_name,

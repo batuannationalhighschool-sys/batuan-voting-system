@@ -72,6 +72,23 @@ export function AuthProvider({ children }) {
     }
   };
 
+  const changeAdminPassword = async (currentPassword, newPassword) => {
+    try {
+      const data = await api.post('/auth/admin/change-password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
+      if (data.token) {
+        localStorage.setItem('auth_token', data.token);
+      }
+      setMustChangePassword(false);
+      await fetchMe();
+      return { error: null };
+    } catch (err) {
+      return { error: { message: err.message } };
+    }
+  };
+
   const signOut = async () => {
     localStorage.removeItem('auth_token');
     setUser(null);
@@ -81,7 +98,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session: null, loading, isAdmin, profile, mustChangePassword, signIn, signOut, changePassword, refreshProfile }}>
+    <AuthContext.Provider value={{ user, session: null, loading, isAdmin, profile, mustChangePassword, signIn, signOut, changePassword, changeAdminPassword, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

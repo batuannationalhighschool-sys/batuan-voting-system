@@ -190,12 +190,13 @@ const DEFAULT_GRADE_SECTIONS = {
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("overview");
-  const { isAdmin, user, changePassword } = useAuth();
+  const { isAdmin, user, changeAdminPassword } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [adminNewPassword, setAdminNewPassword] = useState("");
   const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [adminCurrentPassword, setAdminCurrentPassword] = useState("");
   const [adminPasswordSaving, setAdminPasswordSaving] = useState(false);
 
   // Add candidate form state
@@ -255,6 +256,10 @@ export default function Admin() {
 
   const handleAdminPasswordChange = async (e) => {
     e.preventDefault();
+    if (!adminCurrentPassword) {
+      toast({ title: "Current password required", description: "Enter your current password before choosing a new one.", variant: "destructive" });
+      return;
+    }
     const policyErrors = getAdminPasswordPolicyErrors(adminNewPassword);
     if (policyErrors.length > 0) {
       toast({
@@ -270,12 +275,13 @@ export default function Admin() {
     }
 
     setAdminPasswordSaving(true);
-    const { error } = await changePassword(adminNewPassword);
+    const { error } = await changeAdminPassword(adminCurrentPassword, adminNewPassword);
     if (error) {
       toast({ title: "Password change failed", description: error.message, variant: "destructive" });
     } else {
       setAdminNewPassword("");
       setAdminConfirmPassword("");
+      setAdminCurrentPassword("");
       toast({ title: "Admin password updated", description: "Your existing session remains active securely." });
     }
     setAdminPasswordSaving(false);
@@ -2531,6 +2537,18 @@ export default function Admin() {
             </p>
             <form onSubmit={handleAdminPasswordChange} className="space-y-4">
               <div>
+                <label htmlFor="admin-current-password" className="block text-sm font-medium text-foreground mb-1.5">Current password</label>
+                <input
+                  id="admin-current-password"
+                  type="password"
+                  value={adminCurrentPassword}
+                  onChange={(e) => setAdminCurrentPassword(e.target.value)}
+                  autoComplete="current-password"
+                  required
+                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
+              <div>
                 <label htmlFor="admin-new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
                 <input
                   id="admin-new-password"
@@ -2561,7 +2579,7 @@ export default function Admin() {
               </p>
               <button
                 type="submit"
-                disabled={adminPasswordSaving || !adminNewPassword || !adminConfirmPassword}
+                disabled={adminPasswordSaving || !adminCurrentPassword || !adminNewPassword || !adminConfirmPassword}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
