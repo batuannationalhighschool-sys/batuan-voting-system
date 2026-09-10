@@ -230,57 +230,65 @@ const voters = [
   { lrn: '120300000010', full_name: 'Xanthus Jay Quibod',         grade_level: 'Grade 12', section: 'Tourism' },
 ];
 
-// ─── Candidates (updated to use correct new sections) ────────────
+// ─── Candidates (Two Parties: Lakas Kabataan & Bagong Pag-asa) ──
 const candidatesByPosition = {
   'President': [
-    { name: 'Andrei Jose Villanueva',   grade_level: 'Grade 12', section: 'ICT',        party_list: 'Bagong Pag-asa', motto: 'Together we rise, united we thrive.' },
-    { name: 'Sofia Marie Navarro',      grade_level: 'Grade 11', section: 'ICT',        party_list: 'Pagbabago',     motto: 'A voice for every student, every day.' },
+    { name: 'John Christian Alvarez',   grade_level: 'Grade 11', section: 'TECHPRO - FORBEARANCE', party_list: 'Lakas Kabataan', motto: 'Leadership through Service, Action, and Integrity' },
+    { name: 'Princess Nicole Mendoza',  grade_level: 'Grade 11', section: 'ACADEMIC - KNOWLEDGE',  party_list: 'Bagong Pag-asa', motto: 'Empowering Student Voices, Inspiring Future Leaders' },
   ],
   'Vice President': [
-    { name: 'Marco Rafael Dela Vega',   grade_level: 'Grade 11', section: 'Cookery',    party_list: 'Bagong Pag-asa', motto: 'Service above self.' },
-    { name: 'Jasmine Elise Reyes',      grade_level: 'Grade 12', section: 'Cookery',    party_list: 'Kabataan',      motto: 'Lead with heart, serve with purpose.' },
+    { name: 'Mark Angelo Reyes',        grade_level: 'Grade 11', section: 'ACADEMIC - LOVE',       party_list: 'Lakas Kabataan', motto: 'United in Progress, Committed to Success' },
+    { name: 'Jasmine Chloe Dizon',      grade_level: 'Grade 10', section: 'SAMPAGUITA',            party_list: 'Bagong Pag-asa', motto: 'Dedication and Transparency in Every Step' },
   ],
   'Secretary': [
-    { name: 'Nina Patricia Castillo',   grade_level: 'Grade 10', section: 'Leadership', party_list: 'Pagbabago',     motto: 'Organized, dedicated, transparent.' },
-    { name: 'Carlo James Buenaventura', grade_level: 'Grade 11', section: 'Tourism',    party_list: 'Bagong Pag-asa', motto: 'Every word counts, every record matters.' },
+    { name: 'Hannah Sofia Villanueva',  grade_level: 'Grade 10', section: 'CHRYSANTHEMUM',         party_list: 'Lakas Kabataan', motto: 'Accuracy, Accountability, and Reliable Service' },
+    { name: 'Nathaniel James Ramos',    grade_level: 'Grade 9',  section: 'HYACINTH',              party_list: 'Bagong Pag-asa', motto: 'Organized Leadership for a Progressive SSLG' },
   ],
   'Treasurer': [
-    { name: 'Angela Faith Cruz',        grade_level: 'Grade 11', section: 'ICT',        party_list: 'Kabataan',      motto: 'Wise stewards of our shared resources.' },
-    { name: 'Renz Alberto Magalona',    grade_level: 'Grade 10', section: 'Resilience', party_list: 'Pagbabago',     motto: 'Integrity in every centavo.' },
+    { name: 'Eunice Joy Salazar',       grade_level: 'Grade 11', section: 'ACADEMIC - KNOWLEDGE',  party_list: 'Lakas Kabataan', motto: 'Integrity in Stewardship, Honesty in Action' },
+    { name: 'Joshua David Fernandez',   grade_level: 'Grade 10', section: 'SAMPAGUITA',            party_list: 'Bagong Pag-asa', motto: 'Transparent Funds for Genuine Student Projects' },
   ],
   'Auditor': [
-    { name: 'Bianca Marie Tolentino',   grade_level: 'Grade 12', section: 'ICT',        party_list: 'Bagong Pag-asa', motto: 'Truth and accountability always.' },
-    { name: 'Edison Andre Lim',         grade_level: 'Grade 11', section: 'Tourism',    party_list: 'Kabataan',      motto: "Numbers don't lie — and neither do I." },
+    { name: 'Lance Gabriel Ocampo',     grade_level: 'Grade 10', section: 'CHRYSANTHEMUM',         party_list: 'Lakas Kabataan', motto: 'Fairness, Transparency, and Truth in Service' },
+    { name: 'Althea Marie Bautista',    grade_level: 'Grade 9',  section: 'DAFFODIL',              party_list: 'Bagong Pag-asa', motto: 'Vigilant Leadership for Better Governance' },
   ],
   'Public Information Officer': [
-    { name: 'Kyla Denise Soriano',      grade_level: 'Grade 10', section: 'Leadership', party_list: 'Pagbabago',     motto: 'Connecting students through communication.' },
-    { name: 'James Ryan Evangelista',   grade_level: 'Grade 11', section: 'ICT',        party_list: 'Kabataan',      motto: 'Your news, your voice, your school.' },
-    { name: 'Patricia Anne Bernardo',   grade_level: 'Grade 12', section: 'Cookery',    party_list: 'Bagong Pag-asa', motto: 'Transparency builds trust.' },
+    { name: 'Kian Matthew Estrada',     grade_level: 'Grade 9',  section: 'DAMA DE NOCHE',         party_list: 'Lakas Kabataan', motto: 'Connecting Students, Sharing Timely Updates' },
+    { name: 'Samantha Claire Tolentino', grade_level: 'Grade 8', section: 'ROSAL',                 party_list: 'Bagong Pag-asa', motto: 'Voice of Truth, Information for Everyone' },
   ],
   'Protocol Officer': [
-    { name: 'Vincent Raul Padilla',     grade_level: 'Grade 12', section: 'Tourism',    party_list: 'Bagong Pag-asa', motto: 'Peace starts with one step.' },
-    { name: 'Ella Joy Domingo',         grade_level: 'Grade 11', section: 'Cookery',    party_list: 'Pagbabago',     motto: 'A safer school for everyone.' },
-    { name: 'Miguel Santos Cruz',       grade_level: 'Grade 10', section: 'Fortitude',  party_list: 'Kabataan',      motto: 'Discipline with compassion.' },
+    { name: 'Tristan Paul Macaraeg',    grade_level: 'Grade 8',  section: 'CARNATION',             party_list: 'Lakas Kabataan', motto: 'Order, Peace, and Harmony in School Community' },
+    { name: 'Andrea Louise Miranda',    grade_level: 'Grade 8',  section: 'STARGAZER',             party_list: 'Bagong Pag-asa', motto: 'Discipline with Compassion, Service with Respect' },
   ],
   'Grade 8 Representative': [
-    { name: 'Beatriz Anne Santos',      grade_level: 'Grade 7',  section: 'Gold',        party_list: 'Bagong Pag-asa', motto: 'Grade 7 leading the way into Grade 8.' },
-    { name: 'Karl Martin Aquino',       grade_level: 'Grade 7',  section: 'Silver',      party_list: 'Kabataan',      motto: 'Your voice, our future Grade 8.' },
+    { name: 'Carl Dominic Pineda',      grade_level: 'Grade 8',  section: 'ROSAL',                 party_list: 'Lakas Kabataan', motto: 'Active Representation for Grade 8 Students' },
+    { name: 'Zoe Gabrielle Cortez',     grade_level: 'Grade 8',  section: 'CARNATION',             party_list: 'Lakas Kabataan', motto: 'Listening, Caring, and Leading with Purpose' },
+    { name: 'Ethan Jay Vergara',        grade_level: 'Grade 8',  section: 'STARGAZER',             party_list: 'Bagong Pag-asa', motto: 'Stronger Together for a Brighter Grade 8' },
+    { name: 'Brianna Mae Soriano',      grade_level: 'Grade 8',  section: 'ROSAL',                 party_list: 'Bagong Pag-asa', motto: 'Excellence and Unity in Every Endeavor' },
   ],
   'Grade 9 Representative': [
-    { name: 'Edgar Andrei Valencia',    grade_level: 'Grade 8',  section: 'Pearl',       party_list: 'Pagbabago',     motto: 'Grade 8 moving up to Grade 9 excellence.' },
-    { name: 'Fiona Mae Villareal',      grade_level: 'Grade 8',  section: 'Diamond',     party_list: 'Bagong Pag-asa', motto: 'Empowering Grade 8 as future Grade 9 leaders.' },
+    { name: 'Raffy Justin Mercado',     grade_level: 'Grade 9',  section: 'HYACINTH',              party_list: 'Lakas Kabataan', motto: 'Dedicated to the Needs of Grade 9' },
+    { name: 'Caitlin Faye Domingo',     grade_level: 'Grade 9',  section: 'DAFFODIL',              party_list: 'Lakas Kabataan', motto: 'Empowering our Batch towards Excellence' },
+    { name: 'Kenneth Kyle Aguilar',     grade_level: 'Grade 9',  section: 'DAMA DE NOCHE',         party_list: 'Bagong Pag-asa', motto: 'Progressive Actions for Grade 9 Batch' },
+    { name: 'Marianne Joy Pascual',     grade_level: 'Grade 9',  section: 'HYACINTH',              party_list: 'Bagong Pag-asa', motto: 'Service with a Smile, Action with Impact' },
   ],
   'Grade 10 Representative': [
-    { name: 'Kevin James Dela Peña',    grade_level: 'Grade 9',  section: 'Wisdom',      party_list: 'Kabataan',      motto: 'Grade 9 stepping up for Grade 10.' },
-    { name: 'Valeria Rose Ilagan',      grade_level: 'Grade 9',  section: 'Excellence',  party_list: 'Pagbabago',     motto: 'Excellence and unity in Grade 10.' },
+    { name: 'Patrick Sean De Leon',     grade_level: 'Grade 10', section: 'SAMPAGUITA',            party_list: 'Lakas Kabataan', motto: 'Your Voice, Our Commitment' },
+    { name: 'Denise Nicole Javier',     grade_level: 'Grade 10', section: 'CHRYSANTHEMUM',         party_list: 'Lakas Kabataan', motto: 'Bridging Ideas into Real Actions' },
+    { name: 'Adrian Paul Valenzuela',   grade_level: 'Grade 10', section: 'SAMPAGUITA',            party_list: 'Bagong Pag-asa', motto: 'Leadership that Listens and Delivers' },
+    { name: 'Kylie Danielle Morales',   grade_level: 'Grade 10', section: 'CHRYSANTHEMUM',         party_list: 'Bagong Pag-asa', motto: 'Uniting Grade 10 for Higher Achievements' },
   ],
   'Grade 11 Representative': [
-    { name: 'Ingrid Rose Zarate',       grade_level: 'Grade 10', section: 'Leadership',  party_list: 'Bagong Pag-asa', motto: 'From Grade 10 to Senior High Grade 11.' },
-    { name: 'Queenie Mae Gatmaitan',    grade_level: 'Grade 10', section: 'Fortitude',   party_list: 'Kabataan',      motto: 'Bridging Junior to Senior High with courage and dedication.' },
+    { name: 'Justin Mark Salvador',     grade_level: 'Grade 11', section: 'TECHPRO - FORBEARANCE', party_list: 'Lakas Kabataan', motto: 'Advancing Senior High with Integrity and Skills' },
+    { name: 'Giselle Marie Tan',        grade_level: 'Grade 11', section: 'ACADEMIC - KNOWLEDGE',  party_list: 'Lakas Kabataan', motto: 'Empowering SHS Students to Reach Greater Heights' },
+    { name: 'Aaron Dale Castro',        grade_level: 'Grade 11', section: 'ACADEMIC - LOVE',       party_list: 'Bagong Pag-asa', motto: 'Innovative Leadership for Senior High Students' },
+    { name: 'Chloe Anne Guinto',        grade_level: 'Grade 11', section: 'TECHPRO - FORBEARANCE', party_list: 'Bagong Pag-asa', motto: 'Service Built on Passion and Excellence' },
   ],
   'Grade 12 Representative': [
-    { name: 'Bernardita Rose Salonga',  grade_level: 'Grade 11', section: 'Cookery',     party_list: 'Pagbabago',     motto: 'Grade 11 ready for our final Grade 12 year.' },
-    { name: 'Sharmaine Calabio',        grade_level: 'Grade 11', section: 'ICT',         party_list: 'Bagong Pag-asa', motto: 'Making our Grade 12 count.' },
+    { name: 'Francis Gabriel Navarro',  grade_level: 'Grade 12', section: 'ACADEMIC - KNOWLEDGE',  party_list: 'Lakas Kabataan', motto: 'Leading the Graduating Batch with Pride' },
+    { name: 'Janine Pearl Dimaculangan', grade_level: 'Grade 12', section: 'TECHPRO - FORBEARANCE', party_list: 'Lakas Kabataan', motto: 'Leaving a Legacy of Leadership and Service' },
+    { name: 'Kurt Russell Villanueva',  grade_level: 'Grade 12', section: 'ACADEMIC - LOVE',       party_list: 'Bagong Pag-asa', motto: 'Setting the Standard for Future Leaders' },
+    { name: 'Lorraine Mae Esguerra',    grade_level: 'Grade 12', section: 'ACADEMIC - KNOWLEDGE',  party_list: 'Bagong Pag-asa', motto: 'Striving for Excellence in Every Step' },
   ],
 };
 
