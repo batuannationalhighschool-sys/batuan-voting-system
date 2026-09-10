@@ -180,15 +180,15 @@ INSERT INTO election_settings (name, school_year, election_date, status)
 VALUES ('SSLG Election 2026', '2025-2026', '2026-03-15', 'ongoing');
 
 -- ─── Seed: default SSLG positions ──────────────────────────────────
--- max_votes = 2 for P.I.O., Protocol Officer, and Grade Representatives
+-- max_votes = 2 for Grade Representatives
 INSERT INTO positions (title, display_order, max_votes) VALUES
   ('President',                  1, 1),
   ('Vice President',             2, 1),
   ('Secretary',                  3, 1),
   ('Treasurer',                  4, 1),
   ('Auditor',                    5, 1),
-  ('Public Information Officer', 6, 2),
-  ('Protocol Officer',           7, 2),
+  ('Public Information Officer', 6, 1),
+  ('Protocol Officer',           7, 1),
   ('Grade 8 Representative',     8, 2),
   ('Grade 9 Representative',     9, 2),
   ('Grade 10 Representative',   10, 2),

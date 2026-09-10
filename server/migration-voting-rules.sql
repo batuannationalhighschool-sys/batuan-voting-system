@@ -7,10 +7,16 @@
 
 BEGIN;
 
--- ─── 1. Update Representative positions max_votes to 2 ─────────────────────
+-- ─── 1. Update positions max_votes ─────────────────────────────────────────
+-- Only Grade Representatives have max_votes = 2
 UPDATE public.positions
 SET max_votes = 2
 WHERE lower(title) LIKE '%representative%';
+
+-- All other positions (President, VP, Sec, Treas, Aud, PIO, Protocol Officer) have max_votes = 1
+UPDATE public.positions
+SET max_votes = 1
+WHERE lower(title) NOT LIKE '%representative%';
 
 -- ─── 2. Update submit_votes to support empty votes array ───────────────────
 CREATE OR REPLACE FUNCTION public.submit_votes(p_voter_id UUID, p_votes JSONB)
