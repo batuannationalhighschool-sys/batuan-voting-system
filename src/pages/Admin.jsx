@@ -242,6 +242,9 @@ export default function Admin() {
   // Archive election results state
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
+  // End election confirmation state
+  const [showEndElectionConfirm, setShowEndElectionConfirm] = useState(false);
+
   // Voter management state
   const [newVoter, setNewVoter] = useState({ lrn: "", full_name: "", grade_level: "", section: "" });
   const [customVoterSection, setCustomVoterSection] = useState(false);
@@ -2826,10 +2829,35 @@ export default function Admin() {
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold disabled:opacity-40 hover:opacity-90 transition-opacity">
                     <Power className="w-4 h-4" /> Start Election
                   </button>
-                  <button onClick={() => updateStatus.mutate("completed")} disabled={settings?.status === "completed" || updateStatus.isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity">
-                    <Power className="w-4 h-4" /> End Election
-                  </button>
+                  {!showEndElectionConfirm ? (
+                    <button
+                      onClick={() => setShowEndElectionConfirm(true)}
+                      disabled={settings?.status === "completed" || updateStatus.isPending}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
+                    >
+                      <Power className="w-4 h-4" /> End Election
+                    </button>
+                  ) : (
+                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-destructive/40 bg-destructive/10">
+                      <div className="flex-1">
+                        <p className="text-sm font-semibold text-destructive">⚠️ End Election?</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">This will stop voting for all students. This action cannot be undone.</p>
+                      </div>
+                      <button
+                        onClick={() => setShowEndElectionConfirm(false)}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => { updateStatus.mutate("completed"); setShowEndElectionConfirm(false); }}
+                        disabled={updateStatus.isPending}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                      >
+                        Yes, End Election
+                      </button>
+                    </div>
+                  )}
                   <button onClick={() => setShowResetAllVotedConfirm(true)}
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 font-medium text-sm hover:bg-gold/20 transition-colors ml-auto">
                     <RotateCcw className="w-4 h-4" /> Reset Voters for New Election
