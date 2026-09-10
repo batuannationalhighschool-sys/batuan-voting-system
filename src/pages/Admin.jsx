@@ -107,7 +107,7 @@ function parseCSV(text) {
     });
 
     const lrn = obj.lrn || obj.learnerreferencenumber || obj.lrnno || obj.lrnnumber || obj.studentid || obj.studentlrn || obj.idnumber || obj.id || obj.studentno || obj.no || '';
-    
+
     let fullName = obj.fullname || obj.name || obj.studentname || obj.learnername || obj.completename || obj.nameofstudent || obj.nameoflearner || obj.pangalan || obj.pangalanngmagaaral || '';
     if (!fullName && (obj.lastname || obj.firstname || obj.apelyido || obj.unangpangalan)) {
       const last = obj.lastname || obj.apelyido || '';
@@ -238,6 +238,7 @@ export default function Admin() {
   const [archiveSearch, setArchiveSearch] = useState("");
   const [archiveCandidateSearch, setArchiveCandidateSearch] = useState("");
   const [archiveSubTab, setArchiveSubTab] = useState("voters");
+  const [settingsSubTab, setSettingsSubTab] = useState("election");
 
   // Archive election results state
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -1228,11 +1229,11 @@ export default function Admin() {
   }
 
   const tabs = [
-    { id: "overview",    label: "Overview",    icon: BarChart3 },
-    { id: "voters",      label: "Voters",      icon: Users },
-    { id: "candidates",  label: "Candidates",  icon: Users },
-    { id: "archive",     label: "Archive",     icon: Archive },
-    { id: "settings",    label: "Settings",    icon: Settings },
+    { id: "overview", label: "Overview", icon: BarChart3 },
+    { id: "voters", label: "Voters", icon: Users },
+    { id: "candidates", label: "Candidates", icon: Users },
+    { id: "archive", label: "Archive", icon: Archive },
+    { id: "settings", label: "Settings", icon: Settings },
   ];
 
   const candidatePartyLists = Array.from(new Set((candidates ?? []).map(c => c.party_list).filter(Boolean))).sort();
@@ -1247,9 +1248,9 @@ export default function Admin() {
     if (!voterSearch) return true;
     const q = voterSearch.toLowerCase();
     return v.lrn?.toLowerCase().includes(q) ||
-           v.full_name?.toLowerCase().includes(q) ||
-           v.section?.toLowerCase().includes(q) ||
-           v.grade_level?.toLowerCase().includes(q);
+      v.full_name?.toLowerCase().includes(q) ||
+      v.section?.toLowerCase().includes(q) ||
+      v.grade_level?.toLowerCase().includes(q);
   });
 
   const filteredCandidates = (candidates ?? []).filter((c) => {
@@ -1261,10 +1262,10 @@ export default function Admin() {
     const q = candidateSearch.toLowerCase();
     const pos = (positions ?? []).find((p) => String(p.id) === String(c.position_id));
     return c.name?.toLowerCase().includes(q) ||
-           pos?.title?.toLowerCase().includes(q) ||
-           c.party_list?.toLowerCase().includes(q) ||
-           c.section?.toLowerCase().includes(q) ||
-           c.grade_level?.toLowerCase().includes(q);
+      pos?.title?.toLowerCase().includes(q) ||
+      c.party_list?.toLowerCase().includes(q) ||
+      c.section?.toLowerCase().includes(q) ||
+      c.grade_level?.toLowerCase().includes(q);
   });
 
   const filteredArchived = (archivedVoters ?? []).filter((v) => {
@@ -1821,129 +1822,129 @@ export default function Admin() {
             <h3 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2">
               <Plus className="w-5 h-5 text-gold" /> Add Candidate
             </h3>
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {/* Full Name */}
-                  <div>
-                    <input type="text" placeholder="Full Name" value={newCandidate.name}
-                      onChange={(e) => { setNewCandidate(p => ({ ...p, name: e.target.value })); if (formErrors.name) setFormErrors(p => ({ ...p, name: undefined })); }} maxLength={100}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.name ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
-                    {formErrors.name && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.name}</p>}
-                  </div>
-                  {/* Position */}
-                  <div>
-                    <select value={newCandidate.position_id}
-                      onChange={(e) => { setNewCandidate(p => ({ ...p, position_id: e.target.value })); if (formErrors.position_id) setFormErrors(p => ({ ...p, position_id: undefined })); }}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${formErrors.position_id ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}>
-                      <option value="">Select Position</option>
-                      {(positions ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
-                    </select>
-                    {formErrors.position_id && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.position_id}</p>}
-                  </div>
-                  {/* Grade Level */}
-                  <div>
-                    <select
-                      value={newCandidate.grade_level}
-                      onChange={(e) => {
-                        setNewCandidate(p => ({ ...p, grade_level: e.target.value, section: "" }));
-                        setCustomCandidateSection(false);
-                        if (formErrors.grade_level) setFormErrors(p => ({ ...p, grade_level: undefined }));
-                      }}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${formErrors.grade_level ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                    >
-                      <option value="">Select Grade Level</option>
-                      {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                    {formErrors.grade_level && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.grade_level}</p>}
-                  </div>
-                  {/* Section */}
-                  <div>
-                    {customCandidateSection ? (
-                      <div className="flex gap-1.5">
-                        <input
-                          type="text"
-                          placeholder="Enter custom section..."
-                          value={newCandidate.section}
-                          onChange={(e) => {
-                            setNewCandidate(p => ({ ...p, section: e.target.value.toUpperCase() }));
-                            if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
-                          }}
-                          className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => { setCustomCandidateSection(false); setNewCandidate(p => ({ ...p, section: "" })); }}
-                          className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
-                          title="Select from list"
-                        >
-                          List
-                        </button>
-                      </div>
-                    ) : (
-                      <select
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {/* Full Name */}
+                <div>
+                  <input type="text" placeholder="Full Name" value={newCandidate.name}
+                    onChange={(e) => { setNewCandidate(p => ({ ...p, name: e.target.value })); if (formErrors.name) setFormErrors(p => ({ ...p, name: undefined })); }} maxLength={100}
+                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.name ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
+                  {formErrors.name && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.name}</p>}
+                </div>
+                {/* Position */}
+                <div>
+                  <select value={newCandidate.position_id}
+                    onChange={(e) => { setNewCandidate(p => ({ ...p, position_id: e.target.value })); if (formErrors.position_id) setFormErrors(p => ({ ...p, position_id: undefined })); }}
+                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${formErrors.position_id ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}>
+                    <option value="">Select Position</option>
+                    {(positions ?? []).map(p => <option key={p.id} value={p.id}>{p.title}</option>)}
+                  </select>
+                  {formErrors.position_id && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.position_id}</p>}
+                </div>
+                {/* Grade Level */}
+                <div>
+                  <select
+                    value={newCandidate.grade_level}
+                    onChange={(e) => {
+                      setNewCandidate(p => ({ ...p, grade_level: e.target.value, section: "" }));
+                      setCustomCandidateSection(false);
+                      if (formErrors.grade_level) setFormErrors(p => ({ ...p, grade_level: undefined }));
+                    }}
+                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${formErrors.grade_level ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                  >
+                    <option value="">Select Grade Level</option>
+                    {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
+                  </select>
+                  {formErrors.grade_level && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.grade_level}</p>}
+                </div>
+                {/* Section */}
+                <div>
+                  {customCandidateSection ? (
+                    <div className="flex gap-1.5">
+                      <input
+                        type="text"
+                        placeholder="Enter custom section..."
                         value={newCandidate.section}
                         onChange={(e) => {
-                          if (e.target.value === "__custom__") {
-                            setCustomCandidateSection(true);
-                            setNewCandidate(p => ({ ...p, section: "" }));
-                          } else {
-                            setNewCandidate(p => ({ ...p, section: e.target.value }));
-                            if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
-                          }
+                          setNewCandidate(p => ({ ...p, section: e.target.value.toUpperCase() }));
+                          if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
                         }}
-                        disabled={!newCandidate.grade_level}
-                        className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                        className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => { setCustomCandidateSection(false); setNewCandidate(p => ({ ...p, section: "" })); }}
+                        className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
+                        title="Select from list"
                       >
-                        <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
-                        {newCandidate.grade_level && (dynamicGradeSections[newCandidate.grade_level] || []).map(s => (
-                          <option key={s} value={s}>{s?.toUpperCase()}</option>
-                        ))}
-                        {newCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
-                      </select>
-                    )}
-                    {formErrors.section && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.section}</p>}
-                  </div>
-                  {/* Party List */}
-                  <div>
-                    <input type="text" placeholder="Party List" value={newCandidate.party_list}
-                      onChange={(e) => { setNewCandidate(p => ({ ...p, party_list: e.target.value })); if (formErrors.party_list) setFormErrors(p => ({ ...p, party_list: undefined })); }} maxLength={100}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.party_list ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
-                    {formErrors.party_list && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.party_list}</p>}
-                  </div>
-                  {/* Motto */}
-                  <div>
-                    <input type="text" placeholder="Motto (optional)" value={newCandidate.motto} onChange={(e) => setNewCandidate(p => ({ ...p, motto: e.target.value }))} maxLength={200}
-                      className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
-                  </div>
+                        List
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={newCandidate.section}
+                      onChange={(e) => {
+                        if (e.target.value === "__custom__") {
+                          setCustomCandidateSection(true);
+                          setNewCandidate(p => ({ ...p, section: "" }));
+                        } else {
+                          setNewCandidate(p => ({ ...p, section: e.target.value }));
+                          if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
+                        }
+                      }}
+                      disabled={!newCandidate.grade_level}
+                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                    >
+                      <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
+                      {newCandidate.grade_level && (dynamicGradeSections[newCandidate.grade_level] || []).map(s => (
+                        <option key={s} value={s}>{s?.toUpperCase()}</option>
+                      ))}
+                      {newCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
+                    </select>
+                  )}
+                  {formErrors.section && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.section}</p>}
                 </div>
-                <div className="sm:col-span-2 lg:col-span-3">
-                  <div className="flex items-center gap-4">
-                    <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm cursor-pointer hover:bg-muted transition-colors">
-                      <ImagePlus className="w-4 h-4 text-muted-foreground" />
-                      <span>{photoFile ? 'Change Photo' : 'Upload Photo'}</span>
-                      <input ref={fileInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.jfif,.pjpeg,.avif,.bmp,.svg,.heic" className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files[0];
-                          if (file) { setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); }
-                        }} />
-                    </label>
-                    {photoPreview && (
-                      <div className="relative">
-                        <img src={photoPreview} alt="Preview" className="w-12 h-12 rounded-full object-cover border-2 border-border" />
-                        <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                          className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center">
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
-                    )}
-                    {!photoPreview && <span className="text-xs text-muted-foreground">Optional — default avatar will be used if no photo is uploaded</span>}
-                  </div>
+                {/* Party List */}
+                <div>
+                  <input type="text" placeholder="Party List" value={newCandidate.party_list}
+                    onChange={(e) => { setNewCandidate(p => ({ ...p, party_list: e.target.value })); if (formErrors.party_list) setFormErrors(p => ({ ...p, party_list: undefined })); }} maxLength={100}
+                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.party_list ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
+                  {formErrors.party_list && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.party_list}</p>}
                 </div>
-                <button onClick={() => addCandidate.mutate()} disabled={addCandidate.isPending}
-                  className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50">
-                  <UserPlus className="w-4 h-4" /> Add Candidate
-                </button>
-              </>
+                {/* Motto */}
+                <div>
+                  <input type="text" placeholder="Motto (optional)" value={newCandidate.motto} onChange={(e) => setNewCandidate(p => ({ ...p, motto: e.target.value }))} maxLength={200}
+                    className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground" />
+                </div>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm cursor-pointer hover:bg-muted transition-colors">
+                    <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                    <span>{photoFile ? 'Change Photo' : 'Upload Photo'}</span>
+                    <input ref={fileInputRef} type="file" accept="image/*,.jpg,.jpeg,.png,.webp,.gif,.jfif,.pjpeg,.avif,.bmp,.svg,.heic" className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) { setPhotoFile(file); setPhotoPreview(URL.createObjectURL(file)); }
+                      }} />
+                  </label>
+                  {photoPreview && (
+                    <div className="relative">
+                      <img src={photoPreview} alt="Preview" className="w-12 h-12 rounded-full object-cover border-2 border-border" />
+                      <button type="button" onClick={() => { setPhotoFile(null); setPhotoPreview(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
+                  {!photoPreview && <span className="text-xs text-muted-foreground">Optional — default avatar will be used if no photo is uploaded</span>}
+                </div>
+              </div>
+              <button onClick={() => addCandidate.mutate()} disabled={addCandidate.isPending}
+                className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50">
+                <UserPlus className="w-4 h-4" /> Add Candidate
+              </button>
+            </>
           </div>
 
           {/* Search & Filters */}
@@ -2092,8 +2093,8 @@ export default function Admin() {
                 {deleteTarget.type === 'candidate'
                   ? <><Archive className="w-5 h-5 text-amber-500" /> Archive Candidate</>
                   : deleteTarget.type === 'voter'
-                  ? <><Archive className="w-5 h-5 text-amber-500" /> Archive Voter</>
-                  : <><Trash2 className="w-5 h-5 text-destructive" /> Permanently Delete</>}
+                    ? <><Archive className="w-5 h-5 text-amber-500" /> Archive Voter</>
+                    : <><Trash2 className="w-5 h-5 text-destructive" /> Permanently Delete</>}
               </h3>
               <button onClick={() => setDeleteTarget(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                 <X className="w-5 h-5" />
@@ -2107,8 +2108,8 @@ export default function Admin() {
               {deleteTarget.type === 'candidate'
                 ? "This candidate will be archived and removed from the ballot. You can restore them from the Archive tab."
                 : deleteTarget.type === 'voter'
-                ? "This voter will be moved to the Archive tab. You can restore them later."
-                : "This action cannot be undone. All data will be permanently removed from the system."}
+                  ? "This voter will be moved to the Archive tab. You can restore them later."
+                  : "This action cannot be undone. All data will be permanently removed from the system."}
             </p>
             <div className="flex items-center justify-end gap-3">
               <button onClick={() => setDeleteTarget(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
@@ -2123,11 +2124,10 @@ export default function Admin() {
                   setDeleteTarget(null);
                 }}
                 disabled={archiveCandidate.isPending || deleteVoter.isPending || permanentDeleteVoter.isPending || permanentDeleteCandidate.isPending}
-                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-opacity disabled:opacity-50 ${
-                  (deleteTarget.type === 'candidate' || deleteTarget.type === 'voter')
+                className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-opacity disabled:opacity-50 ${(deleteTarget.type === 'candidate' || deleteTarget.type === 'voter')
                     ? 'bg-amber-500 text-white hover:opacity-90'
                     : 'bg-destructive text-destructive-foreground hover:opacity-90'
-                }`}
+                  }`}
               >
                 {(deleteTarget.type === 'candidate' || deleteTarget.type === 'voter')
                   ? <><Archive className="w-4 h-4" /> Archive</>
@@ -2398,7 +2398,7 @@ export default function Admin() {
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              The scheduled voting start time (<span className="font-semibold text-foreground">{settings?.voting_start?.slice(0,5)}</span>) has not arrived yet.
+              The scheduled voting start time (<span className="font-semibold text-foreground">{settings?.voting_start?.slice(0, 5)}</span>) has not arrived yet.
             </p>
             <p className="text-xs text-muted-foreground mb-6">
               Are you sure you want to trigger the election to start right now?
@@ -2469,7 +2469,7 @@ export default function Admin() {
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-3">
-              The configured voting end time (<span className="font-semibold text-foreground">{settings?.voting_end?.slice(0,5)}</span>) has already passed for today.
+              The configured voting end time (<span className="font-semibold text-foreground">{settings?.voting_end?.slice(0, 5)}</span>) has already passed for today.
             </p>
             <p className="text-xs text-muted-foreground mb-6">
               Would you like to automatically extend the end time to <strong className="text-foreground">11:59 PM</strong> today and start voting now?
@@ -2664,9 +2664,8 @@ export default function Admin() {
           <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
             <button
               onClick={() => setArchiveSubTab("voters")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                archiveSubTab === "voters" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${archiveSubTab === "voters" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <UserX className="w-4 h-4" />
               Archived Voters
@@ -2678,9 +2677,8 @@ export default function Admin() {
             </button>
             <button
               onClick={() => setArchiveSubTab("candidates")}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-                archiveSubTab === "candidates" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${archiveSubTab === "candidates" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
             >
               <Archive className="w-4 h-4" />
               Archived Candidates
@@ -2891,304 +2889,232 @@ export default function Admin() {
       )}
 
       {activeTab === "settings" && (
-        <div className="max-w-2xl space-y-6 animate-fade-in">
-          <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-            <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
-              <KeyRound className="w-5 h-5 text-gold" /> Admin Account Security
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4">
-              Signed in as <span className="font-medium text-foreground">{user?.email || "admin account"}</span>. Change your administrator password here.
-            </p>
-            <form onSubmit={handleAdminPasswordChange} className="space-y-4">
-              <div>
-                <label htmlFor="admin-current-password" className="block text-sm font-medium text-foreground mb-1.5">Current password</label>
-                <div className="relative">
-                  <input
-                    id="admin-current-password"
-                    type={showAdminCurrentPassword ? "text" : "password"}
-                    value={adminCurrentPassword}
-                    onChange={(e) => setAdminCurrentPassword(e.target.value)}
-                    autoComplete="current-password"
-                    required
-                    aria-describedby="admin-current-password-help"
-                    className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                  <button
-                    type="button"
-                    aria-label={showAdminCurrentPassword ? "Hide current password" : "Show current password"}
-                    onClick={() => setShowAdminCurrentPassword((visible) => !visible)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showAdminCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p id="admin-current-password-help" className="mt-1 text-xs text-muted-foreground">
-                  Required. It will be verified securely when you submit.
-                </p>
-              </div>
-              <div>
-                <label htmlFor="admin-new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
-                <div className="relative">
-                  <input
-                    id="admin-new-password"
-                    type={showAdminNewPassword ? "text" : "password"}
-                    value={adminNewPassword}
-                    onChange={(e) => setAdminNewPassword(e.target.value)}
-                    minLength={ADMIN_PASSWORD_MIN_LENGTH}
-                    autoComplete="new-password"
-                    required
-                    aria-invalid={adminNewPasswordHasError}
-                    aria-describedby="admin-new-password-requirements"
-                    className={`w-full px-4 pr-10 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${adminNewPasswordHasError ? 'border-red-500 focus:ring-red-500/40' : adminNewPassword && adminPasswordIsStrong ? 'border-success focus:ring-success/40' : 'border-border'}`}
-                  />
-                  <button
-                    type="button"
-                    aria-label={showAdminNewPassword ? "Hide new password" : "Show new password"}
-                    onClick={() => setShowAdminNewPassword((visible) => !visible)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showAdminNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                </div>
-                <div id="admin-new-password-requirements" aria-live="polite" className="mt-2 rounded-lg border border-border bg-muted/20 p-3">
-                  <p className="text-xs font-medium text-foreground mb-2">Password requirements</p>
-                  <ul className="grid gap-1.5 sm:grid-cols-2">
-                    {adminPasswordChecks.map(({ label, valid }) => {
-                      const status = !adminNewPassword ? "neutral" : valid ? "valid" : "invalid";
-                      return (
-                        <li key={label} className={`flex items-center gap-1.5 text-xs ${status === "valid" ? "text-success" : status === "invalid" ? "text-red-500" : "text-muted-foreground"}`}>
-                          {status === "valid" ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : status === "invalid" ? <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <span className="w-3.5 h-3.5 shrink-0 rounded-full border border-current" aria-hidden="true" />}
-                          <span>{label}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {adminNewPasswordMatchesCurrent && (
-                    <p className="mt-2 flex items-center gap-1.5 text-xs text-red-500">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
-                      New password must be different from the current password.
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div>
-                <label htmlFor="admin-confirm-password" className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
-                <div className="relative">
-                  <input
-                    id="admin-confirm-password"
-                    type={showAdminConfirmPassword ? "text" : "password"}
-                    value={adminConfirmPassword}
-                    onChange={(e) => setAdminConfirmPassword(e.target.value)}
-                    minLength={ADMIN_PASSWORD_MIN_LENGTH}
-                    autoComplete="new-password"
-                    required
-                    aria-invalid={adminConfirmPasswordHasError}
-                    aria-describedby={adminConfirmPassword ? "admin-confirm-password-feedback" : undefined}
-                    className={`w-full px-4 pr-10 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${adminConfirmPasswordHasError ? 'border-red-500 focus:ring-red-500/40' : adminPasswordsMatch ? 'border-success focus:ring-success/40' : 'border-border'}`}
-                  />
-                  <button
-                    type="button"
-                    aria-label={showAdminConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
-                    onClick={() => setShowAdminConfirmPassword((visible) => !visible)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showAdminConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </button>
-                </div>
-                {adminConfirmPassword && (
-                  <p id="admin-confirm-password-feedback" aria-live="polite" className={`mt-1 flex items-center gap-1.5 text-xs ${adminPasswordsMatch ? "text-success" : "text-red-500"}`}>
-                    {adminPasswordsMatch ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
-                    {adminPasswordsMatch ? "Passwords match." : "Passwords do not match."}
-                  </p>
-                )}
-              </div>
-              <button
-                type="submit"
-                disabled={adminPasswordSaving || !adminPasswordFormIsValid}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
-                {adminPasswordSaving ? "Updating…" : "Change Admin Password"}
-              </button>
-            </form>
+        <div className="animate-fade-in space-y-4">
+          {/* Settings Sub-tabs */}
+          <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
+            <button
+              onClick={() => setSettingsSubTab("election")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${settingsSubTab === "election" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <Power className="w-4 h-4" />
+              Election Management
+            </button>
+            <button
+              onClick={() => setSettingsSubTab("schedule")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${settingsSubTab === "schedule" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <Clock className="w-4 h-4" />
+              Schedule & Info
+            </button>
+            <button
+              onClick={() => setSettingsSubTab("security")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${settingsSubTab === "security" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <KeyRound className="w-4 h-4" />
+              Account Security
+            </button>
           </div>
 
-          {settings && (
-            <>
-              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-                <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                  <h3 className="font-display font-bold text-foreground text-lg">Election Control</h3>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${
-                      settings?.status === "ongoing"
-                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
-                        : settings?.status === "completed"
-                        ? "bg-destructive/15 text-destructive border border-destructive/30"
-                        : "bg-muted text-muted-foreground border border-border"
-                    }`}>
-                      {settings?.status === "ongoing" && <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1.5" />}
-                      {settings?.status ?? "unknown"}
-                    </span>
+          {/* ── Election Management Sub-panel ── */}
+          {settingsSubTab === "election" && settings && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+              {/* Election Control Card */}
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                    <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                      <Power className="w-5 h-5 text-gold" /> Election Control
+                    </h3>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-semibold uppercase tracking-wider ${settings?.status === "ongoing"
+                          ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                          : settings?.status === "completed"
+                            ? "bg-destructive/15 text-destructive border border-destructive/30"
+                            : "bg-muted text-muted-foreground border border-border"
+                        }`}>
+                        {settings?.status === "ongoing" && <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse mr-1.5" />}
+                        {settings?.status ?? "unknown"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-muted-foreground mb-4 min-h-[32px]">
+                    {settings?.status === "ongoing" ? (
+                      settings?.auto_end_enabled ? (
+                        autoEndCountdown != null && autoEndCountdown > 0 ? (
+                          <span className="text-gold font-medium flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 animate-pulse" />
+                            Auto-End in <strong className="mx-1">{formatCountdown(autoEndCountdown)}</strong> — Election will automatically end at scheduled time.
+                          </span>
+                        ) : (
+                          <span className="text-gold font-medium">⏰ Auto-End Enabled: Election will automatically end when voting schedule expires.</span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground font-medium">🔒 Manual Mode: Auto-end is disabled. You control when to end the election.</span>
+                      )
+                    ) : settings?.status === "upcoming" && autoStartCountdown != null && autoStartCountdown > 0 ? (
+                      <span className="text-gold font-medium flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 animate-pulse" />
+                        Auto-Start in <strong className="mx-1">{formatCountdown(autoStartCountdown)}</strong> — Election will begin automatically at scheduled time.
+                      </span>
+                    ) : (
+                      <span>Controls voting access for all students across the platform.</span>
+                    )}
+                  </p>
+
+                  <div className="flex flex-wrap gap-2.5">
+                    <button
+                      type="button"
+                      onClick={handleSetUpcomingClick}
+                      disabled={settings?.status === "upcoming" || updateStatus.isPending}
+                      className="flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm disabled:opacity-40 hover:bg-muted/80 transition-colors"
+                      title={settings?.status === "upcoming" ? "Status is already Upcoming" : "Set status to Upcoming"}
+                    >
+                      Set Upcoming
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleStartElection}
+                      disabled={settings?.status === "ongoing" || updateStatus.isPending}
+                      className="flex-1 min-w-[130px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold disabled:opacity-40 hover:opacity-90 transition-opacity"
+                      title={settings?.status === "ongoing" ? "Election is already Ongoing" : "Start the election"}
+                    >
+                      <Power className="w-4 h-4" /> Start Election
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleEndElectionClick}
+                      disabled={updateStatus.isPending}
+                      className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium text-sm transition-all ${settings?.status === "ongoing"
+                          ? "bg-destructive text-destructive-foreground shadow-md hover:opacity-90 animate-pulse"
+                          : settings?.status === "completed"
+                            ? "bg-destructive/30 text-destructive border border-destructive/30 hover:bg-destructive/40 cursor-pointer"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
+                        }`}
+                      title={
+                        settings?.status === "completed"
+                          ? "Election is already Completed. Click to view status."
+                          : settings?.status === "upcoming"
+                            ? "Election has not started yet."
+                            : "End the active election"
+                      }
+                    >
+                      <Power className="w-4 h-4" /> End Election
+                    </button>
                   </div>
                 </div>
 
-                <p className="text-xs text-muted-foreground mb-4">
-                  {settings?.status === "ongoing" ? (
-                    settings?.auto_end_enabled ? (
-                      autoEndCountdown != null && autoEndCountdown > 0 ? (
-                        <span className="text-gold font-medium flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 animate-pulse" />
-                          Auto-End in <strong className="mx-1">{formatCountdown(autoEndCountdown)}</strong> — Election will automatically end at the scheduled time.
-                        </span>
-                      ) : (
-                        <span className="text-gold font-medium">⏰ Auto-End Enabled: Election will automatically end when voting schedule expires.</span>
-                      )
-                    ) : (
-                      <span className="text-muted-foreground font-medium">🔒 Manual Mode: Auto-end is disabled. You control when to end the election.</span>
-                    )
-                  ) : settings?.status === "upcoming" && autoStartCountdown != null && autoStartCountdown > 0 ? (
-                    <span className="text-gold font-medium flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 animate-pulse" />
-                      Auto-Start in <strong className="mx-1">{formatCountdown(autoStartCountdown)}</strong> — Election will begin automatically at the scheduled time.
-                    </span>
-                  ) : (
-                    <span>Controls voting access for all students across the platform.</span>
-                  )}
-                </p>
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    type="button"
-                    onClick={handleSetUpcomingClick}
-                    disabled={settings?.status === "upcoming" || updateStatus.isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm disabled:opacity-40 hover:bg-muted/80 transition-colors"
-                    title={settings?.status === "upcoming" ? "Status is already Upcoming" : "Set status to Upcoming"}
-                  >
-                    Set Upcoming
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleStartElection}
-                    disabled={settings?.status === "ongoing" || updateStatus.isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold disabled:opacity-40 hover:opacity-90 transition-opacity"
-                    title={settings?.status === "ongoing" ? "Election is already Ongoing" : "Start the election"}
-                  >
-                    <Power className="w-4 h-4" /> Start Election
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleEndElectionClick}
-                    disabled={updateStatus.isPending}
-                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
-                      settings?.status === "ongoing"
-                        ? "bg-destructive text-destructive-foreground shadow-md hover:opacity-90 animate-pulse"
-                        : settings?.status === "completed"
-                        ? "bg-destructive/30 text-destructive border border-destructive/30 hover:bg-destructive/40 cursor-pointer"
-                        : "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
-                    }`}
-                    title={
-                      settings?.status === "completed"
-                        ? "Election is already Completed. Click to view status."
-                        : settings?.status === "upcoming"
-                        ? "Election has not started yet."
-                        : "End the active election"
-                    }
-                  >
-                    <Power className="w-4 h-4" /> End Election
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleResetVotersClick}
-                    disabled={resetAllVoted.isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 font-medium text-sm hover:bg-gold/20 transition-colors ml-auto disabled:opacity-50"
-                    title="Reset all voters' has_voted status and clear live ballot tallies"
-                  >
-                    <RotateCcw className="w-4 h-4" /> Reset Voters for New Election
-                  </button>
+                {/* Voter Reset / Maintenance Section to match History height */}
+                <div className="mt-6 pt-5 border-t border-border">
+                  <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Election Reset & Maintenance</p>
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 bg-muted/40 rounded-xl border border-border gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                        <RotateCcw className="w-4 h-4 text-gold" /> Reset Voters for New Election
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Reset all voter accounts to unvoted and clear active tallies.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleResetVotersClick}
+                      disabled={resetAllVoted.isPending}
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gold/15 text-gold border border-gold/30 font-medium text-xs hover:bg-gold/20 transition-colors shrink-0 disabled:opacity-50"
+                      title="Reset all voters' has_voted status and clear live ballot tallies"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> Reset Voters
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Save Results to History */}
-              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-                <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
-                  <History className="w-5 h-5 text-gold" /> Election History
-                </h3>
-                <p className="text-xs text-muted-foreground mb-4">
-                  Save the current election results to history so students and staff can view past election winners. Results for the same school year will be replaced if archived again.
-                </p>
+              {/* Election History Card */}
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant flex flex-col justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                    <History className="w-5 h-5 text-gold" /> Election History
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-4 min-h-[32px]">
+                    Save the current election results to history so students and staff can view past election winners. Results for the same school year will be replaced if archived again.
+                  </p>
 
-                {!showArchiveConfirm ? (
-                  <button
-                    onClick={() => setShowArchiveConfirm(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity"
-                  >
-                    <Archive className="w-4 h-4" /> Save Results to History
-                  </button>
-                ) : (
-                  <div className="bg-muted/50 rounded-xl p-5 border border-border space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-foreground font-semibold flex items-center gap-2">
-                        <Archive className="w-4 h-4 text-gold" /> Archive Current Election Results?
+                  {!showArchiveConfirm ? (
+                    <button
+                      onClick={() => setShowArchiveConfirm(true)}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity"
+                    >
+                      <Archive className="w-4 h-4" /> Save Results to History
+                    </button>
+                  ) : (
+                    <div className="bg-muted/50 rounded-xl p-5 border border-border space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-foreground font-semibold flex items-center gap-2">
+                          <Archive className="w-4 h-4 text-gold" /> Archive Current Election Results?
+                        </p>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold/15 text-gold font-medium border border-gold/30">
+                          S.Y. {settings?.school_year || "2025-2026"}
+                        </span>
+                      </div>
+
+                      <p className="text-xs text-muted-foreground">
+                        This will save a snapshot of <strong>{settings?.name || "SSLG Election"}</strong> (S.Y. {settings?.school_year || "—"}) to history, including live vote tallies and grade/section voter turnout breakdowns.
                       </p>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold/15 text-gold font-medium border border-gold/30">
-                        S.Y. {settings?.school_year || "2025-2026"}
-                      </span>
+
+                      {settings?.status === "ongoing" && (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Warning: Election is currently ONGOING.</strong>
+                            <p className="mt-0.5 text-muted-foreground">Students may still be casting ballots. Archiving now records partial results. It is strongly recommended to End Election first.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {votedCount === 0 && (
+                        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Notice: 0 votes currently recorded.</strong>
+                            <p className="mt-0.5 text-muted-foreground">Archiving now will store a record with zero votes cast.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {(electionHistory ?? []).some(h => h.school_year === settings?.school_year) && (
+                        <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                          <div>
+                            <strong>Overwrite Warning:</strong>
+                            <p className="mt-0.5 text-muted-foreground">Archived results for S.Y. {settings?.school_year} already exist and will be replaced.</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => archiveResults.mutate()}
+                          disabled={archiveResults.isPending}
+                          className="flex items-center gap-2 px-5 py-2 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+                        >
+                          {archiveResults.isPending
+                            ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
+                            : <Archive className="w-4 h-4" />}
+                          {archiveResults.isPending ? "Archiving…" : "Yes, Archive Now"}
+                        </button>
+                        <button
+                          onClick={() => setShowArchiveConfirm(false)}
+                          className="px-5 py-2 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
-
-                    <p className="text-xs text-muted-foreground">
-                      This will save a snapshot of <strong>{settings?.name || "SSLG Election"}</strong> (S.Y. {settings?.school_year || "—"}) to history, including live vote tallies and grade/section voter turnout breakdowns.
-                    </p>
-
-                    {settings?.status === "ongoing" && (
-                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>
-                          <strong>Warning: Election is currently ONGOING.</strong>
-                          <p className="mt-0.5 text-muted-foreground">Students may still be casting ballots. Archiving now records partial results. It is strongly recommended to End Election first.</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {votedCount === 0 && (
-                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>
-                          <strong>Notice: 0 votes currently recorded.</strong>
-                          <p className="mt-0.5 text-muted-foreground">Archiving now will store a record with zero votes cast.</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {(electionHistory ?? []).some(h => h.school_year === settings?.school_year) && (
-                      <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-                        <div>
-                          <strong>Overwrite Warning:</strong>
-                          <p className="mt-0.5 text-muted-foreground">Archived results for S.Y. {settings?.school_year} already exist and will be replaced.</p>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        onClick={() => archiveResults.mutate()}
-                        disabled={archiveResults.isPending}
-                        className="flex items-center gap-2 px-5 py-2 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
-                      >
-                        {archiveResults.isPending
-                          ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
-                          : <Archive className="w-4 h-4" />}
-                        {archiveResults.isPending ? "Archiving…" : "Yes, Archive Now"}
-                      </button>
-                      <button
-                        onClick={() => setShowArchiveConfirm(false)}
-                        className="px-5 py-2 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {(electionHistory ?? []).length > 0 && (
                   <div className="mt-6 pt-5 border-t border-border">
@@ -3215,25 +3141,169 @@ export default function Admin() {
                   </div>
                 )}
               </div>
-
-              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-                <h3 className="font-display font-bold text-foreground text-lg mb-1">Election Schedule</h3>
-                <p className="text-xs text-muted-foreground mb-5 flex items-center gap-1.5">
-                  <span className="inline-block w-2 h-2 rounded-full bg-success"></span>
-                  The election will <strong>automatically end</strong> when the date and end time you set is reached.
-                </p>
-                <ElectionScheduleForm settings={settings} onSave={(fields) => updateSchedule.mutate(fields)} isSaving={updateSchedule.isPending} />
-              </div>
-
-              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-                <h3 className="font-display font-bold text-foreground text-lg mb-4">Election Info</h3>
-                <ElectionInfoForm settings={settings} onSave={(fields) => updateInfo.mutate(fields)} isSaving={updateInfo.isPending} />
-              </div>
-            </>
+            </div>
           )}
-          {!settings && (
+          {settingsSubTab === "election" && !settings && (
             <div className="bg-card rounded-xl border border-border p-6 shadow-elegant text-center">
               <p className="text-muted-foreground">No election settings found.</p>
+            </div>
+          )}
+
+          {/* ── Schedule & Info Sub-panel ── */}
+          {settingsSubTab === "schedule" && settings && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant flex flex-col justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-gold" /> Election Schedule
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-5 flex items-center gap-1.5">
+                    <span className="inline-block w-2 h-2 rounded-full bg-success"></span>
+                    The election will <strong>automatically end</strong> when the date and end time you set is reached.
+                  </p>
+                  <ElectionScheduleForm settings={settings} onSave={(fields) => updateSchedule.mutate(fields)} isSaving={updateSchedule.isPending} />
+                </div>
+              </div>
+
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant flex flex-col justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg mb-4 flex items-center gap-2">
+                    <Shield className="w-5 h-5 text-gold" /> Election Info
+                  </h3>
+                  <ElectionInfoForm settings={settings} onSave={(fields) => updateInfo.mutate(fields)} isSaving={updateInfo.isPending} />
+                </div>
+              </div>
+            </div>
+          )}
+          {settingsSubTab === "schedule" && !settings && (
+            <div className="bg-card rounded-xl border border-border p-6 shadow-elegant text-center">
+              <p className="text-muted-foreground">No election settings found.</p>
+            </div>
+          )}
+
+          {/* ── Account Security Sub-panel ── */}
+          {settingsSubTab === "security" && (
+            <div className="max-w-2xl">
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
+                <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                  <KeyRound className="w-5 h-5 text-gold" /> Admin Account Security
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4">
+                  Signed in as <span className="font-medium text-foreground">{user?.email || "admin account"}</span>. Change your administrator password here.
+                </p>
+                <form onSubmit={handleAdminPasswordChange} className="space-y-4">
+                  <div>
+                    <label htmlFor="admin-current-password" className="block text-sm font-medium text-foreground mb-1.5">Current password</label>
+                    <div className="relative">
+                      <input
+                        id="admin-current-password"
+                        type={showAdminCurrentPassword ? "text" : "password"}
+                        value={adminCurrentPassword}
+                        onChange={(e) => setAdminCurrentPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
+                        aria-describedby="admin-current-password-help"
+                        className="w-full px-4 pr-10 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showAdminCurrentPassword ? "Hide current password" : "Show current password"}
+                        onClick={() => setShowAdminCurrentPassword((visible) => !visible)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showAdminCurrentPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p id="admin-current-password-help" className="mt-1 text-xs text-muted-foreground">
+                      Required. It will be verified securely when you submit.
+                    </p>
+                  </div>
+                  <div>
+                    <label htmlFor="admin-new-password" className="block text-sm font-medium text-foreground mb-1.5">New password</label>
+                    <div className="relative">
+                      <input
+                        id="admin-new-password"
+                        type={showAdminNewPassword ? "text" : "password"}
+                        value={adminNewPassword}
+                        onChange={(e) => setAdminNewPassword(e.target.value)}
+                        minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                        autoComplete="new-password"
+                        required
+                        aria-invalid={adminNewPasswordHasError}
+                        aria-describedby="admin-new-password-requirements"
+                        className={`w-full px-4 pr-10 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${adminNewPasswordHasError ? 'border-red-500 focus:ring-red-500/40' : adminNewPassword && adminPasswordIsStrong ? 'border-success focus:ring-success/40' : 'border-border'}`}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showAdminNewPassword ? "Hide new password" : "Show new password"}
+                        onClick={() => setShowAdminNewPassword((visible) => !visible)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showAdminNewPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <div id="admin-new-password-requirements" aria-live="polite" className="mt-2 rounded-lg border border-border bg-muted/20 p-3">
+                      <p className="text-xs font-medium text-foreground mb-2">Password requirements</p>
+                      <ul className="grid gap-1.5 sm:grid-cols-2">
+                        {adminPasswordChecks.map(({ label, valid }) => {
+                          const status = !adminNewPassword ? "neutral" : valid ? "valid" : "invalid";
+                          return (
+                            <li key={label} className={`flex items-center gap-1.5 text-xs ${status === "valid" ? "text-success" : status === "invalid" ? "text-red-500" : "text-muted-foreground"}`}>
+                              {status === "valid" ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : status === "invalid" ? <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <span className="w-3.5 h-3.5 shrink-0 rounded-full border border-current" aria-hidden="true" />}
+                              <span>{label}</span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      {adminNewPasswordMatchesCurrent && (
+                        <p className="mt-2 flex items-center gap-1.5 text-xs text-red-500">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                          New password must be different from the current password.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label htmlFor="admin-confirm-password" className="block text-sm font-medium text-foreground mb-1.5">Confirm new password</label>
+                    <div className="relative">
+                      <input
+                        id="admin-confirm-password"
+                        type={showAdminConfirmPassword ? "text" : "password"}
+                        value={adminConfirmPassword}
+                        onChange={(e) => setAdminConfirmPassword(e.target.value)}
+                        minLength={ADMIN_PASSWORD_MIN_LENGTH}
+                        autoComplete="new-password"
+                        required
+                        aria-invalid={adminConfirmPasswordHasError}
+                        aria-describedby={adminConfirmPassword ? "admin-confirm-password-feedback" : undefined}
+                        className={`w-full px-4 pr-10 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${adminConfirmPasswordHasError ? 'border-red-500 focus:ring-red-500/40' : adminPasswordsMatch ? 'border-success focus:ring-success/40' : 'border-border'}`}
+                      />
+                      <button
+                        type="button"
+                        aria-label={showAdminConfirmPassword ? "Hide confirmation password" : "Show confirmation password"}
+                        onClick={() => setShowAdminConfirmPassword((visible) => !visible)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showAdminConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    {adminConfirmPassword && (
+                      <p id="admin-confirm-password-feedback" aria-live="polite" className={`mt-1 flex items-center gap-1.5 text-xs ${adminPasswordsMatch ? "text-success" : "text-red-500"}`}>
+                        {adminPasswordsMatch ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />}
+                        {adminPasswordsMatch ? "Passwords match." : "Passwords do not match."}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={adminPasswordSaving || !adminPasswordFormIsValid}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+                  >
+                    {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                    {adminPasswordSaving ? "Updating…" : "Change Admin Password"}
+                  </button>
+                </form>
+              </div>
             </div>
           )}
         </div>
