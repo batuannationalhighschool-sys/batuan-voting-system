@@ -34,8 +34,17 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
   const isWindowInvalid = isScheduleComplete && scheduleState.state === "invalid";
   const isEndPast = Boolean(scheduleState.endAt && new Date() >= scheduleState.endAt);
 
+  const updateField = (key, value) => {
+    setForm(p => ({ ...p, [key]: value }));
+    if (validationError) setValidationError("");
+  };
+
   const handleSave = (e) => {
     e.preventDefault();
+    if (!form.name || !form.name.trim()) {
+      setValidationError("Election name is required.");
+      return;
+    }
     if (!form.election_date || !form.voting_start || !form.voting_end) {
       setValidationError("Election date, opening time, and ending time are required.");
       return;
@@ -44,18 +53,28 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
       setValidationError("The ending time must be later than the opening time on the configured election date.");
       return;
     }
+    if (form.auto_end_enabled && isEndPast) {
+      setValidationError("The configured auto-end time has already passed. Please set a future end time or disable Auto-End.");
+      return;
+    }
     setValidationError("");
     onSave({
-      name: form.name,
+      name: form.name.trim(),
       election_date: form.election_date,
-      voting_start: form.voting_start + ":00",
-      voting_end: form.voting_end + ":00",
+      voting_start: form.voting_start.length === 5 ? form.voting_start + ":00" : form.voting_start,
+      voting_end: form.voting_end.length === 5 ? form.voting_end + ":00" : form.voting_end,
       auto_end_enabled: form.auto_end_enabled,
     });
   };
 
   return (
     <form onSubmit={handleSave} className="space-y-4">
+      {settings?.status === "ongoing" && (
+        <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span>Election is currently <strong>ONGOING</strong>. Any schedule changes saved will immediately update active student voting access.</span>
+        </div>
+      )}
       {validationError && (
         <p className="text-xs rounded-xl px-4 py-2.5 border text-destructive bg-destructive/10 border-destructive/20 font-medium" role="alert">
           {validationError}
@@ -66,7 +85,7 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
         <input
           type="text"
           value={form.name}
-          onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))}
+          onChange={(e) => updateField("name", e.target.value)}
           maxLength={100}
           className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
@@ -77,7 +96,7 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
         <input
           type="date"
           value={form.election_date}
-          onChange={(e) => setForm(p => ({ ...p, election_date: e.target.value }))}
+          onChange={(e) => updateField("election_date", e.target.value)}
           required
           className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
@@ -89,7 +108,7 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
           <input
             type="time"
             value={form.voting_start}
-            onChange={(e) => setForm(p => ({ ...p, voting_start: e.target.value }))}
+            onChange={(e) => updateField("voting_start", e.target.value)}
             required
             className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
@@ -102,7 +121,7 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
           <input
             type="time"
             value={form.voting_end}
-            onChange={(e) => setForm(p => ({ ...p, voting_end: e.target.value }))}
+            onChange={(e) => updateField("voting_end", e.target.value)}
             required
             className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${
               isEndPast ? 'border-destructive/60 ring-destructive/20' : 'border-gold/50 ring-gold/20'
@@ -123,7 +142,7 @@ export default function ElectionScheduleForm({ settings, onSave, isSaving }) {
         </div>
         <button
           type="button"
-          onClick={() => setForm(p => ({ ...p, auto_end_enabled: !p.auto_end_enabled }))}
+          onClick={() => updateField("auto_end_enabled", !form.auto_end_enabled)}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
             form.auto_end_enabled
               ? "bg-gold/20 text-gold border border-gold/30"

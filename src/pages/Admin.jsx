@@ -242,8 +242,11 @@ export default function Admin() {
   // Archive election results state
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
-  // End election confirmation state
+  // Settings tab trappings & confirmation modal states
   const [showEndElectionConfirm, setShowEndElectionConfirm] = useState(false);
+  const [showSetUpcomingConfirm, setShowSetUpcomingConfirm] = useState(false);
+  const [showStartFromCompletedConfirm, setShowStartFromCompletedConfirm] = useState(false);
+  const [deleteHistoryTarget, setDeleteHistoryTarget] = useState(null);
 
   // Voter management state
   const [newVoter, setNewVoter] = useState({ lrn: "", full_name: "", grade_level: "", section: "" });
@@ -776,8 +779,42 @@ export default function Admin() {
 
   const [showExpiredEndConfirm, setShowExpiredEndConfirm] = useState(false);
 
+  const handleSetUpcomingClick = () => {
+    if (settings?.status === "upcoming") {
+      toast({ title: "Already Upcoming", description: "The election is already set to Upcoming status." });
+      return;
+    }
+    setShowSetUpcomingConfirm(true);
+  };
+
   const handleStartElection = () => {
     if (!settings) return;
+
+    // Trapping 1: Check if candidates exist
+    if (!candidates || candidates.length === 0) {
+      toast({
+        title: "Cannot Start Election",
+        description: "No candidates have been registered yet. Please add candidates in the Candidates tab before opening voting.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Trapping 2: Check if voters exist
+    if ((stats?.voterCount ?? 0) === 0) {
+      toast({
+        title: "No Registered Voters",
+        description: "Warning: There are 0 registered voters in the database. Please import or add voters first.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Trapping 3: If current status is "completed", prompt confirmation modal
+    if (settings.status === "completed") {
+      setShowStartFromCompletedConfirm(true);
+      return;
+    }
 
     const dateStr = settings.election_date instanceof Date
       ? settings.election_date.toISOString().slice(0, 10)
@@ -809,6 +846,36 @@ export default function Admin() {
     }
 
     updateStatus.mutate("ongoing");
+  };
+
+  const handleEndElectionClick = () => {
+    if (settings?.status === "completed") {
+      toast({
+        title: "Election Already Ended",
+        description: "The election is already marked as Completed. Voting is closed. You can archive the results or reset voters below.",
+      });
+      return;
+    }
+    if (settings?.status === "upcoming") {
+      toast({
+        title: "Election Not Started",
+        description: "The election is currently Upcoming and has not started yet.",
+      });
+      return;
+    }
+    setShowEndElectionConfirm(true);
+  };
+
+  const handleResetVotersClick = () => {
+    if (settings?.status === "ongoing") {
+      toast({
+        title: "Action Blocked",
+        description: "Cannot reset voters while the election is ONGOING! Please end or pause the election first to protect voting integrity.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setShowResetAllVotedConfirm(true);
   };
 
   const handleExtendAndStart = async () => {
@@ -2422,6 +2489,175 @@ export default function Admin() {
         </div>
       )}
 
+      {/* End Election Confirmation Modal */}
+      {showEndElectionConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowEndElectionConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Power className="w-5 h-5 text-destructive" /> End Election Confirmation
+              </h3>
+              <button onClick={() => setShowEndElectionConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to end the active election right now?
+            </p>
+            <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-xs space-y-2 mb-5">
+              <p className="font-semibold text-destructive flex items-center gap-1.5">
+                <AlertCircle className="w-4 h-4" /> Important Action Safeguards:
+              </p>
+              <p className="text-muted-foreground">• Voting access will immediately <strong>close</strong> for all students.</p>
+              <p className="text-muted-foreground">• Election status will change to <strong className="text-foreground uppercase">COMPLETED</strong>.</p>
+              <p className="text-muted-foreground">• Turnout recorded: <strong className="text-foreground">{votedCount} of {profileCount}</strong> registered voters.</p>
+              <p className="text-muted-foreground">• You can archive the final results to history in the <strong>Election History</strong> section below.</p>
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button
+                onClick={() => setShowEndElectionConfirm(false)}
+                className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  updateStatus.mutate("completed");
+                  setShowEndElectionConfirm(false);
+                }}
+                disabled={updateStatus.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold text-sm shadow-md hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {updateStatus.isPending ? <div className="w-4 h-4 border-2 border-destructive-foreground/30 border-t-destructive-foreground rounded-full animate-spin" /> : <Power className="w-4 h-4" />}
+                Yes, End Election
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set Upcoming Confirmation Modal */}
+      {showSetUpcomingConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowSetUpcomingConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 text-amber-500" /> Set Election to Upcoming?
+              </h3>
+              <button onClick={() => setShowSetUpcomingConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {settings?.status === "ongoing" ? (
+              <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-xs space-y-1.5 mb-5">
+                <p className="font-semibold text-destructive">⚠️ Active Voting Interruption Warning:</p>
+                <p className="text-muted-foreground">Voting is currently <strong>ONGOING</strong>. Changing the status to Upcoming will immediately lock the voting portal for all students.</p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground mb-5">
+                This will set the election status back to <strong className="text-foreground">Upcoming</strong> to prepare the system for scheduled or future voting.
+              </p>
+            )}
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowSetUpcomingConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  updateStatus.mutate("upcoming");
+                  setShowSetUpcomingConfirm(false);
+                }}
+                disabled={updateStatus.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-600 text-white font-semibold text-sm hover:bg-amber-700 transition-colors disabled:opacity-50"
+              >
+                {updateStatus.isPending ? "Updating..." : "Yes, Set to Upcoming"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Start from Completed Status Modal */}
+      {showStartFromCompletedConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowStartFromCompletedConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Power className="w-5 h-5 text-gold" /> Reopen / Start Election?
+              </h3>
+              <button onClick={() => setShowStartFromCompletedConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              This election was previously marked as <strong className="text-foreground">COMPLETED</strong>.
+            </p>
+            {votedCount > 0 && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs space-y-2 mb-5">
+                <p className="font-semibold text-amber-600 dark:text-amber-400 flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4" /> Existing Ballots Notice:
+                </p>
+                <p className="text-muted-foreground">• <strong>{votedCount} voters</strong> have already submitted ballots in this session.</p>
+                <p className="text-muted-foreground">• If you are starting a <strong>brand new election</strong>, please click <strong>Save Results to History</strong> first, then click <strong>Reset Voters for New Election</strong>.</p>
+                <p className="text-muted-foreground">• If you simply need to <strong>reopen voting</strong> for remaining voters, click proceed below.</p>
+              </div>
+            )}
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowStartFromCompletedConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  updateStatus.mutate("ongoing");
+                  setShowStartFromCompletedConfirm(false);
+                }}
+                disabled={updateStatus.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {updateStatus.isPending ? "Starting..." : "Yes, Reopen Voting"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete History Target Confirmation Modal */}
+      {deleteHistoryTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setDeleteHistoryTarget(null)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" /> Delete History Record?
+              </h3>
+              <button onClick={() => setDeleteHistoryTarget(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to permanently delete the archived record for <strong className="text-foreground">{deleteHistoryTarget.election_name}</strong> (S.Y. {deleteHistoryTarget.school_year})?
+            </p>
+            <p className="text-xs text-destructive mb-6">
+              This action cannot be undone. All archived results and breakdown data for this school year will be removed from the Past Elections results page.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setDeleteHistoryTarget(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  deleteHistory.mutate(deleteHistoryTarget.school_year);
+                  setDeleteHistoryTarget(null);
+                }}
+                disabled={deleteHistory.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {deleteHistory.isPending ? "Deleting…" : "Yes, Delete Record"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "archive" && (
         <div className="animate-fade-in space-y-4">
           {/* Archive Sub-tabs */}
@@ -2821,45 +3057,52 @@ export default function Admin() {
                 </p>
 
                 <div className="flex flex-wrap gap-3">
-                  <button onClick={() => updateStatus.mutate("upcoming")} disabled={settings?.status === "upcoming"}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm disabled:opacity-40 hover:bg-muted/80 transition-colors">
+                  <button
+                    type="button"
+                    onClick={handleSetUpcomingClick}
+                    disabled={settings?.status === "upcoming" || updateStatus.isPending}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm disabled:opacity-40 hover:bg-muted/80 transition-colors"
+                    title={settings?.status === "upcoming" ? "Status is already Upcoming" : "Set status to Upcoming"}
+                  >
                     Set Upcoming
                   </button>
-                  <button onClick={handleStartElection} disabled={settings?.status === "ongoing" || updateStatus.isPending}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold disabled:opacity-40 hover:opacity-90 transition-opacity">
+                  <button
+                    type="button"
+                    onClick={handleStartElection}
+                    disabled={settings?.status === "ongoing" || updateStatus.isPending}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold disabled:opacity-40 hover:opacity-90 transition-opacity"
+                    title={settings?.status === "ongoing" ? "Election is already Ongoing" : "Start the election"}
+                  >
                     <Power className="w-4 h-4" /> Start Election
                   </button>
-                  {!showEndElectionConfirm ? (
-                    <button
-                      onClick={() => setShowEndElectionConfirm(true)}
-                      disabled={settings?.status === "completed" || updateStatus.isPending}
-                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-medium text-sm disabled:opacity-40 hover:opacity-90 transition-opacity"
-                    >
-                      <Power className="w-4 h-4" /> End Election
-                    </button>
-                  ) : (
-                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-destructive/40 bg-destructive/10">
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-destructive">⚠️ End Election?</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">This will stop voting for all students. This action cannot be undone.</p>
-                      </div>
-                      <button
-                        onClick={() => setShowEndElectionConfirm(false)}
-                        className="px-3 py-1.5 rounded-lg text-xs font-medium bg-muted text-foreground hover:bg-muted/80 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={() => { updateStatus.mutate("completed"); setShowEndElectionConfirm(false); }}
-                        disabled={updateStatus.isPending}
-                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-destructive text-destructive-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
-                      >
-                        Yes, End Election
-                      </button>
-                    </div>
-                  )}
-                  <button onClick={() => setShowResetAllVotedConfirm(true)}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 font-medium text-sm hover:bg-gold/20 transition-colors ml-auto">
+                  <button
+                    type="button"
+                    onClick={handleEndElectionClick}
+                    disabled={updateStatus.isPending}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-all ${
+                      settings?.status === "ongoing"
+                        ? "bg-destructive text-destructive-foreground shadow-md hover:opacity-90 animate-pulse"
+                        : settings?.status === "completed"
+                        ? "bg-destructive/30 text-destructive border border-destructive/30 hover:bg-destructive/40 cursor-pointer"
+                        : "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
+                    }`}
+                    title={
+                      settings?.status === "completed"
+                        ? "Election is already Completed. Click to view status."
+                        : settings?.status === "upcoming"
+                        ? "Election has not started yet."
+                        : "End the active election"
+                    }
+                  >
+                    <Power className="w-4 h-4" /> End Election
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleResetVotersClick}
+                    disabled={resetAllVoted.isPending}
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gold/15 text-gold border border-gold/30 font-medium text-sm hover:bg-gold/20 transition-colors ml-auto disabled:opacity-50"
+                    title="Reset all voters' has_voted status and clear live ballot tallies"
+                  >
                     <RotateCcw className="w-4 h-4" /> Reset Voters for New Election
                   </button>
                 </div>
@@ -2882,17 +3125,55 @@ export default function Admin() {
                     <Archive className="w-4 h-4" /> Save Results to History
                   </button>
                 ) : (
-                  <div className="bg-muted/50 rounded-xl p-4 border border-border">
-                    <p className="text-sm text-foreground font-medium mb-1">Archive current results?</p>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      This will save a snapshot of <strong>{settings?.name || "the current election"}</strong> (S.Y. {settings?.school_year || "—"}) to history.
-                      {" "}If results for this school year already exist, they will be replaced.
+                  <div className="bg-muted/50 rounded-xl p-5 border border-border space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-foreground font-semibold flex items-center gap-2">
+                        <Archive className="w-4 h-4 text-gold" /> Archive Current Election Results?
+                      </p>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-gold/15 text-gold font-medium border border-gold/30">
+                        S.Y. {settings?.school_year || "2025-2026"}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      This will save a snapshot of <strong>{settings?.name || "SSLG Election"}</strong> (S.Y. {settings?.school_year || "—"}) to history, including live vote tallies and grade/section voter turnout breakdowns.
                     </p>
-                    <div className="flex gap-2">
+
+                    {settings?.status === "ongoing" && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Warning: Election is currently ONGOING.</strong>
+                          <p className="mt-0.5 text-muted-foreground">Students may still be casting ballots. Archiving now records partial results. It is strongly recommended to End Election first.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {votedCount === 0 && (
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Notice: 0 votes currently recorded.</strong>
+                          <p className="mt-0.5 text-muted-foreground">Archiving now will store a record with zero votes cast.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {(electionHistory ?? []).some(h => h.school_year === settings?.school_year) && (
+                      <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-xs text-destructive flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <div>
+                          <strong>Overwrite Warning:</strong>
+                          <p className="mt-0.5 text-muted-foreground">Archived results for S.Y. {settings?.school_year} already exist and will be replaced.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
                       <button
                         onClick={() => archiveResults.mutate()}
                         disabled={archiveResults.isPending}
-                        className="flex items-center gap-2 px-5 py-2 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+                        className="flex items-center gap-2 px-5 py-2 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
                       >
                         {archiveResults.isPending
                           ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
@@ -2920,11 +3201,8 @@ export default function Admin() {
                             <p className="text-xs text-muted-foreground">S.Y. {h.school_year} {h.election_date ? `· ${h.election_date}` : ''}</p>
                           </div>
                           <button
-                            onClick={() => {
-                              if (confirm(`Delete archived election history for S.Y. ${h.school_year}?`)) {
-                                deleteHistory.mutate(h.school_year);
-                              }
-                            }}
+                            type="button"
+                            onClick={() => setDeleteHistoryTarget(h)}
                             disabled={deleteHistory.isPending}
                             className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
                             title="Delete this history record"
