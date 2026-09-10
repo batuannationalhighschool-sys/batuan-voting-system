@@ -1279,7 +1279,7 @@ export default function Admin() {
                   Browse
                 </button>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  or drag files to upload <span className="font-medium text-foreground">CSV</span> and select
+                  or drag files to upload <span className="font-medium text-foreground">CSV or XLS</span> and select
                 </p>
                 {bulkFile && (
                   <div className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border">
@@ -1638,7 +1638,7 @@ export default function Admin() {
                   Browse
                 </button>
                 <p className="mt-3 text-sm text-muted-foreground">
-                  or drag files to upload <span className="font-medium text-foreground">CSV</span> and select
+                  or drag files to upload <span className="font-medium text-foreground">CSV or XLS</span> and select
                 </p>
                 {bulkCandidateFile && (
                   <div className="mt-4 flex items-center gap-2 px-4 py-2 rounded-xl bg-background border border-border">
