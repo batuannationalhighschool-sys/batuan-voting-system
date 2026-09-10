@@ -61,7 +61,7 @@ export default function AuthPage() {
                 id="login-identifier"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Email for admins or LRN for voters"
+                placeholder="Enter your LRN"
                 required
                 maxLength={320}
                 className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground"
@@ -103,9 +103,7 @@ export default function AuthPage() {
             )}
           </button>
 
-          <p className="text-xs text-center text-muted-foreground pt-2">
-            Students sign in with their LRN. Administrators sign in with their registered email address.
-          </p>
+
         </form>
       </div>
     </div>
