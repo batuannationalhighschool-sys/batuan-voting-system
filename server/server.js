@@ -462,7 +462,8 @@ app.post('/api/voters/reset-all-voted', requireAuth, requireAdmin, async (req, r
   try {
     const { error: profileErr } = await supabase
       .from('profiles')
-      .update({ has_voted: false });
+      .update({ has_voted: false })
+      .neq('id', '00000000-0000-0000-0000-000000000000');
 
     if (profileErr) throw profileErr;
 
@@ -473,6 +474,12 @@ app.post('/api/voters/reset-all-voted', requireAuth, requireAdmin, async (req, r
       .neq('id', '00000000-0000-0000-0000-000000000000');
 
     if (votesErr) throw votesErr;
+
+    // Clear ballot submissions so voters can submit votes again
+    await supabase
+      .from('ballot_submissions')
+      .delete()
+      .neq('voter_id', '00000000-0000-0000-0000-000000000000');
 
     res.json({ success: true, message: 'All voters voting status reset successfully' });
   } catch (err) {
