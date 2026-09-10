@@ -976,8 +976,8 @@ app.post('/api/votes', requireAuth, async (req, res) => {
   try {
     const { votes } = req.body;
 
-    if (!votes || !Array.isArray(votes) || votes.length === 0) {
-      return res.status(400).json({ error: 'No votes provided' });
+    if (!votes || !Array.isArray(votes)) {
+      return res.status(400).json({ error: 'Invalid votes format' });
     }
 
     // Check if user is admin
@@ -1032,65 +1032,67 @@ app.post('/api/votes', requireAuth, async (req, res) => {
     const voterProfile = profiles?.[0] || {};
 
     // ── Validate max_votes per position ────────────────────────────────────
-    const votesByPosition = {};
-    for (const vote of votes) {
-      if (!votesByPosition[vote.position_id]) votesByPosition[vote.position_id] = [];
-      votesByPosition[vote.position_id].push(vote.candidate_id);
-    }
-
-    // Fetch position max_votes for all involved positions
-    const positionIds = Object.keys(votesByPosition);
-    const { data: positionRows, error: posError } = await supabase
-      .from('positions')
-      .select('id, title, max_votes')
-      .in('id', positionIds);
-
-    if (posError) throw posError;
-
-    const positionMap = {};
-    for (const p of positionRows) positionMap[p.id] = p;
-
-    for (const [posId, candIds] of Object.entries(votesByPosition)) {
-      const pos = positionMap[posId];
-      if (!pos) return res.status(400).json({ error: 'Invalid position' });
-
-      if (candIds.length > pos.max_votes) {
-        return res.status(400).json({
-          error: `You can only vote for up to ${pos.max_votes} candidate(s) for ${pos.title}`
-        });
+    if (votes.length > 0) {
+      const votesByPosition = {};
+      for (const vote of votes) {
+        if (!votesByPosition[vote.position_id]) votesByPosition[vote.position_id] = [];
+        votesByPosition[vote.position_id].push(vote.candidate_id);
       }
 
-      // ── Grade Representative restriction (Next-Grade Logic) ─────────
-      if (pos.title.toLowerCase().includes('representative')) {
-        if (!voterProfile.grade_level) {
-          return res.status(403).json({ error: 'Your grade level must be set to vote for Grade Representatives' });
+      // Fetch position max_votes for all involved positions
+      const positionIds = Object.keys(votesByPosition);
+      const { data: positionRows, error: posError } = await supabase
+        .from('positions')
+        .select('id, title, max_votes')
+        .in('id', positionIds);
+
+      if (posError) throw posError;
+
+      const positionMap = {};
+      for (const p of positionRows) positionMap[p.id] = p;
+
+      for (const [posId, candIds] of Object.entries(votesByPosition)) {
+        const pos = positionMap[posId];
+        if (!pos) return res.status(400).json({ error: 'Invalid position' });
+
+        if (candIds.length > pos.max_votes) {
+          return res.status(400).json({
+            error: `You can only vote for up to ${pos.max_votes} candidate(s) for ${pos.title}`
+          });
         }
 
-        const NEXT_GRADE_MAP = {
-          'Grade 7': 'Grade 8',
-          'Grade 8': 'Grade 9',
-          'Grade 9': 'Grade 10',
-          'Grade 10': 'Grade 11',
-          'Grade 11': 'Grade 12',
-        };
-        const allowedGrade = NEXT_GRADE_MAP[voterProfile.grade_level];
-        if (!allowedGrade) {
-          return res.status(403).json({ error: `Voters from ${voterProfile.grade_level} are not eligible to vote for a Grade Representative` });
-        }
+        // ── Grade Representative restriction (Next-Grade Logic) ─────────
+        if (pos.title.toLowerCase().includes('representative')) {
+          if (!voterProfile.grade_level) {
+            return res.status(403).json({ error: 'Your grade level must be set to vote for Grade Representatives' });
+          }
 
-        // Verify each candidate for this position matches the allowed next grade
-        for (const candId of candIds) {
-          const { data: cands } = await supabase
-            .from('candidates')
-            .select('grade_level')
-            .eq('id', candId);
+          const NEXT_GRADE_MAP = {
+            'Grade 7': 'Grade 8',
+            'Grade 8': 'Grade 9',
+            'Grade 9': 'Grade 10',
+            'Grade 10': 'Grade 11',
+            'Grade 11': 'Grade 12',
+          };
+          const allowedGrade = NEXT_GRADE_MAP[voterProfile.grade_level];
+          if (!allowedGrade) {
+            return res.status(403).json({ error: `Voters from ${voterProfile.grade_level} are not eligible to vote for a Grade Representative` });
+          }
 
-          if (!cands || cands.length === 0) return res.status(400).json({ error: 'Invalid candidate' });
-          const candGrade = cands[0].grade_level;
-          if (candGrade !== allowedGrade && candGrade !== voterProfile.grade_level) {
-            return res.status(403).json({
-              error: `Grade Representatives: voters from ${voterProfile.grade_level} may only vote for ${allowedGrade} Representative candidates`
-            });
+          // Verify each candidate for this position matches the allowed next grade
+          for (const candId of candIds) {
+            const { data: cands } = await supabase
+              .from('candidates')
+              .select('grade_level')
+              .eq('id', candId);
+
+            if (!cands || cands.length === 0) return res.status(400).json({ error: 'Invalid candidate' });
+            const candGrade = cands[0].grade_level;
+            if (candGrade !== allowedGrade && candGrade !== voterProfile.grade_level) {
+              return res.status(403).json({
+                error: `Grade Representatives: voters from ${voterProfile.grade_level} may only vote for ${allowedGrade} Representative candidates`
+              });
+            }
           }
         }
       }

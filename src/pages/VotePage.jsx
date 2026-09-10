@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Vote, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, ShieldAlert, Clock, Calendar } from "lucide-react";
+import { Vote, ChevronRight, ChevronLeft, CheckCircle2, AlertCircle, ShieldAlert, Clock, Calendar, MinusCircle, X } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,6 +19,7 @@ const NEXT_GRADE_REP_MAP = {
 export default function VotePage() {
   const [selections, setSelections] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const { user, profile, refreshProfile, isAdmin } = useAuth();
   const { toast } = useToast();
@@ -62,11 +63,11 @@ export default function VotePage() {
           if (candidateId) votes.push({ candidate_id: candidateId, position_id: positionId });
         }
       }
-      if (votes.length === 0) throw new Error("No votes selected");
       await api.post('/votes', { votes });
     },
     onSuccess: () => {
       setSubmitted(true);
+      setShowConfirm(false);
       refreshProfile();
       queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
       queryClient.invalidateQueries({ queryKey: ["vote-counts-home"] });
@@ -216,13 +217,22 @@ export default function VotePage() {
           <p className="text-muted-foreground mb-2">Thank you for participating in {settings?.name || "the SSLG Election"}.</p>
           <div className="mt-8 p-4 bg-card rounded-xl border border-border">
             <p className="text-sm font-medium text-foreground mb-3">Your Selections:</p>
-            {Object.entries(selections).flatMap(([posId, candIds]) => {
-              const pos = (positions ?? []).find((p) => p.id === posId);
-              return (candIds || []).map((candId, idx) => {
+            {(positions ?? []).map((pos) => {
+              const candIds = selections[pos.id] ?? [];
+              const maxVotes = pos.max_votes ?? 1;
+              if (candIds.length === 0) {
+                return (
+                  <div key={pos.id} className="flex justify-between py-1.5 text-sm border-b border-border last:border-0">
+                    <span className="text-muted-foreground">{pos.title}</span>
+                    <span className="font-medium text-muted-foreground/60 italic">Abstain</span>
+                  </div>
+                );
+              }
+              return candIds.map((candId, idx) => {
                 const cand = (candidates ?? []).find((c) => c.id === candId);
                 return (
-                  <div key={`${posId}-${idx}`} className="flex justify-between py-1.5 text-sm border-b border-border last:border-0">
-                    <span className="text-muted-foreground">{pos?.title}{(pos?.max_votes ?? 1) > 1 ? ` (${idx + 1})` : ''}</span>
+                  <div key={`${pos.id}-${idx}`} className="flex justify-between py-1.5 text-sm border-b border-border last:border-0">
+                    <span className="text-muted-foreground">{pos.title}{maxVotes > 1 ? ` (${idx + 1})` : ''}</span>
                     <span className="font-medium text-foreground uppercase">{cand?.name}</span>
                   </div>
                 );
@@ -255,6 +265,20 @@ export default function VotePage() {
   };
 
   const totalSelected = Object.values(selections).reduce((sum, arr) => sum + (arr?.length ?? 0), 0);
+
+  // Compute blank positions for confirmation dialog
+  const blankPositions = (positions ?? []).filter((pos) => {
+    const sel = selections[pos.id] ?? [];
+    return sel.length === 0;
+  });
+
+  const handleSubmitClick = () => {
+    if (blankPositions.length > 0) {
+      setShowConfirm(true);
+    } else {
+      submitVotes.mutate();
+    }
+  };
 
   return (
     <div className="container py-8 md:py-12">
@@ -327,11 +351,14 @@ export default function VotePage() {
           <div className="mt-12 bg-card p-6 rounded-2xl border border-border shadow-elegant flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="text-sm text-center sm:text-left">
               <span className="font-medium text-foreground">{totalSelected} vote{totalSelected !== 1 ? 's' : ''} selected</span>
+              {blankPositions.length > 0 && (
+                <p className="text-xs text-gold mt-0.5">{blankPositions.length} position{blankPositions.length !== 1 ? 's' : ''} left blank (abstain)</p>
+              )}
               <p className="text-xs text-muted-foreground">Review your choices carefully before submitting.</p>
             </div>
 
             <button 
-              onClick={() => submitVotes.mutate()} 
+              onClick={handleSubmitClick} 
               disabled={submitVotes.isPending}
               className="flex items-center gap-2 px-8 py-3 rounded-xl gradient-gold text-accent-foreground font-bold text-base shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50 w-full sm:w-auto justify-center"
             >
@@ -340,6 +367,58 @@ export default function VotePage() {
                 : <CheckCircle2 className="w-5 h-5" />}
               Submit Final Vote
             </button>
+          </div>
+        )}
+
+        {/* Blank Position Confirmation Modal */}
+        {showConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in p-4">
+            <div className="bg-card rounded-2xl border border-border shadow-2xl max-w-md w-full p-6 animate-scale-in">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="w-5 h-5 text-gold" />
+                  <h3 className="text-lg font-display font-bold text-foreground">Confirm Your Vote</h3>
+                </div>
+                <button onClick={() => setShowConfirm(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-muted-foreground mb-4">
+                You have <span className="font-semibold text-gold">{blankPositions.length}</span> position{blankPositions.length !== 1 ? 's' : ''} without a vote. These will be recorded as <span className="font-semibold">abstain</span>.
+              </p>
+
+              <div className="bg-muted/50 rounded-xl p-3 mb-5 max-h-40 overflow-y-auto space-y-1">
+                {blankPositions.map((pos) => (
+                  <div key={pos.id} className="flex items-center gap-2 text-sm py-1">
+                    <MinusCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span className="text-muted-foreground">{pos.title}</span>
+                    <span className="ml-auto text-xs text-muted-foreground/60 italic">Abstain</span>
+                  </div>
+                ))}
+              </div>
+
+              <p className="text-xs text-muted-foreground mb-5">Are you sure you want to submit? This action cannot be undone.</p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirm(false)}
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm hover:bg-muted/80 transition-colors border border-border"
+                >
+                  Go Back
+                </button>
+                <button
+                  onClick={() => submitVotes.mutate()}
+                  disabled={submitVotes.isPending}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl gradient-gold text-accent-foreground font-bold text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
+                >
+                  {submitVotes.isPending
+                    ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" />
+                    : <CheckCircle2 className="w-4 h-4" />}
+                  Submit Vote
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

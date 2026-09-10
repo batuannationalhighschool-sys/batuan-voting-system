@@ -143,17 +143,19 @@ DECLARE
   vote_record JSONB;
   v_id UUID;
 BEGIN
-  FOR vote_record IN SELECT * FROM jsonb_array_elements(p_votes)
-  LOOP
-    v_id := gen_random_uuid();
-    INSERT INTO votes (id, voter_id, candidate_id, position_id)
-    VALUES (
-      v_id,
-      p_voter_id,
-      (vote_record->>'candidate_id')::UUID,
-      (vote_record->>'position_id')::UUID
-    );
-  END LOOP;
+  IF p_votes IS NOT NULL AND jsonb_typeof(p_votes) = 'array' THEN
+    FOR vote_record IN SELECT * FROM jsonb_array_elements(p_votes)
+    LOOP
+      v_id := gen_random_uuid();
+      INSERT INTO votes (id, voter_id, candidate_id, position_id)
+      VALUES (
+        v_id,
+        p_voter_id,
+        (vote_record->>'candidate_id')::UUID,
+        (vote_record->>'position_id')::UUID
+      );
+    END LOOP;
+  END IF;
   UPDATE profiles SET has_voted = TRUE WHERE user_id = p_voter_id;
 END;
 $$ LANGUAGE plpgsql;
@@ -178,7 +180,7 @@ INSERT INTO election_settings (name, school_year, election_date, status)
 VALUES ('SSLG Election 2026', '2025-2026', '2026-03-15', 'ongoing');
 
 -- ─── Seed: default SSLG positions ──────────────────────────────────
--- max_votes = 2 for P.I.O. and Protocol Officer (voters elect 2 per position)
+-- max_votes = 2 for P.I.O., Protocol Officer, and Grade Representatives
 INSERT INTO positions (title, display_order, max_votes) VALUES
   ('President',                  1, 1),
   ('Vice President',             2, 1),
@@ -187,10 +189,10 @@ INSERT INTO positions (title, display_order, max_votes) VALUES
   ('Auditor',                    5, 1),
   ('Public Information Officer', 6, 2),
   ('Protocol Officer',           7, 2),
-  ('Grade 8 Representative',     8, 1),
-  ('Grade 9 Representative',     9, 1),
-  ('Grade 10 Representative',   10, 1),
-  ('Grade 11 Representative',   11, 1);
+  ('Grade 8 Representative',     8, 2),
+  ('Grade 9 Representative',     9, 2),
+  ('Grade 10 Representative',   10, 2),
+  ('Grade 11 Representative',   11, 2);
 
 -- ─── Seed: bootstrap admin row; set a strong password immediately ───────
 INSERT INTO users (id, lrn, email, password_hash, full_name, must_change_password)
@@ -988,8 +990,8 @@ BEGIN
   v_payload := verify_app_token(p_token);
   v_user_id := (v_payload->>'id')::uuid;
 
-  IF p_votes IS NULL OR jsonb_array_length(p_votes) = 0 THEN
-    RAISE EXCEPTION 'No votes provided';
+  IF p_votes IS NULL OR jsonb_typeof(p_votes) <> 'array' THEN
+    RAISE EXCEPTION 'Invalid votes format';
   END IF;
 
   -- Block admins
