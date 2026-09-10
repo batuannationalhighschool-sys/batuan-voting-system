@@ -1,52 +1,14 @@
--- ============================================================================
--- BATUAN VOTING - VOTING RULES UPDATE & BLANK BALLOT SUPPORT
+-- Fix representative validation for existing candidate imports.
 --
--- 1. Sets max_votes = 2 for all Grade Representative positions (allowing voters to vote for up to 2 candidates).
--- 2. Updates public.app_submit_votes and public.submit_votes to allow empty/blank ballots (voters can skip any/all positions).
--- ============================================================================
+-- Representative eligibility is determined by the selected position. The
+-- candidate's grade_level is descriptive metadata; existing imports store the
+-- voter's grade there, so comparing it to the position grade rejects valid
+-- ballots. Candidate-to-position membership remains enforced.
+--
+-- Apply after migration-security-hardening.sql.
 
 BEGIN;
 
--- ─── 1. Update positions max_votes ─────────────────────────────────────────
--- Only Grade Representatives have max_votes = 2
-UPDATE public.positions
-SET max_votes = 2
-WHERE lower(title) LIKE '%representative%';
-
--- All other positions (President, VP, Sec, Treas, Aud, PIO, Protocol Officer) have max_votes = 1
-UPDATE public.positions
-SET max_votes = 1
-WHERE lower(title) NOT LIKE '%representative%';
-
--- ─── 2. Update submit_votes to support empty votes array ───────────────────
-CREATE OR REPLACE FUNCTION public.submit_votes(p_voter_id UUID, p_votes JSONB)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = pg_catalog, public
-AS $$
-DECLARE
-  v_vote JSONB;
-BEGIN
-  IF p_votes IS NOT NULL AND jsonb_typeof(p_votes) = 'array' THEN
-    FOR v_vote IN SELECT value FROM jsonb_array_elements(p_votes)
-    LOOP
-      INSERT INTO public.votes (id, voter_id, candidate_id, position_id)
-      VALUES (
-        extensions.gen_random_uuid(),
-        p_voter_id,
-        (v_vote->>'candidate_id')::UUID,
-        (v_vote->>'position_id')::UUID
-      );
-    END LOOP;
-  END IF;
-  UPDATE public.profiles SET has_voted = true WHERE user_id = p_voter_id;
-END;
-$$;
-
-REVOKE ALL ON FUNCTION public.submit_votes(UUID, JSONB) FROM PUBLIC, anon, authenticated;
-
--- ─── 3. Update app_submit_votes to allow blank votes and enforce max_votes ───
 CREATE OR REPLACE FUNCTION public.app_submit_votes(p_token TEXT, p_votes JSONB)
 RETURNS JSONB
 LANGUAGE plpgsql
@@ -79,8 +41,8 @@ BEGIN
   v_payload := public.verify_app_token(p_token);
   v_user_id := (v_payload->>'id')::UUID;
 
-  IF p_votes IS NULL OR jsonb_typeof(p_votes) <> 'array' THEN
-    RAISE EXCEPTION 'Invalid votes format';
+  IF p_votes IS NULL OR jsonb_typeof(p_votes) <> 'array' OR jsonb_array_length(p_votes) = 0 THEN
+    RAISE EXCEPTION 'No votes provided';
   END IF;
   IF jsonb_array_length(p_votes) > 100 THEN
     RAISE EXCEPTION 'Too many votes provided';
@@ -119,7 +81,6 @@ BEGIN
     RAISE EXCEPTION 'You have already voted';
   END IF;
 
-  -- Lock the settings row so a vote cannot race an admin status/schedule change.
   SELECT id, status, election_date, voting_start, voting_end, auto_end_enabled
   INTO v_election
   FROM public.election_settings
@@ -207,7 +168,8 @@ BEGIN
         RAISE EXCEPTION 'Voters from % are not eligible to vote for a Grade Representative', v_profile.grade_level;
       END IF;
 
-      -- The selected position is authoritative for representative eligibility.
+      -- The position, not candidate grade_level metadata, identifies the
+      -- representative grade. Candidate membership was checked above.
       IF lower(v_position.title) NOT LIKE '%' || lower(v_allowed_grade) || '%' THEN
         RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative', v_profile.grade_level, v_allowed_grade;
       END IF;

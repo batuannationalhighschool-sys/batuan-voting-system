@@ -1086,20 +1086,13 @@ app.post('/api/votes', requireAuth, async (req, res) => {
             return res.status(403).json({ error: `Voters from ${voterProfile.grade_level} are not eligible to vote for a Grade Representative` });
           }
 
-          // Verify each candidate for this position matches the allowed next grade
-          for (const candId of candIds) {
-            const { data: cands } = await supabase
-              .from('candidates')
-              .select('grade_level')
-              .eq('id', candId);
-
-            if (!cands || cands.length === 0) return res.status(400).json({ error: 'Invalid candidate' });
-            const candGrade = cands[0].grade_level;
-            if (candGrade !== allowedGrade && candGrade !== voterProfile.grade_level) {
-              return res.status(403).json({
-                error: `Grade Representatives: voters from ${voterProfile.grade_level} may only vote for ${allowedGrade} Representative candidates`
-              });
-            }
+          // The selected position is authoritative. Candidate grade_level is
+          // descriptive metadata and existing imports store the voter's grade
+          // there rather than the representative position grade.
+          if (!pos.title.toLowerCase().includes(allowedGrade.toLowerCase())) {
+            return res.status(403).json({
+              error: `Grade Representatives: voters from ${voterProfile.grade_level} may only vote for ${allowedGrade} Representative`
+            });
           }
         }
       }

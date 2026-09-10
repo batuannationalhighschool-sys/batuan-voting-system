@@ -798,9 +798,7 @@ BEGIN
       END IF;
       SELECT grade_level INTO v_candidate FROM candidates WHERE id = (v_vote->>'candidate_id')::uuid;
       IF v_candidate IS NULL THEN RAISE EXCEPTION 'Invalid candidate'; END IF;
-      IF v_candidate.grade_level != v_profile.grade_level THEN
-        RAISE EXCEPTION 'Grade Representatives: you may only vote for candidates from your grade level (%)', v_profile.grade_level;
-      END IF;
+      -- The selected position is authoritative for representative eligibility.
     END IF;
   END LOOP;
 

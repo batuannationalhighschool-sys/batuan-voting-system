@@ -1052,10 +1052,8 @@ BEGIN
         SELECT grade_level INTO v_candidate FROM candidates WHERE id = (v_vote->>'candidate_id')::uuid;
         IF v_candidate IS NULL THEN RAISE EXCEPTION 'Invalid candidate'; END IF;
 
-        IF v_candidate.grade_level NOT IN (v_profile.grade_level, v_allowed_grade) THEN
-          RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative candidates', v_profile.grade_level, v_allowed_grade;
-        END IF;
-
+        -- The selected position is authoritative for representative
+        -- eligibility. Candidate grade_level is descriptive metadata.
         IF lower(v_position.title) NOT LIKE '%' || lower(v_allowed_grade) || '%' THEN
           RAISE EXCEPTION 'Grade Representatives: voters from % may only vote for % Representative', v_profile.grade_level, v_allowed_grade;
         END IF;
