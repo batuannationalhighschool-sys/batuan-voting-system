@@ -235,6 +235,7 @@ export default function Admin() {
 
   // Delete confirmation state
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
   const [archiveSearch, setArchiveSearch] = useState("");
   const [archiveCandidateSearch, setArchiveCandidateSearch] = useState("");
   const [archiveElectionSearch, setArchiveElectionSearch] = useState("");
@@ -2178,6 +2179,50 @@ export default function Admin() {
         </div>
       )}
 
+      {/* Restore Voter / Candidate Confirmation Modal */}
+      {restoreTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setRestoreTarget(null)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-success" /> Restore {restoreTarget.type === 'voter' ? 'Voter' : 'Candidate'}?
+              </h3>
+              <button onClick={() => setRestoreTarget(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to restore
+            </p>
+            <p className="font-semibold text-foreground mb-3 uppercase">{restoreTarget.name}?</p>
+            <p className="text-xs text-muted-foreground mb-6">
+              {restoreTarget.type === 'voter'
+                ? "This voter will be restored and returned to the active voters list."
+                : "This candidate will be restored and returned to the active candidates list and ballot."}
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setRestoreTarget(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (restoreTarget.type === 'voter') {
+                    restoreVoter.mutate(restoreTarget.id);
+                  } else {
+                    restoreCandidate.mutate(restoreTarget.id);
+                  }
+                  setRestoreTarget(null);
+                }}
+                disabled={restoreVoter.isPending || restoreCandidate.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-success text-success-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {restoreVoter.isPending || restoreCandidate.isPending ? "Restoring…" : <><RotateCcw className="w-4 h-4" /> Restore</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Reset Password Confirmation Modal */}
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setResetTarget(null)}>
@@ -2892,7 +2937,7 @@ export default function Admin() {
                           <td className="py-3 px-3">
                             <div className="flex items-center justify-end gap-1">
                               <button
-                                onClick={() => restoreVoter.mutate(v.id)}
+                                onClick={() => setRestoreTarget({ id: v.id, name: v.full_name, type: 'voter' })}
                                 disabled={restoreVoter.isPending}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
                                 title="Restore voter"
@@ -2990,7 +3035,7 @@ export default function Admin() {
                           <td className="py-3 px-3">
                             <div className="flex items-center justify-end gap-1">
                               <button
-                                onClick={() => restoreCandidate.mutate(c.id)}
+                                onClick={() => setRestoreTarget({ id: c.id, name: c.name, type: 'candidate' })}
                                 disabled={restoreCandidate.isPending}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
                                 title="Restore candidate"
