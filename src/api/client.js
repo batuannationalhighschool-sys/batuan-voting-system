@@ -310,13 +310,25 @@ async function handlePut(path, body) {
 }
 
 // ─── PATCH Router ───────────────────────────────────────────────────
-async function handlePatch(path) {
+async function handlePatch(path, body) {
   const pathname = path.split('?')[0];
 
   // /candidates/:id/archive
-  const m = pathname.match(/^\/candidates\/([^/]+)\/archive$/);
+  let m = pathname.match(/^\/candidates\/([^/]+)\/archive$/);
   if (m) {
     const { data, error } = await supabase.rpc('app_archive_candidate', { p_token: getToken(), p_id: m[1] });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /sections/rename — bulk-rename a section across voters + candidates
+  if (pathname === '/sections/rename') {
+    const { data, error } = await supabase.rpc('app_rename_section', {
+      p_token:       getToken(),
+      p_grade_level: body.grade_level,
+      p_old_section: body.old_section,
+      p_new_section: body.new_section.toUpperCase().trim(),
+    });
     if (error) throw new Error(error.message);
     return data;
   }
