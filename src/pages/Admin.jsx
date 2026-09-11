@@ -237,6 +237,7 @@ export default function Admin() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [archiveSearch, setArchiveSearch] = useState("");
   const [archiveCandidateSearch, setArchiveCandidateSearch] = useState("");
+  const [archiveElectionSearch, setArchiveElectionSearch] = useState("");
   const [archiveSubTab, setArchiveSubTab] = useState("voters");
   const [settingsSubTab, setSettingsSubTab] = useState("election");
 
@@ -248,6 +249,8 @@ export default function Admin() {
   const [showSetUpcomingConfirm, setShowSetUpcomingConfirm] = useState(false);
   const [showStartFromCompletedConfirm, setShowStartFromCompletedConfirm] = useState(false);
   const [deleteHistoryTarget, setDeleteHistoryTarget] = useState(null);
+  const [archiveElectionTarget, setArchiveElectionTarget] = useState(null);
+  const [restoreElectionTarget, setRestoreElectionTarget] = useState(null);
 
   // Voter management state
   const [newVoter, setNewVoter] = useState({ lrn: "", full_name: "", grade_level: "", section: "" });
@@ -933,6 +936,30 @@ export default function Admin() {
     onError: (err) => toast({ title: "Failed to delete", description: err.message, variant: "destructive" }),
   });
 
+  const archivePastElection = useMutation({
+    mutationFn: async (schoolYear) => {
+      await api.post(`/election-history/${encodeURIComponent(schoolYear)}/archive`);
+    },
+    onSuccess: () => {
+      toast({ title: "Election archived!", description: "Election moved to Archive > Archived Past Elections.", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["election-history"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-results"] });
+    },
+    onError: (err) => toast({ title: "Failed to archive", description: err.message, variant: "destructive" }),
+  });
+
+  const restoreElection = useMutation({
+    mutationFn: async (schoolYear) => {
+      await api.post(`/election-history/${encodeURIComponent(schoolYear)}/restore`);
+    },
+    onSuccess: () => {
+      toast({ title: "Election restored!", description: "Election restored from archive.", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["election-history"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-results"] });
+    },
+    onError: (err) => toast({ title: "Failed to restore", description: err.message, variant: "destructive" }),
+  });
+
   const { data: electionHistory } = useQuery({
     queryKey: ["election-history"],
     queryFn: () => api.get('/election-history'),
@@ -1278,6 +1305,19 @@ export default function Admin() {
     if (!archiveCandidateSearch) return true;
     const q = archiveCandidateSearch.toLowerCase();
     return c.name?.toLowerCase().includes(q) || c.position_title?.toLowerCase().includes(q) || c.party_list?.toLowerCase().includes(q) || c.section?.toLowerCase().includes(q) || c.grade_level?.toLowerCase().includes(q);
+  });
+
+  const archivedElections = (electionHistory ?? []).filter((h) => Boolean(h.archived));
+  const activePastElections = (electionHistory ?? []).filter((h) => !h.archived);
+
+  const filteredArchivedElections = archivedElections.filter((h) => {
+    if (!archiveElectionSearch) return true;
+    const q = archiveElectionSearch.toLowerCase();
+    return (
+      h.election_name?.toLowerCase().includes(q) ||
+      h.school_year?.toLowerCase().includes(q) ||
+      (h.election_date && String(h.election_date).toLowerCase().includes(q))
+    );
   });
 
   return (
@@ -2658,10 +2698,86 @@ export default function Admin() {
         </div>
       )}
 
+      {/* Archive Election Target Confirmation Modal */}
+      {archiveElectionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setArchiveElectionTarget(null)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Archive className="w-5 h-5 text-amber-500" /> Archive Election?
+              </h3>
+              <button onClick={() => setArchiveElectionTarget(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to archive
+            </p>
+            <p className="font-semibold text-foreground mb-3">{archiveElectionTarget.election_name} (S.Y. {archiveElectionTarget.school_year})?</p>
+            <p className="text-xs text-muted-foreground mb-6">
+              This election will be moved to the <strong>Archived Past Elections</strong> panel. You can restore it anytime from the Archive tab.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setArchiveElectionTarget(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  archivePastElection.mutate(archiveElectionTarget.school_year);
+                  setArchiveElectionTarget(null);
+                }}
+                disabled={archivePastElection.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {archivePastElection.isPending ? "Archiving…" : <><Archive className="w-4 h-4" /> Archive</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Election Target Confirmation Modal */}
+      {restoreElectionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setRestoreElectionTarget(null)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-success" /> Restore Election?
+              </h3>
+              <button onClick={() => setRestoreElectionTarget(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to restore
+            </p>
+            <p className="font-semibold text-foreground mb-3">{restoreElectionTarget.election_name} (S.Y. {restoreElectionTarget.school_year})?</p>
+            <p className="text-xs text-muted-foreground mb-6">
+              This election will be restored back to the active past elections list in Election Settings.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setRestoreElectionTarget(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  restoreElection.mutate(restoreElectionTarget.school_year);
+                  setRestoreElectionTarget(null);
+                }}
+                disabled={restoreElection.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-success text-success-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {restoreElection.isPending ? "Restoring…" : <><RotateCcw className="w-4 h-4" /> Restore</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {activeTab === "archive" && (
         <div className="animate-fade-in space-y-4">
           {/* Archive Sub-tabs */}
-          <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit">
+          <div className="flex gap-1 p-1 bg-muted rounded-xl w-fit flex-wrap">
             <button
               onClick={() => setArchiveSubTab("voters")}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${archiveSubTab === "voters" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
@@ -2685,6 +2801,19 @@ export default function Admin() {
               {(archivedCandidates ?? []).length > 0 && (
                 <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 text-xs font-semibold">
                   {(archivedCandidates ?? []).length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => setArchiveSubTab("elections")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${archiveSubTab === "elections" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <History className="w-4 h-4" />
+              Archived Past Elections
+              {archivedElections.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 text-xs font-semibold">
+                  {archivedElections.length}
                 </span>
               )}
             </button>
@@ -2881,6 +3010,104 @@ export default function Admin() {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Archived Past Elections Sub-panel ── */}
+          {archiveSubTab === "elections" && (
+            <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                    <History className="w-5 h-5 text-gold" /> Archived Past Elections
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {archivedElections.length} archived past election{archivedElections.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    value={archiveElectionSearch}
+                    onChange={(e) => setArchiveElectionSearch(e.target.value)}
+                    placeholder="Search past elections..."
+                    className="w-full pl-9 pr-4 py-2 rounded-lg bg-muted border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-gold/50"
+                  />
+                </div>
+              </div>
+
+              {archivedElections.length === 0 ? (
+                <div className="text-center py-16">
+                  <History className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground font-medium">No archived past elections</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Elections you archive from the Settings panel using the Archive button will appear here.
+                  </p>
+                </div>
+              ) : filteredArchivedElections.length === 0 ? (
+                <div className="text-center py-16">
+                  <History className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+                  <p className="text-muted-foreground font-medium">No past elections match your search</p>
+                  <p className="text-xs text-muted-foreground mt-1">Try a different search term</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredArchivedElections.map((h) => (
+                    <div
+                      key={h.school_year}
+                      className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-muted/40 rounded-xl border border-border hover:border-border/80 transition-all gap-4"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2.5 flex-wrap">
+                          <p className="text-sm font-semibold text-foreground">{h.election_name}</p>
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gold/15 text-gold border border-gold/30">
+                            S.Y. {h.school_year}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                          {h.election_date && <span>Election Date: {h.election_date}</span>}
+                          {h.election_date && h.archived_at && <span>·</span>}
+                          {h.archived_at && (
+                            <span>
+                              Archived on {new Date(h.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/results?tab=history&year=${encodeURIComponent(h.school_year)}`)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                          title="View election results"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> View Results
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRestoreElectionTarget(h)}
+                          disabled={restoreElection.isPending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
+                          title="Restore election from archive"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" /> Restore
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteHistoryTarget(h)}
+                          disabled={deleteHistory.isPending}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-50"
+                          title="Permanently delete this history record"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -3116,11 +3343,25 @@ export default function Admin() {
                   )}
                 </div>
 
-                {(electionHistory ?? []).length > 0 && (
+                {activePastElections.length > 0 ? (
                   <div className="mt-6 pt-5 border-t border-border">
-                    <p className="text-xs font-semibold text-muted-foreground mb-3 uppercase tracking-wide">Archived Past Elections</p>
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Past Elections</p>
+                      {archivedElections.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setActiveTab("archive");
+                            setArchiveSubTab("elections");
+                          }}
+                          className="text-xs text-gold hover:underline font-medium flex items-center gap-1"
+                        >
+                          View {archivedElections.length} in Archive Panel →
+                        </button>
+                      )}
+                    </div>
                     <div className="space-y-2">
-                      {(electionHistory ?? []).map((h) => (
+                      {activePastElections.map((h) => (
                         <div key={h.school_year} className="flex items-center justify-between p-3 bg-muted/40 rounded-xl border border-border">
                           <div>
                             <p className="text-sm font-semibold text-foreground">{h.election_name}</p>
@@ -3128,18 +3369,32 @@ export default function Admin() {
                           </div>
                           <button
                             type="button"
-                            onClick={() => setDeleteHistoryTarget(h)}
-                            disabled={deleteHistory.isPending}
-                            className="p-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors"
-                            title="Delete this history record"
+                            onClick={() => setArchiveElectionTarget(h)}
+                            disabled={archivePastElection.isPending}
+                            className="p-2 rounded-lg text-amber-500 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+                            title="Archive this election"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Archive className="w-4 h-4" />
                           </button>
                         </div>
                       ))}
                     </div>
                   </div>
-                )}
+                ) : archivedElections.length > 0 ? (
+                  <div className="mt-6 pt-5 border-t border-border flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">All past elections are archived.</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab("archive");
+                        setArchiveSubTab("elections");
+                      }}
+                      className="text-xs text-gold hover:underline font-medium flex items-center gap-1"
+                    >
+                      View {archivedElections.length} in Archive Panel →
+                    </button>
+                  </div>
+                ) : null}
               </div>
             </div>
           )}

@@ -232,8 +232,30 @@ async function handlePost(path, body) {
     return data;
   }
 
+  // Dynamic: /election-history/:schoolYear/archive
+  let m = pathname.match(/^\/election-history\/([^/]+)\/archive$/);
+  if (m) {
+    const { data, error } = await supabase.rpc('app_archive_election', {
+      p_token: getToken(),
+      p_school_year: decodeURIComponent(m[1]),
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // Dynamic: /election-history/:schoolYear/restore
+  m = pathname.match(/^\/election-history\/([^/]+)\/restore$/);
+  if (m) {
+    const { data, error } = await supabase.rpc('app_restore_election', {
+      p_token: getToken(),
+      p_school_year: decodeURIComponent(m[1]),
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
   // Dynamic: /voters/:id/restore
-  let m = pathname.match(/^\/voters\/([^/]+)\/restore$/);
+  m = pathname.match(/^\/voters\/([^/]+)\/restore$/);
   if (m) {
     const { data, error } = await supabase.rpc('app_restore_voter', { p_token: getToken(), p_id: m[1] });
     if (error) throw new Error(error.message);
