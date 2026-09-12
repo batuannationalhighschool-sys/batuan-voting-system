@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File, Eye, EyeOff, Tag, Check } from "lucide-react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File, Eye, EyeOff, Tag, Check, Flag } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -257,6 +257,11 @@ export default function Admin() {
   const [editingSection, setEditingSection] = useState(null); // { grade_level, section }
   const [renameSectionValue, setRenameSectionValue] = useState("");
   const [renameSectionConfirm, setRenameSectionConfirm] = useState(null); // { grade_level, old_section, new_section }
+
+  // Rename party list state
+  const [editingPartyList, setEditingPartyList] = useState(null); // string (party list name)
+  const [renamePartyListValue, setRenamePartyListValue] = useState("");
+  const [renamePartyListConfirm, setRenamePartyListConfirm] = useState(null); // { old_party_list, new_party_list }
 
   // Voter management state
   const [newVoter, setNewVoter] = useState({ lrn: "", full_name: "", grade_level: "", section: "" });
@@ -974,6 +979,31 @@ export default function Admin() {
     onError: (err) => {
       toast({ title: 'Failed to rename', description: err.message, variant: 'destructive' });
       setRenameSectionConfirm(null);
+    },
+  });
+
+  // Rename party list (bulk-update all candidates in that party list)
+  const renamePartyList = useMutation({
+    mutationFn: ({ old_party_list, new_party_list }) =>
+      api.patch('/partylists/rename', { old_party_list, new_party_list }),
+    onSuccess: (data, vars) => {
+      toast({
+        title: 'Party list renamed!',
+        description: `"${vars.old_party_list}" → "${vars.new_party_list}" — ${data?.updated_candidates ?? 0} candidate(s) updated.`,
+        variant: 'success',
+      });
+      queryClient.invalidateQueries({ queryKey: ['candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['archived-candidates'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      queryClient.invalidateQueries({ queryKey: ['voter-groups'] });
+      setRenamePartyListConfirm(null);
+      setEditingPartyList(null);
+      setRenamePartyListValue("");
+    },
+    onError: (err) => {
+      toast({ title: 'Failed to rename party list', description: err.message, variant: 'destructive' });
+      setRenamePartyListConfirm(null);
     },
   });
 
@@ -3217,12 +3247,18 @@ export default function Admin() {
               Account Security
             </button>
             <button
-              onClick={() => { setSettingsSubTab("sections"); setEditingSection(null); setRenameSectionValue(""); }}
+              onClick={() => {
+                setSettingsSubTab("sections");
+                setEditingSection(null);
+                setRenameSectionValue("");
+                setEditingPartyList(null);
+                setRenamePartyListValue("");
+              }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${settingsSubTab === "sections" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
             >
               <Tag className="w-4 h-4" />
-              Manage Sections
+              Manage Sections & Party Lists
             </button>
           </div>
 
@@ -3643,99 +3679,188 @@ export default function Admin() {
             </div>
           )}
 
-          {/* ── Manage Sections Sub-panel ── */}
+          {/* ── Manage Sections & Party Lists Sub-panel ── */}
           {settingsSubTab === "sections" && (
-            <div className="animate-fade-in max-w-2xl space-y-4">
-              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
-                <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
-                  <Tag className="w-5 h-5 text-gold" /> Manage Sections
-                </h3>
-                <p className="text-xs text-muted-foreground mb-5">
-                  Rename any section below. The new name will be applied to <span className="font-medium text-foreground">all voters and candidates</span> in that section.
-                </p>
+            <div className="animate-fade-in grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              {/* Left Column: Manage Sections */}
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant flex flex-col justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                    <Tag className="w-5 h-5 text-gold" /> Manage Sections
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-5">
+                    Rename any section below. The new name will be applied to <span className="font-medium text-foreground">all voters and candidates</span> in that section.
+                  </p>
 
-                {!voterGroups ? (
-                  <p className="text-muted-foreground text-sm">Loading sections…</p>
-                ) : (voterGroups.sections?.length ?? 0) === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Tag className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                    <p className="text-sm">No sections found. Add voters to create sections.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {/* Group by grade level */}
-                    {Object.entries(
-                      (voterGroups.sections ?? []).reduce((acc, s) => {
-                        const g = s.grade_level || 'Unknown';
-                        if (!acc[g]) acc[g] = [];
-                        acc[g].push(s.section);
-                        return acc;
-                      }, {})
-                    ).sort(([a], [b]) => a.localeCompare(b)).map(([grade, sections]) => (
-                      <div key={grade}>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 px-1">{grade}</p>
-                        <div className="space-y-1.5">
-                          {sections.sort().map((section) => {
-                            const isEditing = editingSection?.grade_level === grade && editingSection?.section === section;
-                            return (
-                              <div key={section} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-background border border-border hover:border-ring transition-colors group">
-                                <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
-                                {isEditing ? (
-                                  <>
-                                    <input
-                                      autoFocus
-                                      type="text"
-                                      value={renameSectionValue}
-                                      onChange={(e) => setRenameSectionValue(e.target.value.toUpperCase())}
-                                      onKeyDown={(e) => {
-                                        if (e.key === 'Enter' && renameSectionValue.trim() && renameSectionValue.trim() !== section) {
-                                          setRenameSectionConfirm({ grade_level: grade, old_section: section, new_section: renameSectionValue.trim() });
-                                        }
-                                        if (e.key === 'Escape') { setEditingSection(null); setRenameSectionValue(""); }
-                                      }}
-                                      className="flex-1 bg-transparent text-foreground font-medium text-sm focus:outline-none uppercase"
-                                      placeholder={section}
-                                    />
-                                    <button
-                                      onClick={() => {
-                                        if (renameSectionValue.trim() && renameSectionValue.trim() !== section) {
-                                          setRenameSectionConfirm({ grade_level: grade, old_section: section, new_section: renameSectionValue.trim() });
-                                        }
-                                      }}
-                                      disabled={!renameSectionValue.trim() || renameSectionValue.trim() === section}
-                                      className="p-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-30"
-                                      title="Save"
-                                    >
-                                      <Check className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      onClick={() => { setEditingSection(null); setRenameSectionValue(""); }}
-                                      className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                                      title="Cancel"
-                                    >
-                                      <X className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span className="flex-1 font-medium text-foreground text-sm uppercase">{section}</span>
-                                    <button
-                                      onClick={() => { setEditingSection({ grade_level: grade, section }); setRenameSectionValue(section); }}
-                                      className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-all"
-                                      title="Rename section"
-                                    >
-                                      <Pencil className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            );
-                          })}
+                  {!voterGroups ? (
+                    <p className="text-muted-foreground text-sm">Loading sections…</p>
+                  ) : (voterGroups.sections?.length ?? 0) === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Tag className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No sections found. Add voters to create sections.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Group by grade level */}
+                      {Object.entries(
+                        (voterGroups.sections ?? []).reduce((acc, s) => {
+                          const g = s.grade_level || 'Unknown';
+                          if (!acc[g]) acc[g] = [];
+                          acc[g].push(s.section);
+                          return acc;
+                        }, {})
+                      ).sort(([a], [b]) => a.localeCompare(b)).map(([grade, sections]) => (
+                        <div key={grade}>
+                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2 px-1">{grade}</p>
+                          <div className="space-y-1.5">
+                            {sections.sort().map((section) => {
+                              const isEditing = editingSection?.grade_level === grade && editingSection?.section === section;
+                              return (
+                                <div key={section} className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-background border border-border hover:border-ring transition-colors group">
+                                  <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
+                                  {isEditing ? (
+                                    <>
+                                      <input
+                                        autoFocus
+                                        type="text"
+                                        value={renameSectionValue}
+                                        onChange={(e) => setRenameSectionValue(e.target.value.toUpperCase())}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter' && renameSectionValue.trim() && renameSectionValue.trim() !== section) {
+                                            setRenameSectionConfirm({ grade_level: grade, old_section: section, new_section: renameSectionValue.trim() });
+                                          }
+                                          if (e.key === 'Escape') { setEditingSection(null); setRenameSectionValue(""); }
+                                        }}
+                                        className="flex-1 bg-transparent text-foreground font-medium text-sm focus:outline-none uppercase"
+                                        placeholder={section}
+                                      />
+                                      <button
+                                        onClick={() => {
+                                          if (renameSectionValue.trim() && renameSectionValue.trim() !== section) {
+                                            setRenameSectionConfirm({ grade_level: grade, old_section: section, new_section: renameSectionValue.trim() });
+                                          }
+                                        }}
+                                        disabled={!renameSectionValue.trim() || renameSectionValue.trim() === section}
+                                        className="p-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-30"
+                                        title="Save"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => { setEditingSection(null); setRenameSectionValue(""); }}
+                                        className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                        title="Cancel"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span className="flex-1 font-medium text-foreground text-sm uppercase">{section}</span>
+                                      <button
+                                        onClick={() => { setEditingSection({ grade_level: grade, section }); setRenameSectionValue(section); }}
+                                        className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Rename section"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Manage Party Lists */}
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant flex flex-col justify-between">
+                <div>
+                  <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                    <Flag className="w-5 h-5 text-gold" /> Manage Party Lists
+                  </h3>
+                  <p className="text-xs text-muted-foreground mb-5">
+                    Rename any party list below. The new name will be applied to <span className="font-medium text-foreground">all active candidates</span> in that party list.
+                  </p>
+
+                  {!candidates ? (
+                    <p className="text-muted-foreground text-sm">Loading party lists…</p>
+                  ) : candidatePartyLists.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Flag className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                      <p className="text-sm">No party lists found. Add candidates with party lists to manage them here.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {candidatePartyLists.map((party) => {
+                        const isEditing = editingPartyList === party;
+                        const memberCount = (candidates ?? []).filter(c => c.party_list === party).length;
+                        return (
+                          <div key={party} className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl bg-background border border-border hover:border-ring transition-colors group">
+                            <Flag className="w-4 h-4 text-gold shrink-0" />
+                            {isEditing ? (
+                              <>
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  value={renamePartyListValue}
+                                  onChange={(e) => setRenamePartyListValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && renamePartyListValue.trim() && renamePartyListValue.trim() !== party) {
+                                      setRenamePartyListConfirm({ old_party_list: party, new_party_list: renamePartyListValue.trim() });
+                                    }
+                                    if (e.key === 'Escape') { setEditingPartyList(null); setRenamePartyListValue(""); }
+                                  }}
+                                  className="flex-1 bg-transparent text-foreground font-medium text-sm focus:outline-none"
+                                  placeholder={party}
+                                />
+                                <button
+                                  onClick={() => {
+                                    if (renamePartyListValue.trim() && renamePartyListValue.trim() !== party) {
+                                      setRenamePartyListConfirm({ old_party_list: party, new_party_list: renamePartyListValue.trim() });
+                                    }
+                                  }}
+                                  disabled={!renamePartyListValue.trim() || renamePartyListValue.trim() === party}
+                                  className="p-1.5 rounded-lg bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-30"
+                                  title="Save"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  onClick={() => { setEditingPartyList(null); setRenamePartyListValue(""); }}
+                                  className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                  title="Cancel"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-semibold text-foreground text-sm truncate block">{party}</span>
+                                </div>
+                                <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-medium border border-border shrink-0">
+                                  {memberCount} {memberCount === 1 ? 'candidate' : 'candidates'}
+                                </span>
+                                <button
+                                  onClick={() => { setEditingPartyList(party); setRenamePartyListValue(party); }}
+                                  className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted opacity-0 group-hover:opacity-100 transition-all shrink-0"
+                                  title="Rename party list"
+                                >
+                                  <Pencil className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -3761,7 +3886,7 @@ export default function Admin() {
               <span className="font-bold text-gold uppercase">{renameSectionConfirm.new_section}</span>
             </div>
             <p className="text-xs text-muted-foreground mb-6">
-              All voters and candidates currently assigned to <span className="font-medium text-foreground uppercase">{renameSectionConfirm.old_section}</span> will be updated to the new name. This cannot be undone.
+              All voters and candidates currently assigned to <span className="font-medium text-foreground uppercase">{renameSectionConfirm.old_section}</span> will be updated to the new name. You can rename this section again anytime if you need to make corrections.
             </p>
             <div className="flex items-center justify-end gap-3">
               <button onClick={() => setRenameSectionConfirm(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
@@ -3773,6 +3898,45 @@ export default function Admin() {
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
               >
                 {renameSection.isPending
+                  ? <><div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> Renaming…</>
+                  : <><Check className="w-4 h-4" /> Confirm Rename</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Rename Party List Confirmation Modal ── */}
+      {renamePartyListConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setRenamePartyListConfirm(null)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Flag className="w-5 h-5 text-gold" /> Rename Party List?
+              </h3>
+              <button onClick={() => setRenamePartyListConfirm(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">You are about to rename this party list:</p>
+            <div className="flex items-center gap-3 bg-muted rounded-xl px-4 py-3 mb-4">
+              <span className="font-bold text-foreground">{renamePartyListConfirm.old_party_list}</span>
+              <span className="text-muted-foreground">→</span>
+              <span className="font-bold text-gold">{renamePartyListConfirm.new_party_list}</span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-6">
+              All active candidates currently assigned to <span className="font-medium text-foreground">{renamePartyListConfirm.old_party_list}</span> will be updated to <span className="font-medium text-gold">{renamePartyListConfirm.new_party_list}</span>. You can rename this party list again anytime if you need to make corrections.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setRenamePartyListConfirm(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => renamePartyList.mutate(renamePartyListConfirm)}
+                disabled={renamePartyList.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {renamePartyList.isPending
                   ? <><div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> Renaming…</>
                   : <><Check className="w-4 h-4" /> Confirm Rename</>}
               </button>

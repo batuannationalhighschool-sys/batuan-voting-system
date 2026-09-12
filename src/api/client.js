@@ -333,6 +333,58 @@ async function handlePatch(path, body) {
     return data;
   }
 
+  // /partylists/rename — bulk-rename a party list across candidates
+  if (pathname === '/partylists/rename' || pathname === '/party-lists/rename') {
+    const oldPartyList = (body.old_party_list || '').trim();
+    const newPartyList = (body.new_party_list || '').trim();
+
+    if (!newPartyList) throw new Error('New party list name cannot be empty');
+    if (newPartyList === oldPartyList) {
+      throw new Error('New party list name is the same as the old name');
+    }
+
+    try {
+      const { data, error } = await supabase.rpc('app_rename_party_list', {
+        p_token:          getToken(),
+        p_old_party_list: oldPartyList,
+        p_new_party_list: newPartyList,
+      });
+      if (!error && data) return data;
+      if (error && !isMissingRpc(error)) throw new Error(error.message);
+    } catch (err) {
+      if (!isMissingRpc(err)) throw err;
+    }
+
+    // Fallback: fetch candidates with this party list and update each using app_update_candidate RPC
+    const { data: allCandidates, error: fetchErr } = await supabase
+      .from('candidates')
+      .select('*');
+    if (fetchErr) throw new Error(fetchErr.message);
+
+    const matching = (allCandidates || []).filter(
+      c => (c.party_list || '').trim().toLowerCase() === oldPartyList.toLowerCase()
+    );
+
+    let updatedCount = 0;
+    for (const c of matching) {
+      const { error: updErr } = await supabase.rpc('app_update_candidate', {
+        p_token: getToken(),
+        p_id: c.id,
+        p_name: c.name,
+        p_position_id: c.position_id,
+        p_grade_level: c.grade_level,
+        p_section: c.section,
+        p_party_list: newPartyList,
+        p_motto: c.motto || null,
+        p_avatar_url: c.avatar_url || null,
+      });
+      if (updErr) throw new Error(updErr.message);
+      updatedCount++;
+    }
+
+    return { updated_candidates: updatedCount };
+  }
+
   throw new Error(`Unknown PATCH route: ${pathname}`);
 }
 
