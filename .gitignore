@@ -33,3 +33,5 @@ dist-ssr
 !**/.env.example
 
 .vercel
+
+scratch/
