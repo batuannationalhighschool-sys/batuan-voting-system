@@ -49,6 +49,16 @@ function detectImageType(buffer) {
   return null;
 }
 
+function candidatePhotoPath(publicUrl) {
+  try {
+    const path = new URL(publicUrl).pathname;
+    const match = path.match(/\/candidate-photos\/candidates\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/i);
+    return match ? `candidates/${match[1]}` : null;
+  } catch {
+    return null;
+  }
+}
+
 // Helper: upload file buffer to Supabase Storage
 async function uploadToSupabaseStorage(fileBuffer, originalName) {
   const detected = detectImageType(fileBuffer);
@@ -199,6 +209,19 @@ app.post(
     }
   },
 );
+
+app.delete('/api/candidate-photo', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const filePath = candidatePhotoPath(req.query.url);
+    if (!filePath) return res.status(400).json({ error: 'Invalid candidate photo URL' });
+    const { error } = await supabase.storage.from('candidate-photos').remove([filePath]);
+    if (error) throw error;
+    return res.status(204).end();
+  } catch (err) {
+    console.error('Candidate photo cleanup error:', err.message);
+    return res.status(400).json({ error: 'Candidate photo cleanup failed' });
+  }
+});
 
 // ─── Voter Management (Admin only) ─────────────────────────────
 
@@ -727,7 +750,7 @@ app.get('/api/candidates', async (req, res) => {
   try {
     const { data: rows, error } = await supabase
       .from('candidates')
-      .select('*')
+      .select('id,name,position_id,grade_level,section,party_list,motto,avatar_url,created_at')
       .eq('archived', false);
 
     if (error) throw error;
@@ -739,34 +762,30 @@ app.get('/api/candidates', async (req, res) => {
 
 app.post('/api/candidates', requireAuth, requireAdmin, upload.single('photo'), async (req, res) => {
   try {
-    const { name, position_id, grade_level, section, party_list, motto } = req.body;
-    if (!name || !position_id || !grade_level || !section || !party_list) {
-      return res.status(400).json({ error: 'Name, position, grade level, section, and party list are required' });
+    const { student_user_id, position_id, party_list, motto } = req.body;
+    if (!student_user_id || !position_id || !party_list) {
+      return res.status(400).json({ error: 'Selected student, position, and party list are required' });
     }
 
-    const id = randomUUID();
     let avatar_url = null;
 
     if (req.file) {
       avatar_url = await uploadToSupabaseStorage(req.file.buffer, req.file.originalname);
     }
 
-    const { error } = await supabase
-      .from('candidates')
-      .insert({
-        id,
-        name,
-        position_id,
-        grade_level,
-        section,
-        party_list,
-        motto: motto || null,
-        avatar_url,
-      });
-
-    if (error) throw error;
-
-    res.json({ id, name, position_id, grade_level, section, party_list, motto, avatar_url });
+    const { data, error } = await supabase.rpc('app_add_candidate', {
+      p_token: req.authToken, p_student_user_id: student_user_id,
+      p_position_id: position_id, p_party_list: party_list,
+      p_motto: motto || null, p_avatar_url: avatar_url,
+    });
+    if (error) {
+      if (avatar_url) {
+        const filePath = candidatePhotoPath(avatar_url);
+        if (filePath) await supabase.storage.from('candidate-photos').remove([filePath]);
+      }
+      return res.status(400).json({ error: error.message });
+    }
+    res.json(data);
   } catch (err) {
     console.error('Add candidate error:', err);
     res.status(500).json({ error: 'Failed to add candidate' });
@@ -775,39 +794,21 @@ app.post('/api/candidates', requireAuth, requireAdmin, upload.single('photo'), a
 
 app.put('/api/candidates/:id', requireAuth, requireAdmin, upload.single('photo'), async (req, res) => {
   try {
-    const { name, position_id, grade_level, section, party_list, motto } = req.body;
-    if (!name || !position_id || !grade_level || !section || !party_list) {
-      return res.status(400).json({ error: 'Name, position, grade level, section, and party list are required' });
+    const { position_id, party_list, motto } = req.body;
+    if (!position_id || !party_list) {
+      return res.status(400).json({ error: 'Position and party list are required' });
     }
 
-    const updateData = {
-      name,
-      position_id,
-      grade_level,
-      section,
-      party_list,
-      motto: motto || null,
-    };
-
+    let avatar_url = null;
     if (req.file) {
-      updateData.avatar_url = await uploadToSupabaseStorage(req.file.buffer, req.file.originalname);
+      avatar_url = await uploadToSupabaseStorage(req.file.buffer, req.file.originalname);
     }
-
-    const { error: updateError } = await supabase
-      .from('candidates')
-      .update(updateData)
-      .eq('id', req.params.id);
-
-    if (updateError) throw updateError;
-
-    const { data: updated, error: fetchError } = await supabase
-      .from('candidates')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
-
-    if (fetchError) throw fetchError;
-    res.json(updated);
+    const { data, error } = await supabase.rpc('app_update_candidate', {
+      p_token: req.authToken, p_id: req.params.id, p_position_id: position_id,
+      p_party_list: party_list, p_motto: motto || null, p_avatar_url: avatar_url,
+    });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
   } catch (err) {
     console.error('Update candidate error:', err);
     res.status(500).json({ error: 'Failed to update candidate' });
@@ -891,86 +892,11 @@ app.post('/api/candidates/bulk', requireAuth, requireAdmin, async (req, res) => 
       return res.status(400).json({ error: 'Expected a non-empty "candidates" array' });
     }
 
-    // Fetch all positions to match position titles to position_id
-    const { data: positions, error: posError } = await supabase
-      .from('positions')
-      .select('id, title');
-
-    if (posError) throw posError;
-
-    const positionMap = {};
-    for (const p of (positions || [])) {
-      positionMap[p.title.trim().toLowerCase()] = p.id;
-    }
-
-    const inserted = [];
-    const skipped = [];
-    const errors = [];
-
-    for (let i = 0; i < rows.length; i++) {
-      const { name, position, grade_level, section, party_list, motto } = rows[i] ?? {};
-      const rowLabel = `Row ${i + 1}`;
-
-      const cleanName = String(name || '').trim();
-      const cleanPos = String(position || '').trim();
-      const cleanGrade = String(grade_level || '').trim();
-      const cleanSec = String(section || '').trim();
-      const cleanParty = String(party_list || '').trim();
-      const cleanMotto = String(motto || '').trim();
-
-      if (!cleanName || !cleanPos || !cleanGrade || !cleanSec || !cleanParty) {
-        errors.push({ row: rowLabel, name: cleanName, reason: 'Name, position, grade level, section, and party list are required' });
-        continue;
-      }
-
-      const positionId = positionMap[cleanPos.toLowerCase()];
-      if (!positionId) {
-        errors.push({ row: rowLabel, name: cleanName, reason: `Position "${cleanPos}" does not exist in position list` });
-        continue;
-      }
-
-      // Check if candidate with same name and position already exists (and not archived)
-      const { data: existing } = await supabase
-        .from('candidates')
-        .select('id')
-        .eq('name', cleanName)
-        .eq('position_id', positionId)
-        .eq('archived', false);
-
-      if (existing && existing.length > 0) {
-        skipped.push({ name: cleanName, position: cleanPos });
-        continue;
-      }
-
-      const id = randomUUID();
-      const { error: insertError } = await supabase
-        .from('candidates')
-        .insert({
-          id,
-          name: cleanName.slice(0, 100),
-          position_id: positionId,
-          grade_level: cleanGrade.slice(0, 50),
-          section: cleanSec.slice(0, 50),
-          party_list: cleanParty.slice(0, 100),
-          motto: cleanMotto ? cleanMotto.slice(0, 200) : null,
-          archived: false,
-        });
-
-      if (insertError) {
-        errors.push({ row: rowLabel, name: cleanName, reason: insertError.message });
-        continue;
-      }
-
-      inserted.push({ name: cleanName, position: cleanPos });
-    }
-
-    res.json({
-      inserted: inserted.length,
-      skipped: skipped.length,
-      errors: errors.length,
-      skippedList: skipped,
-      errorList: errors,
+    const { data, error } = await supabase.rpc('app_bulk_upload_candidates', {
+      p_token: req.authToken, p_candidates: rows,
     });
+    if (error) return res.status(400).json({ error: error.message });
+    res.json(data);
   } catch (err) {
     console.error('Bulk upload candidates error:', err);
     res.status(500).json({ error: 'Bulk upload candidates failed' });

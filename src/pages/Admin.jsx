@@ -149,6 +149,7 @@ function parseCandidateCSV(text) {
       if (h) obj[h] = vals[i] ?? '';
     });
 
+    const studentId = obj.studentid || obj.lrn || obj.learnerreferencenumber || obj.idnumber || '';
     const name = obj.name || obj.fullname || obj.candidate || obj.candidatename || obj.pangalan || '';
     const position = obj.position || obj.positiontitle || obj.title || obj.pos || obj.posisyon || '';
     const rawGrade = obj.gradelevel || obj.grade || obj.yearlevel || obj.year || obj.level || obj.baitang || obj.gr || '';
@@ -160,6 +161,7 @@ function parseCandidateCSV(text) {
     const { grade_level, section } = extractGradeAndSection(rawGrade, rawSection, rawCombined);
 
     return {
+      student_id: studentId.trim(),
       name: name.trim(),
       position: position.trim(),
       grade_level: grade_level,
@@ -167,7 +169,7 @@ function parseCandidateCSV(text) {
       party_list: partyList.trim(),
       motto: motto.trim(),
     };
-  }).filter(r => r.name || r.position);
+  }).filter(r => r.student_id || r.position);
 }
 
 // ─── CSV template contents ───────────────────────────────────────────────────
@@ -176,8 +178,8 @@ const CSV_TEMPLATE = `lrn,full_name,grade_level,section
 234567890123,Maria Santos,Grade 8,Pearl
 `;
 
-const CANDIDATE_CSV_TEMPLATE = `name,position,grade_level,section,party_list,motto
-Maria Santos,Vice President,Grade 11,Cookery,Siklab Party,Service for all
+const CANDIDATE_CSV_TEMPLATE = `student_id,position,party_list,motto
+123456789012,Vice President,Siklab Party,Service for all
 `;
 
 export default function Admin() {
@@ -213,7 +215,9 @@ export default function Admin() {
   );
 
   // Add candidate form state
-  const [newCandidate, setNewCandidate] = useState({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
+  const [newCandidate, setNewCandidate] = useState({ student_user_id: "", name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
+  const [studentSearch, setStudentSearch] = useState("");
+  const [debouncedStudentSearch, setDebouncedStudentSearch] = useState("");
   const [customCandidateSection, setCustomCandidateSection] = useState(false);
   const [photoFile, setPhotoFile] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
@@ -342,6 +346,15 @@ export default function Admin() {
   const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: () => api.get('/stats') });
   const { data: voters } = useQuery({ queryKey: ["voters"], queryFn: () => api.get('/voters'), enabled: isAdmin });
   const { data: voterGroups } = useQuery({ queryKey: ["voter-groups"], queryFn: () => api.get('/voters/groups') });
+  useEffect(() => {
+    const timeout = setTimeout(() => setDebouncedStudentSearch(studentSearch.trim()), 250);
+    return () => clearTimeout(timeout);
+  }, [studentSearch]);
+  const { data: studentSuggestions = [], isFetching: isSearchingStudents } = useQuery({
+    queryKey: ["eligible-students", debouncedStudentSearch],
+    queryFn: () => api.get(`/eligible-students?q=${encodeURIComponent(debouncedStudentSearch)}`),
+    enabled: isAdmin && !newCandidate.student_user_id && debouncedStudentSearch.length >= 2,
+  });
 
   // Dynamically extract sections & grade levels strictly from Supabase (voterGroups, voters, candidates) and form inputs
   const dynamicGradeSections = useMemo(() => {
@@ -540,7 +553,7 @@ export default function Admin() {
 
   const validateAddForm = () => {
     const errors = {};
-    if (!newCandidate.name.trim()) errors.name = "Full name is required.";
+    if (!newCandidate.student_user_id) errors.student = "Select a student from the search results.";
     if (!newCandidate.position_id) errors.position_id = "Please select a position.";
     if (!newCandidate.grade_level) errors.grade_level = "Please select a grade level.";
     if (!newCandidate.section) errors.section = "Please select a section.";
@@ -553,10 +566,8 @@ export default function Admin() {
     mutationFn: async () => {
       if (!validateAddForm()) throw new Error("Please fill in all required fields.");
       const formData = new FormData();
-      formData.append('name', newCandidate.name);
+      formData.append('student_user_id', newCandidate.student_user_id);
       formData.append('position_id', newCandidate.position_id);
-      formData.append('grade_level', newCandidate.grade_level);
-      formData.append('section', newCandidate.section);
       formData.append('party_list', newCandidate.party_list);
       formData.append('motto', newCandidate.motto);
       if (photoFile) formData.append('photo', photoFile);
@@ -564,7 +575,8 @@ export default function Admin() {
     },
     onSuccess: () => {
       toast({ title: "Candidate added!", variant: "success" });
-      setNewCandidate({ name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
+      setNewCandidate({ student_user_id: "", name: "", position_id: "", grade_level: "", section: "", party_list: "", motto: "" });
+      setStudentSearch("");
       setCustomCandidateSection(false);
       setFormErrors({});
       setPhotoFile(null);
@@ -1786,7 +1798,7 @@ export default function Admin() {
             </div>
 
             <p className="text-xs text-muted-foreground mb-4">
-              Upload a CSV file with columns: <span className="font-mono text-foreground">name, position, grade_level, section, party_list, motto</span>. Existing candidate entries are automatically skipped. Position names must match available positions.
+                Upload a CSV with <span className="font-mono text-foreground">student_id, position, party_list, motto</span>. Name, grade, and section are derived from the official student record; optional copies are checked and rejected if they do not match.
             </p>
 
             <div
@@ -1841,10 +1853,8 @@ export default function Admin() {
                     <thead className="sticky top-0 bg-muted/90 backdrop-blur-sm">
                       <tr>
                         <th className="text-left p-2.5 font-semibold text-foreground">#</th>
-                        <th className="text-left p-2.5 font-semibold text-foreground">Name</th>
+                        <th className="text-left p-2.5 font-semibold text-foreground">Student ID</th>
                         <th className="text-left p-2.5 font-semibold text-foreground">Position</th>
-                        <th className="text-left p-2.5 font-semibold text-foreground hidden sm:table-cell">Grade</th>
-                        <th className="text-left p-2.5 font-semibold text-foreground hidden sm:table-cell">Section</th>
                         <th className="text-left p-2.5 font-semibold text-foreground">Party List</th>
                       </tr>
                     </thead>
@@ -1852,11 +1862,11 @@ export default function Admin() {
                       {bulkCandidatePreview.map((row, i) => {
                         const validPosTitles = (positions ?? []).map(p => p.title.toLowerCase());
                         const posValid = row.position && validPosTitles.includes(row.position.trim().toLowerCase());
-                        const hasError = !row.name || !row.position || !posValid || !row.grade_level || !row.section || !row.party_list;
+                        const hasError = !row.student_id || !row.position || !posValid || !row.party_list;
                         return (
                           <tr key={i} className={`border-t border-border ${hasError ? 'bg-destructive/5' : ''}`}>
                             <td className="p-2.5 text-muted-foreground">{i + 1}</td>
-                            <td className={`p-2.5 uppercase ${!row.name ? 'text-destructive italic' : 'text-foreground font-medium'}`}>{row.name || 'missing'}</td>
+                            <td className={`p-2.5 ${!row.student_id ? 'text-destructive italic' : 'text-foreground font-medium'}`}>{row.student_id || 'missing'}</td>
                             <td className={`p-2.5 ${!posValid ? 'text-destructive font-semibold' : 'text-muted-foreground'}`}>
                               {row.position ? row.position : <span className="italic text-destructive">missing</span>}
                               {row.position && !posValid && <span className="text-[10px] block text-destructive">(invalid position)</span>}
@@ -1923,12 +1933,52 @@ export default function Admin() {
             </h3>
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {/* Full Name */}
-                <div>
-                  <input type="text" placeholder="Full Name" value={newCandidate.name}
-                    onChange={(e) => { setNewCandidate(p => ({ ...p, name: e.target.value })); if (formErrors.name) setFormErrors(p => ({ ...p, name: undefined })); }} maxLength={100}
-                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.name ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
-                  {formErrors.name && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.name}</p>}
+                {/* Student selection: identity is selected, not typed. */}
+                <div className="relative sm:col-span-2 lg:col-span-3">
+                  {newCandidate.student_user_id ? (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-success/40 bg-success/5 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground truncate">{newCandidate.name}</p>
+                        <p className="text-xs text-muted-foreground">{newCandidate.student_id} · {newCandidate.grade_level} · {newCandidate.section}</p>
+                      </div>
+                      <button type="button" onClick={() => {
+                        setNewCandidate(p => ({ ...p, student_user_id: "", student_id: "", name: "", grade_level: "", section: "" }));
+                        setStudentSearch("");
+                      }} className="shrink-0 px-3 py-1.5 rounded-lg bg-background border border-border text-xs font-medium hover:bg-muted transition-colors">
+                        Change student
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <label htmlFor="candidate-student-search" className="sr-only">Search existing student</label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                        <input id="candidate-student-search" type="search" autoComplete="off" placeholder="Search existing student by name or student ID" value={studentSearch}
+                          onChange={(e) => { setStudentSearch(e.target.value); if (formErrors.student) setFormErrors(p => ({ ...p, student: undefined })); }}
+                          className={`w-full pl-10 pr-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.student ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
+                      </div>
+                      {studentSearch.trim().length > 0 && studentSearch.trim().length < 2 && <p className="mt-1 text-xs text-muted-foreground">Enter at least 2 characters.</p>}
+                      {isSearchingStudents && <p className="mt-1 text-xs text-muted-foreground">Searching students…</p>}
+                      {debouncedStudentSearch.length >= 2 && !isSearchingStudents && studentSuggestions.length === 0 && <p className="mt-1 text-xs text-muted-foreground">No eligible student found.</p>}
+                      {studentSuggestions.length > 0 && (
+                        <ul role="listbox" className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-border bg-card shadow-xl">
+                          {studentSuggestions.map((student) => (
+                            <li key={student.user_id}>
+                              <button type="button" role="option" onClick={() => {
+                                setNewCandidate(p => ({ ...p, student_user_id: student.user_id, student_id: student.student_id, name: student.full_name, grade_level: student.grade_level, section: student.section }));
+                                setStudentSearch("");
+                                setFormErrors(p => ({ ...p, student: undefined, name: undefined, grade_level: undefined, section: undefined }));
+                              }} className="w-full px-4 py-3 text-left hover:bg-muted transition-colors border-b border-border/60 last:border-b-0">
+                                <span className="block text-sm font-semibold text-foreground">{student.full_name}</span>
+                                <span className="block text-xs text-muted-foreground">{student.student_id} · {student.grade_level} · {student.section}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </>
+                  )}
+                  {formErrors.student && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.student}</p>}
                 </div>
                 {/* Position */}
                 <div>
@@ -1940,68 +1990,13 @@ export default function Admin() {
                   </select>
                   {formErrors.position_id && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.position_id}</p>}
                 </div>
-                {/* Grade Level */}
                 <div>
-                  <select
-                    value={newCandidate.grade_level}
-                    onChange={(e) => {
-                      setNewCandidate(p => ({ ...p, grade_level: e.target.value, section: "" }));
-                      setCustomCandidateSection(false);
-                      if (formErrors.grade_level) setFormErrors(p => ({ ...p, grade_level: undefined }));
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${formErrors.grade_level ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                  >
-                    <option value="">Select Grade Level</option>
-                    {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
-                  </select>
-                  {formErrors.grade_level && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.grade_level}</p>}
+                  <input readOnly aria-readonly="true" placeholder="Grade auto-filled after student selection" value={newCandidate.grade_level}
+                    className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border text-foreground text-sm cursor-not-allowed" />
                 </div>
-                {/* Section */}
                 <div>
-                  {customCandidateSection ? (
-                    <div className="flex gap-1.5">
-                      <input
-                        type="text"
-                        placeholder="Enter custom section..."
-                        value={newCandidate.section}
-                        onChange={(e) => {
-                          setNewCandidate(p => ({ ...p, section: e.target.value.toUpperCase() }));
-                          if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
-                        }}
-                        className={`flex-1 px-3 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => { setCustomCandidateSection(false); setNewCandidate(p => ({ ...p, section: "" })); }}
-                        className="px-2.5 py-2.5 rounded-xl bg-muted text-foreground text-xs hover:bg-muted/80 transition-colors shrink-0"
-                        title="Select from list"
-                      >
-                        List
-                      </button>
-                    </div>
-                  ) : (
-                    <select
-                      value={newCandidate.section}
-                      onChange={(e) => {
-                        if (e.target.value === "__custom__") {
-                          setCustomCandidateSection(true);
-                          setNewCandidate(p => ({ ...p, section: "" }));
-                        } else {
-                          setNewCandidate(p => ({ ...p, section: e.target.value }));
-                          if (formErrors.section) setFormErrors(p => ({ ...p, section: undefined }));
-                        }
-                      }}
-                      disabled={!newCandidate.grade_level}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${formErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
-                    >
-                      <option value="">{newCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
-                      {newCandidate.grade_level && (dynamicGradeSections[newCandidate.grade_level] || []).map(s => (
-                        <option key={s} value={s}>{s?.toUpperCase()}</option>
-                      ))}
-                      {newCandidate.grade_level && <option value="__custom__">+ Enter new custom section...</option>}
-                    </select>
-                  )}
-                  {formErrors.section && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{formErrors.section}</p>}
+                  <input readOnly aria-readonly="true" placeholder="Section auto-filled after student selection" value={newCandidate.section}
+                    className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border text-foreground text-sm cursor-not-allowed" />
                 </div>
                 {/* Party List */}
                 <div>
@@ -2039,7 +2034,7 @@ export default function Admin() {
                   {!photoPreview && <span className="text-xs text-muted-foreground">Optional — default avatar will be used if no photo is uploaded</span>}
                 </div>
               </div>
-              <button onClick={() => addCandidate.mutate()} disabled={addCandidate.isPending}
+              <button onClick={() => addCandidate.mutate()} disabled={addCandidate.isPending || !newCandidate.student_user_id}
                 className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50">
                 <UserPlus className="w-4 h-4" /> Add Candidate
               </button>
@@ -2408,9 +2403,9 @@ export default function Admin() {
             <div className="space-y-3">
               {/* Edit: Full Name */}
               <div>
-                <input type="text" placeholder="Full Name" value={editCandidate.name}
-                  onChange={(e) => { setEditCandidate(p => ({ ...p, name: e.target.value })); if (editFormErrors.name) setEditFormErrors(p => ({ ...p, name: undefined })); }} maxLength={100}
-                  className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring placeholder:text-muted-foreground ${editFormErrors.name ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`} />
+                <input type="text" placeholder="Full Name" value={editCandidate.name} readOnly aria-readonly="true"
+                  className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border text-foreground text-sm cursor-not-allowed" />
+                <p className="mt-1 text-xs text-muted-foreground">Student identity is managed from the official student record.</p>
                 {editFormErrors.name && <p className="mt-1 text-xs text-red-500 flex items-center gap-1"><AlertCircle className="w-3 h-3" />{editFormErrors.name}</p>}
               </div>
               {/* Edit: Position */}
@@ -2428,12 +2423,8 @@ export default function Admin() {
                 <div>
                   <select
                     value={editCandidate.grade_level}
-                    onChange={(e) => {
-                      setEditCandidate(p => ({ ...p, grade_level: e.target.value, section: "" }));
-                      setCustomEditCandidateSection(false);
-                      if (editFormErrors.grade_level) setEditFormErrors(p => ({ ...p, grade_level: undefined }));
-                    }}
-                    className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring ${editFormErrors.grade_level ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                    disabled
+                    className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border text-foreground text-sm cursor-not-allowed"
                   >
                     <option value="">Grade Level</option>
                     {allAvailableGrades.map(g => <option key={g} value={g}>{g}</option>)}
@@ -2465,17 +2456,8 @@ export default function Admin() {
                   ) : (
                     <select
                       value={editCandidate.section}
-                      onChange={(e) => {
-                        if (e.target.value === "__custom__") {
-                          setCustomEditCandidateSection(true);
-                          setEditCandidate(p => ({ ...p, section: "" }));
-                        } else {
-                          setEditCandidate(p => ({ ...p, section: e.target.value }));
-                          if (editFormErrors.section) setEditFormErrors(p => ({ ...p, section: undefined }));
-                        }
-                      }}
-                      disabled={!editCandidate.grade_level}
-                      className={`w-full px-4 py-2.5 rounded-xl bg-background border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50 ${editFormErrors.section ? 'border-red-500 focus:ring-red-500/40' : 'border-border'}`}
+                      disabled
+                      className="w-full px-4 py-2.5 rounded-xl bg-muted/60 border border-border text-foreground text-sm cursor-not-allowed"
                     >
                       <option value="">{editCandidate.grade_level ? "Select Section" : "Select Grade first"}</option>
                       {editCandidate.grade_level && (dynamicGradeSections[editCandidate.grade_level] || []).map(s => (

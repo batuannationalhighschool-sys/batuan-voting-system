@@ -96,9 +96,37 @@ function detectImageType(buffer) {
   return null;
 }
 
+function candidatePhotoPath(publicUrl) {
+  try {
+    const path = new URL(publicUrl).pathname;
+    const match = path.match(/\/candidate-photos\/candidates\/([0-9a-f-]{36}\.(?:jpg|png|webp))$/i);
+    return match ? `candidates/${match[1]}` : null;
+  } catch {
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
+  if (req.method === 'DELETE') {
+    const token = bearerToken(req);
+    if (!token) return res.status(401).json({ error: 'Authentication required' });
+    try {
+      const client = getSupabaseAdmin();
+      const { data: auth, error: authError } = await client.rpc('app_get_me', { p_token: token });
+      if (authError || !auth?.isAdmin) return res.status(403).json({ error: 'Admin access required' });
+      const filePath = candidatePhotoPath(req.query?.url);
+      if (!filePath) return res.status(400).json({ error: 'Invalid candidate photo URL' });
+      const { error } = await client.storage.from('candidate-photos').remove([filePath]);
+      if (error) throw error;
+      return res.status(204).end();
+    } catch (error) {
+      console.error('Candidate photo cleanup error:', error.message);
+      return res.status(400).json({ error: 'Candidate photo cleanup failed' });
+    }
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'POST, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 

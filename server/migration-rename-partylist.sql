@@ -1,6 +1,12 @@
 -- --- Rename Party List RPC --------------------------------------------------
 -- Renames a party list across all candidates.
 -- Called by PATCH /partylists/rename from the admin panel.
+--
+-- Apply AFTER server/migration-security-hardening.sql: it depends on the
+-- public.require_admin() helper that the hardening migration secures.
+-- This file is idempotent (CREATE OR REPLACE) and only adds one function.
+-- The public search_path is pinned below so the SECURITY DEFINER function
+-- cannot be redirected by a caller-controlled search_path.
 -- -------------------------------------------------------------------------------
 
 CREATE OR REPLACE FUNCTION public.app_rename_party_list(
@@ -11,6 +17,7 @@ CREATE OR REPLACE FUNCTION public.app_rename_party_list(
 RETURNS JSON
 LANGUAGE plpgsql
 SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $$
 DECLARE
   v_admin_id   UUID;

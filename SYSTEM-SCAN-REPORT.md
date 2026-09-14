@@ -1,5 +1,7 @@
 # Full-System Deep Scan Report — Batuan Voting System
 
+> **SUPERSEDED (2026-09-14).** This report is historical. Several claims below are now stale — the Express server does have a high-severity `multer` advisory, the live counts changed, the production commit advanced, and four defects (an RLS-bypassing `vote_counts` view, an unapplied party-list migration, a dead Realtime subscription, and a plaintext GitHub PAT in `.git/config`) are not covered here. See **`SYSTEM-SCAN-REPORT-2026-09-14.md`** for the current verified scan.
+
 > Scan date: 2026-09-07
 > Scope: local source/configuration, dependency tree, SQL migrations, live Supabase schema/RPCs/storage/public REST, Vercel project metadata, and production-readiness checks.
 

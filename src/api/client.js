@@ -56,9 +56,9 @@ async function handleGet(path) {
   }
 
   if (pathname === '/candidates') {
-    const { data, error } = await supabase.from('candidates').select('*').eq('archived', false);
+    const { data, error } = await supabase.rpc('app_list_public_candidates');
     if (error) throw new Error(error.message);
-    return data;
+    return data || [];
   }
 
   if (pathname === '/election-settings') {
@@ -105,6 +105,16 @@ async function handleGet(path) {
     const { data, error } = await supabase.rpc('app_get_voter_groups');
     if (error) throw new Error(error.message);
     return data;
+  }
+
+  if (pathname === '/eligible-students') {
+    const query = (params.q || '').trim();
+    if (query.length < 2) return [];
+    const { data, error } = await supabase.rpc('app_search_eligible_students', {
+      p_token: getToken(), p_query: query, p_limit: 10,
+    });
+    if (error) throw new Error(error.message);
+    return data || [];
   }
 
   if (pathname === '/stats') {
@@ -370,10 +380,7 @@ async function handlePatch(path, body) {
       const { error: updErr } = await supabase.rpc('app_update_candidate', {
         p_token: getToken(),
         p_id: c.id,
-        p_name: c.name,
         p_position_id: c.position_id,
-        p_grade_level: c.grade_level,
-        p_section: c.section,
         p_party_list: newPartyList,
         p_motto: c.motto || null,
         p_avatar_url: c.avatar_url || null,
@@ -471,6 +478,19 @@ async function uploadPhotoToStorage(file) {
   return result.url;
 }
 
+async function deleteUploadedPhoto(url) {
+  if (!url) return;
+  const endpoint = import.meta.env.VITE_UPLOAD_API_URL
+    || (import.meta.env.DEV ? 'http://localhost:3001/api/candidate-photo' : '/api/candidate-photo');
+  try {
+    await fetch(`${endpoint}?url=${encodeURIComponent(url)}`, {
+      method: 'DELETE', headers: { Authorization: `Bearer ${getToken()}` },
+    });
+  } catch {
+    // The original operation error remains the useful error for the admin.
+  }
+}
+
 // ─── Upload (POST with FormData) ────────────────────────────────────
 async function handleUpload(path, formData) {
   const pathname = path.split('?')[0];
@@ -479,15 +499,16 @@ async function handleUpload(path, formData) {
     const avatar_url = await uploadPhotoToStorage(formData.get('photo'));
     const { data, error } = await supabase.rpc('app_add_candidate', {
       p_token: getToken(),
-      p_name: formData.get('name'),
+      p_student_user_id: formData.get('student_user_id'),
       p_position_id: formData.get('position_id'),
-      p_grade_level: formData.get('grade_level'),
-      p_section: formData.get('section'),
       p_party_list: formData.get('party_list'),
       p_motto: formData.get('motto') || null,
       p_avatar_url: avatar_url,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      await deleteUploadedPhoto(avatar_url);
+      throw new Error(error.message);
+    }
     return data;
   }
 
@@ -504,10 +525,7 @@ async function handleUploadPut(path, formData) {
     const { data, error } = await supabase.rpc('app_update_candidate', {
       p_token: getToken(),
       p_id: m[1],
-      p_name: formData.get('name'),
       p_position_id: formData.get('position_id'),
-      p_grade_level: formData.get('grade_level'),
-      p_section: formData.get('section'),
       p_party_list: formData.get('party_list'),
       p_motto: formData.get('motto') || null,
       p_avatar_url: avatar_url,

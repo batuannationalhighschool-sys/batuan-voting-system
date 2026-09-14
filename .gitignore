@@ -23,7 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 # Environment files; keep committed example templates only
+# Environment files; keep committed example templates only.
 .env
+.env.*
+!.env.example
+!**/.env.example
 .env.*
 !.env.example
 !**/.env.example
