@@ -89,6 +89,16 @@ function extractGradeAndSection(rawGrade = '', rawSection = '', rawCombined = ''
   return { grade_level: grade, section: sec.toUpperCase() };
 }
 
+function gradeMatchesPosition(grade, positionTitle) {
+  if (!grade || grade === "all") return true;
+  if (!positionTitle) return true;
+  const gradeMatch = positionTitle.match(/Grade\s*(\d+)/i);
+  if (!gradeMatch) return true;
+  const targetGradeNum = parseInt(gradeMatch[1], 10);
+  const gradeNum = parseInt(grade.replace(/\D/g, ""), 10);
+  return targetGradeNum === gradeNum;
+}
+
 function parseCSV(text) {
   if (!text) return [];
   const cleanText = text.replace(/^\uFEFF/, '').trim();
@@ -1597,9 +1607,88 @@ export default function Admin() {
 
   const turnout = profileCount && profileCount > 0 ? ((votedCount) / profileCount * 100).toFixed(1) : "0";
 
+  const getGradeForSection = (sectionName, availableGrades = []) => {
+    if (!sectionName || sectionName === "all") return null;
+    const target = sectionName.trim().toLowerCase();
+    let found = null;
+
+    // 1. Check dynamicGradeSections
+    for (const [grade, secs] of Object.entries(dynamicGradeSections || {})) {
+      if (Array.isArray(secs) && secs.some(s => s?.trim().toLowerCase() === target)) {
+        found = grade;
+        break;
+      }
+    }
+    // 2. Check candidates
+    if (!found) {
+      const fromCand = (candidates ?? []).find(c => c.section?.trim().toLowerCase() === target);
+      if (fromCand?.grade_level) found = fromCand.grade_level;
+    }
+    // 3. Check voterGroups
+    if (!found) {
+      const fromGroups = (voterGroups?.sections ?? []).find(s => s.section?.trim().toLowerCase() === target);
+      if (fromGroups?.grade_level) found = fromGroups.grade_level;
+    }
+    // 4. Check voters
+    if (!found) {
+      const fromVoters = (voters ?? []).find(v => v.section?.trim().toLowerCase() === target);
+      if (fromVoters?.grade_level) found = fromVoters.grade_level;
+    }
+
+    if (!found) return null;
+
+    if (availableGrades && availableGrades.length > 0) {
+      const exactMatch = availableGrades.find(g => g.trim().toLowerCase() === found.trim().toLowerCase());
+      if (exactMatch) return exactMatch;
+    }
+    return found;
+  };
+
+  const handleCandidateGradeChange = (val) => {
+    setCandidateGradeFilter(val);
+    setCandidateSectionFilter("all");
+    if (val !== "all" && candidatePositionFilter !== "all") {
+      const posObj = (positions ?? []).find(p => String(p.id) === String(candidatePositionFilter));
+      if (posObj && !gradeMatchesPosition(val, posObj.title)) {
+        setCandidatePositionFilter("all");
+      }
+    }
+  };
+
+  const handleCandidateSectionChange = (val) => {
+    setCandidateSectionFilter(val);
+    if (val !== "all") {
+      const detectedGrade = getGradeForSection(val, candidateAvailableGrades);
+      if (detectedGrade && detectedGrade !== candidateGradeFilter) {
+        setCandidateGradeFilter(detectedGrade);
+        if (candidatePositionFilter !== "all") {
+          const posObj = (positions ?? []).find(p => String(p.id) === String(candidatePositionFilter));
+          if (posObj && !gradeMatchesPosition(detectedGrade, posObj.title)) {
+            setCandidatePositionFilter("all");
+          }
+        }
+      }
+    }
+  };
+
+  const handleVoterGradeChange = (val) => {
+    setVoterGradeFilter(val);
+    setVoterSectionFilter("all");
+  };
+
+  const handleVoterSectionChange = (val) => {
+    setVoterSectionFilter(val);
+    if (val !== "all") {
+      const detectedGrade = getGradeForSection(val, voterAvailableGrades);
+      if (detectedGrade && detectedGrade !== voterGradeFilter) {
+        setVoterGradeFilter(detectedGrade);
+      }
+    }
+  };
+
   const filteredVoters = (voters ?? []).filter((v) => {
-    if (voterGradeFilter !== "all" && v.grade_level !== voterGradeFilter) return false;
-    if (voterSectionFilter !== "all" && v.section !== voterSectionFilter) return false;
+    if (voterGradeFilter !== "all" && v.grade_level?.trim().toLowerCase() !== voterGradeFilter.trim().toLowerCase()) return false;
+    if (voterSectionFilter !== "all" && v.section?.trim().toLowerCase() !== voterSectionFilter.trim().toLowerCase()) return false;
     if (voterStatusFilter === "voted" && !v.has_voted) return false;
     if (voterStatusFilter === "not_voted" && v.has_voted) return false;
     if (!voterSearch) return true;
@@ -1612,8 +1701,8 @@ export default function Admin() {
 
   const filteredCandidates = (candidates ?? []).filter((c) => {
     if (candidatePositionFilter !== "all" && String(c.position_id) !== String(candidatePositionFilter)) return false;
-    if (candidateGradeFilter !== "all" && c.grade_level !== candidateGradeFilter) return false;
-    if (candidateSectionFilter !== "all" && c.section !== candidateSectionFilter) return false;
+    if (candidateGradeFilter !== "all" && c.grade_level?.trim().toLowerCase() !== candidateGradeFilter.trim().toLowerCase()) return false;
+    if (candidateSectionFilter !== "all" && c.section?.trim().toLowerCase() !== candidateSectionFilter.trim().toLowerCase()) return false;
     if (candidatePartyFilter !== "all" && c.party_list !== candidatePartyFilter) return false;
     if (!candidateSearch) return true;
     const q = candidateSearch.toLowerCase();
@@ -2063,7 +2152,7 @@ export default function Admin() {
                 <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Grade Level</label>
                 <select
                   value={voterGradeFilter}
-                  onChange={(e) => { setVoterGradeFilter(e.target.value); setVoterSectionFilter("all"); }}
+                  onChange={(e) => handleVoterGradeChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Grade Levels</option>
@@ -2075,7 +2164,7 @@ export default function Admin() {
                 <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Section</label>
                 <select
                   value={voterSectionFilter}
-                  onChange={(e) => setVoterSectionFilter(e.target.value)}
+                  onChange={(e) => handleVoterSectionChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Sections</option>
@@ -2585,7 +2674,7 @@ export default function Admin() {
                 <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Grade Level</label>
                 <select
                   value={candidateGradeFilter}
-                  onChange={(e) => { setCandidateGradeFilter(e.target.value); setCandidateSectionFilter("all"); }}
+                  onChange={(e) => handleCandidateGradeChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Grade Levels</option>
@@ -2597,7 +2686,7 @@ export default function Admin() {
                 <label className="block text-[11px] font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Section</label>
                 <select
                   value={candidateSectionFilter}
-                  onChange={(e) => setCandidateSectionFilter(e.target.value)}
+                  onChange={(e) => handleCandidateSectionChange(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Sections</option>
