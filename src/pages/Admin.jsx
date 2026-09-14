@@ -249,6 +249,34 @@ export default function Admin() {
   // Archive election results state
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
 
+  // Active candidates bulk archive
+  const [isSelectingCandidates, setIsSelectingCandidates] = useState(false);
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState(new Set());
+  const [showArchiveAllCandidatesConfirm, setShowArchiveAllCandidatesConfirm] = useState(false);
+  const [showArchiveSelectedConfirm, setShowArchiveSelectedConfirm] = useState(false);
+
+  // Active voters bulk archive
+  const [isSelectingVoters, setIsSelectingVoters] = useState(false);
+  const [selectedVoterIds, setSelectedVoterIds] = useState(new Set());
+  const [showArchiveAllVotersConfirm, setShowArchiveAllVotersConfirm] = useState(false);
+  const [showArchiveSelectedVotersConfirm, setShowArchiveSelectedVotersConfirm] = useState(false);
+
+  // Archived candidates bulk restore & permanent delete
+  const [isSelectingArchivedCandidates, setIsSelectingArchivedCandidates] = useState(false);
+  const [selectedArchivedCandidateIds, setSelectedArchivedCandidateIds] = useState(new Set());
+  const [showRestoreAllCandidatesConfirm, setShowRestoreAllCandidatesConfirm] = useState(false);
+  const [showDeleteAllCandidatesConfirm, setShowDeleteAllCandidatesConfirm] = useState(false);
+  const [showRestoreSelectedCandidatesConfirm, setShowRestoreSelectedCandidatesConfirm] = useState(false);
+  const [showDeleteSelectedCandidatesConfirm, setShowDeleteSelectedCandidatesConfirm] = useState(false);
+
+  // Archived voters bulk restore & permanent delete
+  const [isSelectingArchivedVoters, setIsSelectingArchivedVoters] = useState(false);
+  const [selectedArchivedVoterIds, setSelectedArchivedVoterIds] = useState(new Set());
+  const [showRestoreAllVotersConfirm, setShowRestoreAllVotersConfirm] = useState(false);
+  const [showDeleteAllVotersConfirm, setShowDeleteAllVotersConfirm] = useState(false);
+  const [showRestoreSelectedVotersConfirm, setShowRestoreSelectedVotersConfirm] = useState(false);
+  const [showDeleteSelectedVotersConfirm, setShowDeleteSelectedVotersConfirm] = useState(false);
+
   // Settings tab trappings & confirmation modal states
   const [showEndElectionConfirm, setShowEndElectionConfirm] = useState(false);
   const [showSetUpcomingConfirm, setShowSetUpcomingConfirm] = useState(false);
@@ -1170,6 +1198,210 @@ export default function Admin() {
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
+  // Bulk mutations: Candidates
+  const archiveAllCandidates = useMutation({
+    mutationFn: async () => { await api.patch('/candidates/archive-all'); },
+    onSuccess: () => {
+      toast({ title: "All candidates archived", description: "All active candidates have been moved to the archive.", variant: "success" });
+      setShowArchiveAllCandidatesConfirm(false);
+      setIsSelectingCandidates(false);
+      setSelectedCandidateIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to archive candidates", description: err.message, variant: "destructive" }),
+  });
+
+  const archiveSelectedCandidates = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedCandidateIds);
+      if (ids.length === 0) throw new Error("No candidates selected");
+      await api.patch('/candidates/archive-selected', { ids });
+    },
+    onSuccess: () => {
+      toast({ title: "Selected candidates archived", description: `${selectedCandidateIds.size} candidate(s) moved to the archive.`, variant: "success" });
+      setSelectedCandidateIds(new Set());
+      setShowArchiveSelectedConfirm(false);
+      setIsSelectingCandidates(false);
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to archive candidates", description: err.message, variant: "destructive" }),
+  });
+
+  const restoreAllCandidatesMutation = useMutation({
+    mutationFn: async () => { await api.post('/candidates/archived/restore-all'); },
+    onSuccess: () => {
+      toast({ title: "All candidates restored", description: "All archived candidates have been returned to active list.", variant: "success" });
+      setShowRestoreAllCandidatesConfirm(false);
+      setIsSelectingArchivedCandidates(false);
+      setSelectedArchivedCandidateIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to restore candidates", description: err.message, variant: "destructive" }),
+  });
+
+  const restoreSelectedCandidatesMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedArchivedCandidateIds);
+      if (ids.length === 0) throw new Error("No candidates selected");
+      await api.post('/candidates/archived/restore-selected', { ids });
+    },
+    onSuccess: () => {
+      toast({ title: "Selected candidates restored", description: `${selectedArchivedCandidateIds.size} candidate(s) restored to active list.`, variant: "success" });
+      setShowRestoreSelectedCandidatesConfirm(false);
+      setIsSelectingArchivedCandidates(false);
+      setSelectedArchivedCandidateIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to restore candidates", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteAllCandidatesMutation = useMutation({
+    mutationFn: async () => { await api.delete('/candidates/archived/all'); },
+    onSuccess: () => {
+      toast({ title: "All archived candidates deleted", description: "All archived candidates permanently deleted.", variant: "success" });
+      setShowDeleteAllCandidatesConfirm(false);
+      setIsSelectingArchivedCandidates(false);
+      setSelectedArchivedCandidateIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to delete candidates", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteSelectedCandidatesMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedArchivedCandidateIds);
+      if (ids.length === 0) throw new Error("No candidates selected");
+      await api.post('/candidates/archived/delete-selected', { ids });
+    },
+    onSuccess: () => {
+      toast({ title: "Selected candidates deleted", description: `${selectedArchivedCandidateIds.size} candidate(s) permanently deleted.`, variant: "success" });
+      setShowDeleteSelectedCandidatesConfirm(false);
+      setIsSelectingArchivedCandidates(false);
+      setSelectedArchivedCandidateIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["candidates"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to delete candidates", description: err.message, variant: "destructive" }),
+  });
+
+  // Bulk mutations: Voters
+  const archiveAllVotersMutation = useMutation({
+    mutationFn: async () => { await api.patch('/voters/archive-all'); },
+    onSuccess: () => {
+      toast({ title: "All voters archived", description: "All active voters moved to the archive.", variant: "success" });
+      setShowArchiveAllVotersConfirm(false);
+      setIsSelectingVoters(false);
+      setSelectedVoterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["voters"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to archive voters", description: err.message, variant: "destructive" }),
+  });
+
+  const archiveSelectedVotersMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedVoterIds);
+      if (ids.length === 0) throw new Error("No voters selected");
+      await api.patch('/voters/archive-selected', { ids });
+    },
+    onSuccess: () => {
+      toast({ title: "Selected voters archived", description: `${selectedVoterIds.size} voter(s) moved to the archive.`, variant: "success" });
+      setShowArchiveSelectedVotersConfirm(false);
+      setIsSelectingVoters(false);
+      setSelectedVoterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["voters"] });
+      queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to archive voters", description: err.message, variant: "destructive" }),
+  });
+
+  const restoreAllVotersMutation = useMutation({
+    mutationFn: async () => { await api.post('/voters/archived/restore-all'); },
+    onSuccess: () => {
+      toast({ title: "All voters restored", description: "All archived voters returned to active list.", variant: "success" });
+      setShowRestoreAllVotersConfirm(false);
+      setIsSelectingArchivedVoters(false);
+      setSelectedArchivedVoterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
+      queryClient.invalidateQueries({ queryKey: ["voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to restore voters", description: err.message, variant: "destructive" }),
+  });
+
+  const restoreSelectedVotersMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedArchivedVoterIds);
+      if (ids.length === 0) throw new Error("No voters selected");
+      await api.post('/voters/archived/restore-selected', { ids });
+    },
+    onSuccess: () => {
+      toast({ title: "Selected voters restored", description: `${selectedArchivedVoterIds.size} voter(s) restored to active list.`, variant: "success" });
+      setShowRestoreSelectedVotersConfirm(false);
+      setIsSelectingArchivedVoters(false);
+      setSelectedArchivedVoterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
+      queryClient.invalidateQueries({ queryKey: ["voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to restore voters", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteAllVotersMutation = useMutation({
+    mutationFn: async () => { await api.delete('/voters/archived/all'); },
+    onSuccess: () => {
+      toast({ title: "All archived voters deleted", description: "All archived voters permanently deleted.", variant: "success" });
+      setShowDeleteAllVotersConfirm(false);
+      setIsSelectingArchivedVoters(false);
+      setSelectedArchivedVoterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to delete voters", description: err.message, variant: "destructive" }),
+  });
+
+  const deleteSelectedVotersMutation = useMutation({
+    mutationFn: async () => {
+      const ids = Array.from(selectedArchivedVoterIds);
+      if (ids.length === 0) throw new Error("No voters selected");
+      await api.post('/voters/archived/delete-selected', { ids });
+    },
+    onSuccess: () => {
+      toast({ title: "Selected voters deleted", description: `${selectedArchivedVoterIds.size} voter(s) permanently deleted.`, variant: "success" });
+      setShowDeleteSelectedVotersConfirm(false);
+      setIsSelectingArchivedVoters(false);
+      setSelectedArchivedVoterIds(new Set());
+      queryClient.invalidateQueries({ queryKey: ["archived-voters"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+    },
+    onError: (err) => toast({ title: "Failed to delete voters", description: err.message, variant: "destructive" }),
+  });
+
   const resetPassword = useMutation({
     mutationFn: async (id) => { await api.post(`/voters/${id}/reset-password`); },
     onSuccess: () => {
@@ -1337,6 +1569,11 @@ export default function Admin() {
     reader.readAsText(file);
   }, [toast]);
 
+  const selectedCandidatesList = useMemo(() => {
+    if (!candidates || selectedCandidateIds.size === 0) return [];
+    return candidates.filter((c) => selectedCandidateIds.has(c.id));
+  }, [candidates, selectedCandidateIds]);
+
   if (!isAdmin) {
     return (
       <div className="container py-16 text-center animate-fade-in">
@@ -1388,6 +1625,65 @@ export default function Admin() {
       c.grade_level?.toLowerCase().includes(q);
   });
 
+  // Candidate Selection Helpers
+  const toggleCandidateSelect = (id) => {
+    setSelectedCandidateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllFilteredSelected = filteredCandidates.length > 0 && filteredCandidates.every((c) => selectedCandidateIds.has(c.id));
+  const isSomeFilteredSelected = filteredCandidates.some((c) => selectedCandidateIds.has(c.id)) && !isAllFilteredSelected;
+
+  const toggleSelectAllCandidates = () => {
+    if (isAllFilteredSelected) {
+      setSelectedCandidateIds((prev) => {
+        const next = new Set(prev);
+        filteredCandidates.forEach((c) => next.delete(c.id));
+        return next;
+      });
+    } else {
+      setSelectedCandidateIds((prev) => {
+        const next = new Set(prev);
+        filteredCandidates.forEach((c) => next.add(c.id));
+        return next;
+      });
+    }
+  };
+
+  // Active Voters Selection Helpers
+  const toggleVoterSelect = (id) => {
+    setSelectedVoterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllFilteredVotersSelected = filteredVoters.length > 0 && filteredVoters.every((v) => selectedVoterIds.has(v.id));
+  const isSomeFilteredVotersSelected = filteredVoters.some((v) => selectedVoterIds.has(v.id)) && !isAllFilteredVotersSelected;
+
+  const toggleSelectAllVoters = () => {
+    if (isAllFilteredVotersSelected) {
+      setSelectedVoterIds((prev) => {
+        const next = new Set(prev);
+        filteredVoters.forEach((v) => next.delete(v.id));
+        return next;
+      });
+    } else {
+      setSelectedVoterIds((prev) => {
+        const next = new Set(prev);
+        filteredVoters.forEach((v) => next.add(v.id));
+        return next;
+      });
+    }
+  };
+
+  // Filtered archived lists (must be declared before selection helpers that use them)
   const filteredArchived = (archivedVoters ?? []).filter((v) => {
     if (!archiveSearch) return true;
     const q = archiveSearch.toLowerCase();
@@ -1399,6 +1695,64 @@ export default function Admin() {
     const q = archiveCandidateSearch.toLowerCase();
     return c.name?.toLowerCase().includes(q) || c.position_title?.toLowerCase().includes(q) || c.party_list?.toLowerCase().includes(q) || c.section?.toLowerCase().includes(q) || c.grade_level?.toLowerCase().includes(q);
   });
+
+  // Archived Candidates Selection Helpers
+  const toggleArchivedCandidateSelect = (id) => {
+    setSelectedArchivedCandidateIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllFilteredArchivedCandidatesSelected = filteredArchivedCandidates.length > 0 && filteredArchivedCandidates.every((c) => selectedArchivedCandidateIds.has(c.id));
+  const isSomeFilteredArchivedCandidatesSelected = filteredArchivedCandidates.some((c) => selectedArchivedCandidateIds.has(c.id)) && !isAllFilteredArchivedCandidatesSelected;
+
+  const toggleSelectAllArchivedCandidates = () => {
+    if (isAllFilteredArchivedCandidatesSelected) {
+      setSelectedArchivedCandidateIds((prev) => {
+        const next = new Set(prev);
+        filteredArchivedCandidates.forEach((c) => next.delete(c.id));
+        return next;
+      });
+    } else {
+      setSelectedArchivedCandidateIds((prev) => {
+        const next = new Set(prev);
+        filteredArchivedCandidates.forEach((c) => next.add(c.id));
+        return next;
+      });
+    }
+  };
+
+  // Archived Voters Selection Helpers
+  const toggleArchivedVoterSelect = (id) => {
+    setSelectedArchivedVoterIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const isAllFilteredArchivedVotersSelected = filteredArchived.length > 0 && filteredArchived.every((v) => selectedArchivedVoterIds.has(v.id));
+  const isSomeFilteredArchivedVotersSelected = filteredArchived.some((v) => selectedArchivedVoterIds.has(v.id)) && !isAllFilteredArchivedVotersSelected;
+
+  const toggleSelectAllArchivedVoters = () => {
+    if (isAllFilteredArchivedVotersSelected) {
+      setSelectedArchivedVoterIds((prev) => {
+        const next = new Set(prev);
+        filteredArchived.forEach((v) => next.delete(v.id));
+        return next;
+      });
+    } else {
+      setSelectedArchivedVoterIds((prev) => {
+        const next = new Set(prev);
+        filteredArchived.forEach((v) => next.add(v.id));
+        return next;
+      });
+    }
+  };
 
   const archivedElections = (electionHistory ?? []).filter((h) => Boolean(h.archived));
   const activePastElections = (electionHistory ?? []).filter((h) => !h.archived);
@@ -1756,22 +2110,111 @@ export default function Admin() {
             )}
           </div>
 
+          {/* Bulk Selection Banner – Active Voters */}
+          {isSelectingVoters && (
+            <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-in fade-in flex-wrap">
+              <div className="flex items-center gap-2 text-foreground font-medium">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>{selectedVoterIds.size} voter{selectedVoterIds.size !== 1 ? 's' : ''} selected</span>
+                <button
+                  type="button"
+                  onClick={toggleSelectAllVoters}
+                  className="ml-2 text-gold hover:underline"
+                >
+                  {isAllFilteredVotersSelected ? "Deselect all" : "Select all"}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedVoterIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowArchiveSelectedVotersConfirm(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    Archive Selected ({selectedVoterIds.size})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setIsSelectingVoters(false); setSelectedVoterIds(new Set()); }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Voters table */}
           <div className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
+                    {isSelectingVoters && (
+                      <th className="w-12 px-4 py-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isAllFilteredVotersSelected}
+                          ref={(el) => { if (el) el.indeterminate = isSomeFilteredVotersSelected; }}
+                          onChange={toggleSelectAllVoters}
+                          className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                          title={isAllFilteredVotersSelected ? "Deselect all" : "Select all"}
+                        />
+                      </th>
+                    )}
                     <th className="text-left p-4 font-semibold text-foreground">LRN</th>
                     <th className="text-left p-4 font-semibold text-foreground">Full Name</th>
                     <th className="text-left p-4 font-semibold text-foreground hidden sm:table-cell">Grade &amp; Section</th>
                     <th className="text-left p-4 font-semibold text-foreground hidden md:table-cell">Status</th>
-                    <th className="text-right p-4 font-semibold text-foreground">Actions</th>
+                    <th className="text-right p-4 font-semibold text-foreground">
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span>Actions</span>
+                        <div className="flex items-center gap-1.5 font-normal text-xs">
+                          {!isSelectingVoters && (filteredVoters.length > 0) && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setIsSelectingVoters(true)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors shadow-sm"
+                                title="Select voters to archive"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
+                                Select Voters to Archive
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowArchiveAllVotersConfirm(true)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 transition-colors shadow-sm"
+                                title="Archive all active voters"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
+                                Archive All
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredVoters.map((v) => (
-                    <tr key={v.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                  {filteredVoters.map((v) => {
+                    const isSelected = selectedVoterIds.has(v.id);
+                    return (
+                    <tr key={v.id} className={`border-b border-border last:border-0 transition-colors ${isSelected ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-muted/30"}`}>
+                      {isSelectingVoters && (
+                        <td className="w-12 px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleVoterSelect(v.id)}
+                            className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                            title={`Select ${v.full_name}`}
+                          />
+                        </td>
+                      )}
                       <td className="p-4 font-mono text-foreground text-xs">{v.lrn}</td>
                       <td className="p-4 font-medium text-foreground uppercase">{v.full_name}</td>
                       <td className="p-4 text-muted-foreground hidden sm:table-cell">
@@ -1814,7 +2257,7 @@ export default function Admin() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                  );})}
                   {filteredVoters.length === 0 && (
                     <tr><td colSpan={5} className="p-8 text-center text-muted-foreground">{voterSearch ? "No voters match your search." : "No voters yet. Add one above."}</td></tr>
                   )}
@@ -2009,7 +2452,33 @@ export default function Admin() {
                       </div>
                       {studentSearch.trim().length > 0 && studentSearch.trim().length < 2 && <p className="mt-1 text-xs text-muted-foreground">Enter at least 2 characters.</p>}
                       {isSearchingStudents && <p className="mt-1 text-xs text-muted-foreground">Searching students…</p>}
-                      {debouncedStudentSearch.length >= 2 && !isSearchingStudents && studentSuggestions.length === 0 && <p className="mt-1 text-xs text-muted-foreground">No eligible student found.</p>}
+                       {debouncedStudentSearch.length >= 2 && !isSearchingStudents && studentSuggestions.length === 0 && (() => {
+                        const q = debouncedStudentSearch.toLowerCase();
+                        const matched = (candidates ?? []).find(c =>
+                          c.name?.toLowerCase().includes(q) || c.student_id?.toLowerCase().includes(q)
+                        );
+                        const matchedPosition = matched
+                          ? ((positions ?? []).find(p => String(p.id) === String(matched.position_id))?.title || matched.position_title)
+                          : null;
+                        return (
+                          <div className="mt-1.5 rounded-lg border border-amber-400/40 bg-amber-50/10 px-3 py-2 flex items-start gap-2">
+                            <span className="text-base leading-none mt-0.5">⚠️</span>
+                            <p className="text-xs text-amber-500 leading-relaxed">
+                              {matched ? (
+                                <>
+                                  <span className="font-semibold text-amber-600">"{matched.name}"</span> is already registered as a candidate
+                                  {matchedPosition && <> running for <span className="font-semibold text-foreground">{matchedPosition}</span></>}
+                                  {matched.party_list && <> under <span className="font-semibold text-foreground">{matched.party_list}</span></>}.
+                                </>
+                              ) : (
+                                <>
+                                  <span className="font-semibold text-amber-600">"{debouncedStudentSearch}"</span> is already registered as a candidate.
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        );
+                      })()}
                       {studentSuggestions.length > 0 && (
                         <ul role="listbox" className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto rounded-xl border border-border bg-card shadow-xl">
                           {studentSuggestions.map((student) => (
@@ -2168,24 +2637,117 @@ export default function Admin() {
             )}
           </div>
 
+          {/* Bulk Selection Banner – Active Candidates */}
+          {isSelectingCandidates && (
+            <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-in fade-in flex-wrap">
+              <div className="flex items-center gap-2 text-foreground font-medium">
+                <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                <span>{selectedCandidateIds.size} candidate{selectedCandidateIds.size !== 1 ? 's' : ''} selected</span>
+                <button
+                  type="button"
+                  onClick={toggleSelectAllCandidates}
+                  className="ml-2 text-gold hover:underline"
+                >
+                  {isAllFilteredSelected ? "Deselect all" : "Select all"}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                {selectedCandidateIds.size > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setShowArchiveSelectedConfirm(true)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-amber-500 text-white hover:bg-amber-600 transition-colors shadow-sm"
+                  >
+                    <Archive className="w-3.5 h-3.5" />
+                    Archive Selected ({selectedCandidateIds.size})
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { setIsSelectingCandidates(false); setSelectedCandidateIds(new Set()); }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Table */}
           <div className="bg-card rounded-xl border border-border overflow-hidden shadow-elegant">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-border bg-muted/50">
+                    {isSelectingCandidates && (
+                      <th className="w-12 px-4 py-4 text-center">
+                        <input
+                          type="checkbox"
+                          checked={isAllFilteredSelected}
+                          ref={(el) => { if (el) el.indeterminate = isSomeFilteredSelected; }}
+                          onChange={toggleSelectAllCandidates}
+                          className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                          title={isAllFilteredSelected ? "Deselect all candidates" : "Select all candidates"}
+                        />
+                      </th>
+                    )}
                     <th className="text-left p-4 font-semibold text-foreground">Name</th>
                     <th className="text-left p-4 font-semibold text-foreground">Position</th>
                     <th className="text-left p-4 font-semibold text-foreground hidden sm:table-cell">Party</th>
                     <th className="text-left p-4 font-semibold text-foreground hidden md:table-cell">Grade &amp; Section</th>
-                    <th className="text-right p-4 font-semibold text-foreground">Actions</th>
+                    <th className="text-right p-4 font-semibold text-foreground">
+                      <div className="flex flex-col items-end gap-1.5">
+                        <span>Actions</span>
+                        <div className="flex items-center gap-1.5">
+                          {!isSelectingCandidates && (candidates ?? []).length > 0 && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setIsSelectingCandidates(true)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors shadow-sm"
+                                title="Select candidates to archive"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
+                                Select Candidates to Archive
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowArchiveAllCandidatesConfirm(true)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-500/15 text-amber-600 dark:text-amber-400 hover:bg-amber-500/25 border border-amber-500/30 transition-colors shadow-sm"
+                                title="Archive all active candidates"
+                              >
+                                <Archive className="w-3.5 h-3.5" />
+                                Archive All
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredCandidates.map((c) => {
                     const pos = (positions ?? []).find((p) => p.id === c.position_id);
+                    const isSelected = selectedCandidateIds.has(c.id);
                     return (
-                      <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30 transition-colors">
+                      <tr
+                        key={c.id}
+                        className={`border-b border-border last:border-0 transition-colors ${
+                          isSelected ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-muted/30"
+                        }`}
+                      >
+                        {isSelectingCandidates && (
+                          <td className="w-12 px-4 py-4 text-center" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleCandidateSelect(c.id)}
+                              className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                              title={`Select ${c.name}`}
+                            />
+                          </td>
+                        )}
                         <td className="p-4 font-medium text-foreground uppercase">{c.name}</td>
                         <td className="p-4 text-muted-foreground">{pos?.title}</td>
                         <td className="p-4 text-muted-foreground hidden sm:table-cell">{c.party_list}</td>
@@ -2276,6 +2838,440 @@ export default function Admin() {
                 {(deleteTarget.type === 'candidate' || deleteTarget.type === 'voter')
                   ? <><Archive className="w-4 h-4" /> Archive</>
                   : <><Trash2 className="w-4 h-4" /> Delete Permanently</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Selected Candidates Confirmation Modal */}
+      {showArchiveSelectedConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowArchiveSelectedConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-md max-h-[85vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 shrink-0">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Archive className="w-5 h-5 text-amber-500" /> Archive Selected Candidates
+              </h3>
+              <button onClick={() => setShowArchiveSelectedConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3 shrink-0">
+              Are you sure you want to archive the <span className="font-semibold text-foreground">{selectedCandidateIds.size}</span> selected candidate(s)?
+            </p>
+            <div className="overflow-y-auto max-h-48 rounded-xl border border-border divide-y divide-border mb-4 shrink-1">
+              {selectedCandidatesList.map((c) => {
+                const pos = (positions ?? []).find((p) => p.id === c.position_id);
+                return (
+                  <div key={c.id} className="p-2.5 text-xs flex items-center justify-between gap-2 bg-muted/20">
+                    <span className="font-semibold text-foreground uppercase truncate">{c.name}</span>
+                    <span className="text-muted-foreground shrink-0">{pos?.title}</span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground mb-5 shrink-0">
+              Selected candidates will be archived and removed from the active ballot. You can restore them anytime from the <strong>Archive</strong> tab.
+            </p>
+            <div className="flex items-center justify-end gap-3 shrink-0">
+              <button onClick={() => setShowArchiveSelectedConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => archiveSelectedCandidates.mutate()}
+                disabled={archiveSelectedCandidates.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-amber-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Archive className="w-4 h-4" />
+                {archiveSelectedCandidates.isPending ? "Archiving…" : `Archive (${selectedCandidateIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive All Candidates Confirmation Modal */}
+      {showArchiveAllCandidatesConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowArchiveAllCandidatesConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Archive className="w-5 h-5 text-amber-500" /> Archive All Candidates
+              </h3>
+              <button onClick={() => setShowArchiveAllCandidatesConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to archive all active candidates?
+            </p>
+            <p className="font-semibold text-foreground mb-3">
+              Total candidates to archive: {(candidates ?? []).length}
+            </p>
+            <p className="text-xs text-muted-foreground mb-6">
+              All active candidates will be archived and removed from the active ballot. You can restore them anytime from the <strong>Archive</strong> tab.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowArchiveAllCandidatesConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => archiveAllCandidates.mutate()}
+                disabled={archiveAllCandidates.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-amber-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Archive className="w-4 h-4" />
+                {archiveAllCandidates.isPending ? "Archiving…" : "Archive All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive Selected Voters Confirmation Modal */}
+      {showArchiveSelectedVotersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowArchiveSelectedVotersConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Archive className="w-5 h-5 text-amber-500" /> Archive Selected Voters
+              </h3>
+              <button onClick={() => setShowArchiveSelectedVotersConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to archive the <span className="font-semibold text-foreground">{selectedVoterIds.size}</span> selected voter(s)? They will be moved to the <strong>Archive</strong> tab.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowArchiveSelectedVotersConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => archiveSelectedVotersMutation.mutate()}
+                disabled={archiveSelectedVotersMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-amber-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Archive className="w-4 h-4" />
+                {archiveSelectedVotersMutation.isPending ? "Archiving…" : `Archive (${selectedVoterIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Archive All Voters Confirmation Modal */}
+      {showArchiveAllVotersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowArchiveAllVotersConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Archive className="w-5 h-5 text-amber-500" /> Archive All Voters
+              </h3>
+              <button onClick={() => setShowArchiveAllVotersConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to archive all active registered voters?
+            </p>
+            <p className="font-semibold text-foreground mb-3">
+              Total voters to archive: {(voters ?? []).length}
+            </p>
+            <p className="text-xs text-muted-foreground mb-6">
+              All active voters will be moved to the <strong>Archive</strong> tab. You can restore them anytime.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowArchiveAllVotersConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => archiveAllVotersMutation.mutate()}
+                disabled={archiveAllVotersMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-amber-500 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Archive className="w-4 h-4" />
+                {archiveAllVotersMutation.isPending ? "Archiving…" : "Archive All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore All Candidates Confirmation Modal */}
+      {showRestoreAllCandidatesConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowRestoreAllCandidatesConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-success" /> Restore All Candidates
+              </h3>
+              <button onClick={() => setShowRestoreAllCandidatesConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to restore all archived candidates back to the active list?
+            </p>
+            <p className="font-semibold text-foreground mb-3">
+              Total candidates to restore: {(archivedCandidates ?? []).length}
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowRestoreAllCandidatesConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => restoreAllCandidatesMutation.mutate()}
+                disabled={restoreAllCandidatesMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-success text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {restoreAllCandidatesMutation.isPending ? "Restoring…" : "Restore All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Selected Candidates Confirmation Modal */}
+      {showRestoreSelectedCandidatesConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowRestoreSelectedCandidatesConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-success" /> Restore Selected Candidates
+              </h3>
+              <button onClick={() => setShowRestoreSelectedCandidatesConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to restore the <span className="font-semibold text-foreground">{selectedArchivedCandidateIds.size}</span> selected candidate(s) back to the active list?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowRestoreSelectedCandidatesConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => restoreSelectedCandidatesMutation.mutate()}
+                disabled={restoreSelectedCandidatesMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-success text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {restoreSelectedCandidatesMutation.isPending ? "Restoring…" : `Restore (${selectedArchivedCandidateIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Candidates Confirmation Modal */}
+      {showDeleteAllCandidatesConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowDeleteAllCandidatesConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" /> Delete All Archived Candidates
+              </h3>
+              <button onClick={() => setShowDeleteAllCandidatesConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to <strong className="text-destructive">permanently delete</strong> all archived candidates?
+            </p>
+            <p className="font-semibold text-foreground mb-3">
+              Total candidates to delete: {(archivedCandidates ?? []).length}
+            </p>
+            <p className="text-xs text-destructive/80 mb-6">
+              ⚠️ This action is irreversible. These candidate records will be permanently removed.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowDeleteAllCandidatesConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteAllCandidatesMutation.mutate()}
+                disabled={deleteAllCandidatesMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-destructive text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleteAllCandidatesMutation.isPending ? "Deleting…" : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Selected Candidates Confirmation Modal */}
+      {showDeleteSelectedCandidatesConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowDeleteSelectedCandidatesConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" /> Delete Selected Candidates
+              </h3>
+              <button onClick={() => setShowDeleteSelectedCandidatesConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to <strong className="text-destructive">permanently delete</strong> the <span className="font-semibold text-foreground">{selectedArchivedCandidateIds.size}</span> selected candidate(s)?
+            </p>
+            <p className="text-xs text-destructive/80 mb-6">
+              ⚠️ This action is irreversible.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowDeleteSelectedCandidatesConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteSelectedCandidatesMutation.mutate()}
+                disabled={deleteSelectedCandidatesMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-destructive text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleteSelectedCandidatesMutation.isPending ? "Deleting…" : `Delete (${selectedArchivedCandidateIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore All Voters Confirmation Modal */}
+      {showRestoreAllVotersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowRestoreAllVotersConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-success" /> Restore All Voters
+              </h3>
+              <button onClick={() => setShowRestoreAllVotersConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to restore all archived voters back to the active list?
+            </p>
+            <p className="font-semibold text-foreground mb-3">
+              Total voters to restore: {(archivedVoters ?? []).length}
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowRestoreAllVotersConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => restoreAllVotersMutation.mutate()}
+                disabled={restoreAllVotersMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-success text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {restoreAllVotersMutation.isPending ? "Restoring…" : "Restore All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Restore Selected Voters Confirmation Modal */}
+      {showRestoreSelectedVotersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowRestoreSelectedVotersConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <RotateCcw className="w-5 h-5 text-success" /> Restore Selected Voters
+              </h3>
+              <button onClick={() => setShowRestoreSelectedVotersConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to restore the <span className="font-semibold text-foreground">{selectedArchivedVoterIds.size}</span> selected voter(s)?
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowRestoreSelectedVotersConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => restoreSelectedVotersMutation.mutate()}
+                disabled={restoreSelectedVotersMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-success text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <RotateCcw className="w-4 h-4" />
+                {restoreSelectedVotersMutation.isPending ? "Restoring…" : `Restore (${selectedArchivedVoterIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete All Voters Confirmation Modal */}
+      {showDeleteAllVotersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowDeleteAllVotersConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" /> Delete All Archived Voters
+              </h3>
+              <button onClick={() => setShowDeleteAllVotersConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-1">
+              Are you sure you want to <strong className="text-destructive">permanently delete</strong> all archived voters?
+            </p>
+            <p className="font-semibold text-foreground mb-3">
+              Total voters to delete: {(archivedVoters ?? []).length}
+            </p>
+            <p className="text-xs text-destructive/80 mb-6">
+              ⚠️ This action is irreversible. All voter records and login credentials will be permanently removed.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowDeleteAllVotersConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteAllVotersMutation.mutate()}
+                disabled={deleteAllVotersMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-destructive text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleteAllVotersMutation.isPending ? "Deleting…" : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Selected Voters Confirmation Modal */}
+      {showDeleteSelectedVotersConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setShowDeleteSelectedVotersConfirm(false)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" /> Delete Selected Voters
+              </h3>
+              <button onClick={() => setShowDeleteSelectedVotersConfirm(false)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-3">
+              Are you sure you want to <strong className="text-destructive">permanently delete</strong> the <span className="font-semibold text-foreground">{selectedArchivedVoterIds.size}</span> selected voter(s)?
+            </p>
+            <p className="text-xs text-destructive/80 mb-6">
+              ⚠️ This action is irreversible.
+            </p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setShowDeleteSelectedVotersConfirm(false)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteSelectedVotersMutation.mutate()}
+                disabled={deleteSelectedVotersMutation.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm bg-destructive text-white hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                {deleteSelectedVotersMutation.isPending ? "Deleting…" : `Delete (${selectedArchivedVoterIds.size})`}
               </button>
             </div>
           </div>
@@ -2994,60 +3990,169 @@ export default function Admin() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">LRN</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Full Name</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Grade & Section</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Archived On</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredArchived.map((v) => (
-                        <tr key={v.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{v.lrn}</td>
-                          <td className="py-3 px-3 font-medium text-foreground uppercase">{v.full_name}</td>
-                          <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">
-                            {v.grade_level || v.section ? (
-                              <span>
-                                {v.grade_level && <span className="font-medium text-foreground">{v.grade_level}</span>}
-                                {v.grade_level && v.section && <span> — </span>}
-                                {v.section && <span className="uppercase">{v.section}</span>}
-                              </span>
-                            ) : (
-                              <span className="italic text-xs text-muted-foreground/60">Not set</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 text-xs text-muted-foreground">
-                            {v.archived_at ? new Date(v.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => setRestoreTarget({ id: v.id, name: v.full_name, type: 'voter' })}
-                                disabled={restoreVoter.isPending}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
-                                title="Restore voter"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" /> Restore
-                              </button>
-                              <button
-                                onClick={() => setDeleteTarget({ id: v.id, name: v.full_name, type: 'archived' })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                                title="Delete permanently"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Delete
-                              </button>
+                <>
+                  {/* Bulk Selection Banner – Archived Voters */}
+                  {isSelectingArchivedVoters && (
+                    <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-in fade-in flex-wrap">
+                      <div className="flex items-center gap-2 text-foreground font-medium">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span>{selectedArchivedVoterIds.size} voter{selectedArchivedVoterIds.size !== 1 ? 's' : ''} selected</span>
+                        <button
+                          type="button"
+                          onClick={toggleSelectAllArchivedVoters}
+                          className="ml-2 text-gold hover:underline"
+                        >
+                          {isAllFilteredArchivedVotersSelected ? "Deselect all" : "Select all"}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedArchivedVoterIds.size > 0 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setShowRestoreSelectedVotersConfirm(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-success text-white hover:bg-success/90 transition-colors shadow-sm"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Restore Selected ({selectedArchivedVoterIds.size})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowDeleteSelectedVotersConfirm(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-destructive text-white hover:bg-destructive/90 transition-colors shadow-sm"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete Selected ({selectedArchivedVoterIds.size})
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setIsSelectingArchivedVoters(false); setSelectedArchivedVoterIds(new Set()); }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          {isSelectingArchivedVoters && (
+                            <th className="w-12 px-3 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isAllFilteredArchivedVotersSelected}
+                                ref={(el) => { if (el) el.indeterminate = isSomeFilteredArchivedVotersSelected; }}
+                                onChange={toggleSelectAllArchivedVoters}
+                                className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                                title={isAllFilteredArchivedVotersSelected ? "Deselect all" : "Select all"}
+                              />
+                            </th>
+                          )}
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">LRN</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Full Name</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Grade & Section</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Archived On</th>
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            <div className="flex flex-col items-end gap-1.5">
+                              <span>Actions</span>
+                              <div className="flex items-center gap-1.5 normal-case font-normal">
+                                {!isSelectingArchivedVoters && (filteredArchived.length > 0) && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsSelectingArchivedVoters(true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors shadow-sm"
+                                      title="Select voters to restore or delete"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowRestoreAllVotersConfirm(true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-success/15 text-success hover:bg-success/25 border border-success/30 transition-colors shadow-sm"
+                                      title="Restore all archived voters"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5" />
+                                      Restore All
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowDeleteAllVotersConfirm(true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-destructive/15 text-destructive hover:bg-destructive/25 border border-destructive/30 transition-colors shadow-sm"
+                                      title="Permanently delete all archived voters"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      Delete All
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             </div>
-                          </td>
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {filteredArchived.map((v) => {
+                          const isSelected = selectedArchivedVoterIds.has(v.id);
+                          return (
+                          <tr key={v.id} className={`border-b border-border/50 transition-colors ${isSelected ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-muted/30"}`}>
+                            {isSelectingArchivedVoters && (
+                              <td className="w-12 px-3 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleArchivedVoterSelect(v.id)}
+                                  className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                                  title={`Select ${v.full_name}`}
+                                />
+                              </td>
+                            )}
+                            <td className="py-3 px-3 font-mono text-xs text-muted-foreground">{v.lrn}</td>
+                            <td className="py-3 px-3 font-medium text-foreground uppercase">{v.full_name}</td>
+                            <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">
+                              {v.grade_level || v.section ? (
+                                <span>
+                                  {v.grade_level && <span className="font-medium text-foreground">{v.grade_level}</span>}
+                                  {v.grade_level && v.section && <span> — </span>}
+                                  {v.section && <span className="uppercase">{v.section}</span>}
+                                </span>
+                              ) : (
+                                <span className="italic text-xs text-muted-foreground/60">Not set</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 text-xs text-muted-foreground">
+                              {v.archived_at ? new Date(v.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => setRestoreTarget({ id: v.id, name: v.full_name, type: 'voter' })}
+                                  disabled={restoreVoter.isPending}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
+                                  title="Restore voter"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" /> Restore
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget({ id: v.id, name: v.full_name, type: 'archived' })}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                                  title="Delete permanently"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );})}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -3092,60 +4197,169 @@ export default function Admin() {
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Photo</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Position</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Party</th>
-                        <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Archived On</th>
-                        <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredArchivedCandidates.map((c) => (
-                        <tr key={c.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-3">
-                            {c.avatar_url ? (
-                              <img src={c.avatar_url} alt={c.name} className="w-8 h-8 rounded-full object-cover border border-border opacity-60" />
-                            ) : (
-                              <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
-                                {c.name?.charAt(0)}
+                <>
+                  {/* Bulk Selection Banner – Archived Candidates */}
+                  {isSelectingArchivedCandidates && (
+                    <div className="mb-3 px-4 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs animate-in fade-in flex-wrap">
+                      <div className="flex items-center gap-2 text-foreground font-medium">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                        <span>{selectedArchivedCandidateIds.size} candidate{selectedArchivedCandidateIds.size !== 1 ? 's' : ''} selected</span>
+                        <button
+                          type="button"
+                          onClick={toggleSelectAllArchivedCandidates}
+                          className="ml-2 text-gold hover:underline"
+                        >
+                          {isAllFilteredArchivedCandidatesSelected ? "Deselect all" : "Select all"}
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {selectedArchivedCandidateIds.size > 0 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setShowRestoreSelectedCandidatesConfirm(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-success text-white hover:bg-success/90 transition-colors shadow-sm"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5" />
+                              Restore Selected ({selectedArchivedCandidateIds.size})
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowDeleteSelectedCandidatesConfirm(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-destructive text-white hover:bg-destructive/90 transition-colors shadow-sm"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              Delete Selected ({selectedArchivedCandidateIds.size})
+                            </button>
+                          </>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => { setIsSelectingArchivedCandidates(false); setSelectedArchivedCandidateIds(new Set()); }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          {isSelectingArchivedCandidates && (
+                            <th className="w-12 px-3 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isAllFilteredArchivedCandidatesSelected}
+                                ref={(el) => { if (el) el.indeterminate = isSomeFilteredArchivedCandidatesSelected; }}
+                                onChange={toggleSelectAllArchivedCandidates}
+                                className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                                title={isAllFilteredArchivedCandidatesSelected ? "Deselect all" : "Select all"}
+                              />
+                            </th>
+                          )}
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Photo</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Name</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">Position</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden md:table-cell">Party</th>
+                          <th className="text-left py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Archived On</th>
+                          <th className="text-right py-3 px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                            <div className="flex flex-col items-end gap-1.5">
+                              <span>Actions</span>
+                              <div className="flex items-center gap-1.5 normal-case font-normal">
+                                {!isSelectingArchivedCandidates && (filteredArchivedCandidates.length > 0) && (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => setIsSelectingArchivedCandidates(true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-muted text-muted-foreground hover:bg-muted/80 border border-border transition-colors shadow-sm"
+                                      title="Select candidates to restore or delete"
+                                    >
+                                      Select
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowRestoreAllCandidatesConfirm(true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-success/15 text-success hover:bg-success/25 border border-success/30 transition-colors shadow-sm"
+                                      title="Restore all archived candidates"
+                                    >
+                                      <RotateCcw className="w-3.5 h-3.5" />
+                                      Restore All
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setShowDeleteAllCandidatesConfirm(true)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-destructive/15 text-destructive hover:bg-destructive/25 border border-destructive/30 transition-colors shadow-sm"
+                                      title="Permanently delete all archived candidates"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                      Delete All
+                                    </button>
+                                  </>
+                                )}
                               </div>
-                            )}
-                          </td>
-                          <td className="py-3 px-3 font-medium text-foreground uppercase">{c.name}</td>
-                          <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{c.position_title || '—'}</td>
-                          <td className="py-3 px-3 text-muted-foreground hidden md:table-cell">{c.party_list || '—'}</td>
-                          <td className="py-3 px-3 text-xs text-muted-foreground">
-                            {c.archived_at ? new Date(c.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
-                          </td>
-                          <td className="py-3 px-3">
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => setRestoreTarget({ id: c.id, name: c.name, type: 'candidate' })}
-                                disabled={restoreCandidate.isPending}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
-                                title="Restore candidate"
-                              >
-                                <RotateCcw className="w-3.5 h-3.5" /> Restore
-                              </button>
-                              <button
-                                onClick={() => setDeleteTarget({ id: c.id, name: c.name, type: 'archived-candidate' })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
-                                title="Delete permanently"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" /> Delete
-                              </button>
                             </div>
-                          </td>
+                          </th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                      </thead>
+                      <tbody>
+                        {filteredArchivedCandidates.map((c) => {
+                          const isSelected = selectedArchivedCandidateIds.has(c.id);
+                          return (
+                          <tr key={c.id} className={`border-b border-border/50 transition-colors ${isSelected ? "bg-amber-500/5 hover:bg-amber-500/10" : "hover:bg-muted/30"}`}>
+                            {isSelectingArchivedCandidates && (
+                              <td className="py-3 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleArchivedCandidateSelect(c.id)}
+                                  className="w-4 h-4 rounded border-border text-gold focus:ring-ring cursor-pointer"
+                                  title={`Select ${c.name}`}
+                                />
+                              </td>
+                            )}
+                            <td className="py-3 px-3">
+                              {c.avatar_url ? (
+                                <img src={c.avatar_url} alt={c.name} className="w-8 h-8 rounded-full object-cover border border-border opacity-60" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground">
+                                  {c.name?.charAt(0)}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-3 font-medium text-foreground uppercase">{c.name}</td>
+                            <td className="py-3 px-3 text-muted-foreground hidden sm:table-cell">{c.position_title || '—'}</td>
+                            <td className="py-3 px-3 text-muted-foreground hidden md:table-cell">{c.party_list || '—'}</td>
+                            <td className="py-3 px-3 text-xs text-muted-foreground">
+                              {c.archived_at ? new Date(c.archived_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+                            </td>
+                            <td className="py-3 px-3">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => setRestoreTarget({ id: c.id, name: c.name, type: 'candidate' })}
+                                  disabled={restoreCandidate.isPending}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-success/10 text-success hover:bg-success/20 transition-colors disabled:opacity-50"
+                                  title="Restore candidate"
+                                >
+                                  <RotateCcw className="w-3.5 h-3.5" /> Restore
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget({ id: c.id, name: c.name, type: 'archived-candidate' })}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
+                                  title="Delete permanently"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" /> Delete
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );})}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           )}

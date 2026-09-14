@@ -11,6 +11,7 @@ export default defineConfig({
     host: "::",
     port: 8080,
     allowedHosts: true,
+    historyApiFallback: true,
     hmr: {
       overlay: false,
     },

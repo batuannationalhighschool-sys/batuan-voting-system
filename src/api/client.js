@@ -288,6 +288,43 @@ async function handlePost(path, body) {
     return data;
   }
 
+  // Bulk restore / delete archived candidates & voters
+  if (pathname === '/candidates/archived/restore-all') {
+    const { data, error } = await supabase.rpc('app_restore_all_candidates', { p_token: getToken() });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/candidates/archived/restore-selected') {
+    const { data, error } = await supabase.rpc('app_restore_selected_candidates', { p_token: getToken(), p_ids: body.ids });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/candidates/archived/delete-selected') {
+    const { data, error } = await supabase.rpc('app_permanent_delete_selected_candidates', { p_token: getToken(), p_ids: body.ids });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/voters/archived/restore-all') {
+    const { data, error } = await supabase.rpc('app_restore_all_voters', { p_token: getToken() });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/voters/archived/restore-selected') {
+    const { data, error } = await supabase.rpc('app_restore_selected_voters', { p_token: getToken(), p_ids: body.ids });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/voters/archived/delete-selected') {
+    const { data, error } = await supabase.rpc('app_permanent_delete_selected_voters', { p_token: getToken(), p_ids: body.ids });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
   throw new Error(`Unknown POST route: ${pathname}`);
 }
 
@@ -322,6 +359,37 @@ async function handlePut(path, body) {
 // ─── PATCH Router ───────────────────────────────────────────────────
 async function handlePatch(path, body) {
   const pathname = path.split('?')[0];
+
+  // /candidates/archive-selected
+  if (pathname === '/candidates/archive-selected') {
+    const { data, error } = await supabase.rpc('app_archive_selected_candidates', {
+      p_token: getToken(),
+      p_ids: body.ids,
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /candidates/archive-all
+  if (pathname === '/candidates/archive-all') {
+    const { data, error } = await supabase.rpc('app_archive_all_candidates', { p_token: getToken() });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /voters/archive-all
+  if (pathname === '/voters/archive-all') {
+    const { data, error } = await supabase.rpc('app_archive_all_voters', { p_token: getToken() });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /voters/archive-selected
+  if (pathname === '/voters/archive-selected') {
+    const { data, error } = await supabase.rpc('app_archive_selected_voters', { p_token: getToken(), p_ids: body.ids });
+    if (error) throw new Error(error.message);
+    return data;
+  }
 
   // /candidates/:id/archive
   let m = pathname.match(/^\/candidates\/([^/]+)\/archive$/);
@@ -427,6 +495,20 @@ async function handleDelete(path) {
   m = pathname.match(/^\/candidates\/([^/]+)\/permanent$/);
   if (m) {
     const { data, error } = await supabase.rpc('app_permanent_delete_candidate', { p_token: getToken(), p_id: m[1] });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /candidates/archived/all
+  if (pathname === '/candidates/archived/all') {
+    const { data, error } = await supabase.rpc('app_permanent_delete_all_candidates', { p_token: getToken() });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /voters/archived/all
+  if (pathname === '/voters/archived/all') {
+    const { data, error } = await supabase.rpc('app_permanent_delete_all_voters', { p_token: getToken() });
     if (error) throw new Error(error.message);
     return data;
   }

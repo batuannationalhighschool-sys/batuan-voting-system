@@ -480,6 +480,130 @@ app.delete('/api/voters/:id/permanent', requireAuth, requireAdmin, async (req, r
   }
 });
 
+// Restore all archived voters
+app.post('/api/voters/archived/restore-all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ archived: false, archived_at: null })
+      .eq('archived', true);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Restore all voters error:', err);
+    res.status(500).json({ error: 'Failed to restore all voters' });
+  }
+});
+
+// Restore selected archived voters
+app.post('/api/voters/archived/restore-selected', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No voter IDs provided' });
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ archived: false, archived_at: null })
+      .in('user_id', ids);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Restore selected voters error:', err);
+    res.status(500).json({ error: 'Failed to restore selected voters' });
+  }
+});
+
+// Permanently delete all archived voters
+app.delete('/api/voters/archived/all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data: archivedProfiles, error: fetchErr } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('archived', true);
+
+    if (fetchErr) throw fetchErr;
+    const userIds = (archivedProfiles || []).map(p => p.user_id);
+    if (userIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from('users')
+        .delete()
+        .in('id', userIds);
+      if (delErr) throw delErr;
+    }
+    res.json({ success: true, count: userIds.length });
+  } catch (err) {
+    console.error('Permanent delete all voters error:', err);
+    res.status(500).json({ error: 'Failed to permanently delete all archived voters' });
+  }
+});
+
+// Permanently delete selected archived voters
+app.post('/api/voters/archived/delete-selected', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No voter IDs provided' });
+    }
+    const { error } = await supabase
+      .from('users')
+      .delete()
+      .in('id', ids);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Permanent delete selected voters error:', err);
+    res.status(500).json({ error: 'Failed to permanently delete selected voters' });
+  }
+});
+
+// Archive all active voters
+app.patch('/api/voters/archive-all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data: voterRoles, error: roleError } = await supabase
+      .from('user_roles')
+      .select('user_id')
+      .eq('role', 'voter');
+
+    if (roleError) throw roleError;
+    const voterIds = (voterRoles || []).map(r => r.user_id);
+    if (voterIds.length > 0) {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ archived: true, archived_at: new Date().toISOString() })
+        .in('user_id', voterIds)
+        .eq('archived', false);
+      if (error) throw error;
+    }
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Archive all voters error:', err);
+    res.status(500).json({ error: 'Failed to archive all voters' });
+  }
+});
+
+// Archive selected active voters
+app.patch('/api/voters/archive-selected', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No voter IDs provided' });
+    }
+    const { error } = await supabase
+      .from('profiles')
+      .update({ archived: true, archived_at: new Date().toISOString() })
+      .in('user_id', ids);
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Archive selected voters error:', err);
+    res.status(500).json({ error: 'Failed to archive selected voters' });
+  }
+});
+
 // Reset all voters' voting status (set has_voted = false for all profiles & clear votes)
 app.post('/api/voters/reset-all-voted', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -792,6 +916,37 @@ app.put('/api/candidates/:id', requireAuth, requireAdmin, upload.single('photo')
   }
 });
 
+// Archive selected candidates (bulk)
+app.patch('/api/candidates/archive-selected', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No candidate IDs provided' });
+    }
+    const { data, error } = await supabase.rpc('app_archive_selected_candidates', {
+      p_token: req.token,
+      p_ids: ids,
+    });
+    if (error) throw error;
+    res.json(data || { success: true });
+  } catch (err) {
+    console.error('Archive selected candidates error:', err);
+    res.status(500).json({ error: 'Failed to archive selected candidates' });
+  }
+});
+
+// Archive all candidates
+app.patch('/api/candidates/archive-all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc('app_archive_all_candidates', { p_token: req.token });
+    if (error) throw error;
+    res.json(data || { success: true });
+  } catch (err) {
+    console.error('Archive all candidates error:', err);
+    res.status(500).json({ error: 'Failed to archive all candidates' });
+  }
+});
+
 // Archive a candidate (soft delete)
 app.patch('/api/candidates/:id/archive', requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -858,6 +1013,78 @@ app.delete('/api/candidates/:id/permanent', requireAuth, requireAdmin, async (re
   } catch (err) {
     console.error('Permanent delete candidate error:', err);
     res.status(500).json({ error: 'Failed to permanently delete candidate' });
+  }
+});
+
+// Restore all archived candidates
+app.post('/api/candidates/archived/restore-all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('candidates')
+      .update({ archived: false, archived_at: null })
+      .eq('archived', true);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Restore all candidates error:', err);
+    res.status(500).json({ error: 'Failed to restore all candidates' });
+  }
+});
+
+// Restore selected archived candidates
+app.post('/api/candidates/archived/restore-selected', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No candidate IDs provided' });
+    }
+    const { error } = await supabase
+      .from('candidates')
+      .update({ archived: false, archived_at: null })
+      .in('id', ids);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Restore selected candidates error:', err);
+    res.status(500).json({ error: 'Failed to restore selected candidates' });
+  }
+});
+
+// Permanently delete all archived candidates
+app.delete('/api/candidates/archived/all', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { error } = await supabase
+      .from('candidates')
+      .delete()
+      .eq('archived', true);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Permanent delete all candidates error:', err);
+    res.status(500).json({ error: 'Failed to permanently delete all candidates' });
+  }
+});
+
+// Permanently delete selected archived candidates
+app.post('/api/candidates/archived/delete-selected', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { ids } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'No candidate IDs provided' });
+    }
+    const { error } = await supabase
+      .from('candidates')
+      .delete()
+      .in('id', ids);
+
+    if (error) throw error;
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Permanent delete selected candidates error:', err);
+    res.status(500).json({ error: 'Failed to permanently delete selected candidates' });
   }
 });
 

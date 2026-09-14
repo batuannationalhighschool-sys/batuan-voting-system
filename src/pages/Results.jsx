@@ -233,6 +233,24 @@ export default function Results() {
     }
   };
 
+  const handleSectionChange = (val) => {
+    setVoterSection(val);
+    if (val !== "all") {
+      // Auto-detect and set the grade level that this section belongs to
+      const sectionEntry = allSections.find(s => s.section === val);
+      if (sectionEntry?.grade_level && sectionEntry.grade_level !== voterGrade) {
+        setVoterGrade(sectionEntry.grade_level);
+        // Also reset position filter if incompatible with newly auto-set grade
+        if (activePosition !== "all") {
+          const posObj = (positions ?? []).find(p => String(p.id) === String(activePosition));
+          if (posObj && !gradeMatchesPosition(sectionEntry.grade_level, posObj.title)) {
+            setActivePosition("all");
+          }
+        }
+      }
+    }
+  };
+
   const votedCount = stats?.votedCount ?? 0;
   const profileCount = stats?.voterCount ?? 0;
   const turnout = profileCount && profileCount > 0 ? ((votedCount) / profileCount * 100).toFixed(1) : "0";
@@ -320,6 +338,21 @@ export default function Results() {
     if (val !== "all" && historyPositionFilter !== "all") {
       if (!gradeMatchesPosition(val, historyPositionFilter)) {
         setHistoryPositionFilter("all");
+      }
+    }
+  };
+
+  const handleHistorySectionChange = (val) => {
+    setHistorySectionFilter(val);
+    if (val !== "all") {
+      // Auto-detect and set the grade level that this section belongs to
+      const allArchivedSections = archivedVoterGroups?.sections ?? [];
+      const sectionEntry = allArchivedSections.find(s => s.section === val);
+      if (sectionEntry?.grade_level && sectionEntry.grade_level !== historyGradeFilter) {
+        setHistoryGradeFilter(sectionEntry.grade_level);
+        if (historyPositionFilter !== "all" && !gradeMatchesPosition(sectionEntry.grade_level, historyPositionFilter)) {
+          setHistoryPositionFilter("all");
+        }
       }
     }
   };
@@ -559,7 +592,7 @@ export default function Results() {
                 <select
                   id="results-section-filter"
                   value={voterSection}
-                  onChange={(e) => setVoterSection(e.target.value)}
+                  onChange={(e) => handleSectionChange(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="all">All Sections</option>
@@ -801,7 +834,7 @@ export default function Results() {
                     <select
                       id="history-section-filter"
                       value={historySectionFilter}
-                      onChange={(e) => setHistorySectionFilter(e.target.value)}
+                      onChange={(e) => handleHistorySectionChange(e.target.value)}
                       disabled={!historyFilterSupported}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
