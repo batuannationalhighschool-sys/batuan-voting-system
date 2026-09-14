@@ -1051,15 +1051,15 @@ export default function Admin() {
       if (!newVoter.lrn || !newVoter.full_name) throw new Error("LRN and full name are required");
       const cleanLrn = String(newVoter.lrn).replace(/\D/g, '').slice(0, 12);
       if (!/^\d{12}$/.test(cleanLrn)) throw new Error("LRN must be exactly 12 digits (numbers only)");
-      // TRAPPING (client-side): huwag nang ipadala kung ang LRN ay nag-e-exist na.
-      // Ang unang may-ari ng LRN ang mananatili — hindi ito io-overwrite.
+      // TRAPPING (client-side): do not send if the LRN already exists.
+      // The original owner of the LRN will be retained — it cannot be overwritten.
       const duplicate = (voters ?? []).find((v) => String(v.lrn).replace(/\D/g, '') === cleanLrn);
       if (duplicate) {
-        throw new Error(`LRN ${cleanLrn} already registered to "${duplicate.full_name}". Original record kept — hindi pwedeng i-overwrite.`);
+        throw new Error(`LRN ${cleanLrn} is already registered to "${duplicate.full_name}". Original record kept — cannot be overwritten.`);
       }
       const archivedDup = (archivedVoters ?? []).find((v) => String(v.lrn).replace(/\D/g, '') === cleanLrn);
       if (archivedDup) {
-        throw new Error(`LRN ${cleanLrn} exists in Archive ("${archivedDup.full_name}"). I-restore muna ito sa Archive tab sa halip na gumawa ng bago.`);
+        throw new Error(`LRN ${cleanLrn} exists in the Archive ("${archivedDup.full_name}"). Please restore it from the Archive tab instead of creating a new one.`);
       }
       await api.post('/voters', { ...newVoter, lrn: cleanLrn });
     },
@@ -1071,7 +1071,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["admin-stats"] });
       queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
     },
-    onError: (err) => toast({ title: " hindi na-add — duplicate LRN", description: err.message, variant: "destructive" }),
+    onError: (err) => toast({ title: "Failed to add voter — duplicate LRN", description: err.message, variant: "destructive" }),
   });
 
   const updateVoter = useMutation({
@@ -1079,13 +1079,13 @@ export default function Admin() {
       if (!editVoter || !editVoter.lrn || !editVoter.full_name) throw new Error("LRN and full name are required");
       const cleanLrn = String(editVoter.lrn).replace(/\D/g, '').slice(0, 12);
       if (!/^\d{12}$/.test(cleanLrn)) throw new Error("LRN must be exactly 12 digits (numbers only)");
-      // TRAPPING (client-side): bawal palitan ang LRN ng isang voter
-      // papunta sa LRN na pagmamay-ari na ng ibang account.
+      // TRAPPING (client-side): prevent changing a voter's LRN to one that belongs to another account.
+      // It cannot be reassigned to an LRN owned by another user.
       const conflict = (voters ?? []).find(
         (v) => String(v.id) !== String(editVoter.id) && String(v.lrn).replace(/\D/g, '') === cleanLrn
       );
       if (conflict) {
-        throw new Error(`LRN ${cleanLrn} already in use by "${conflict.full_name}". Hindi pwedeng gamitin ng ibang voter.`);
+        throw new Error(`LRN ${cleanLrn} is already in use by "${conflict.full_name}". It cannot be used by another voter.`);
       }
       await api.put(`/voters/${editVoter.id}`, { ...editVoter, lrn: cleanLrn });
     },
@@ -1461,7 +1461,7 @@ export default function Admin() {
             </div>
 
             <p className="text-xs text-muted-foreground mb-4">
-              Upload a CSV file with columns: <span className="font-mono text-foreground">lrn, full_name, grade_level, section</span>. Kapag ang LRN ay nag-e-exist na sa system, ito ay <span className="font-semibold text-foreground">iska-skip at hindi io-overwrite</span> — ang unang may-ari ng LRN ang mananatili. Default password is the LRN.
+              Upload a CSV file with columns: <span className="font-mono text-foreground">lrn, full_name, grade_level, section</span>. If an LRN already exists in the system, it will be <span className="font-semibold text-foreground">skipped and not overwritten</span> — the original record will be kept. Default password is the LRN.
             </p>
 
             <div
@@ -1535,7 +1535,7 @@ export default function Admin() {
                             <td className="p-2.5 text-muted-foreground">{i + 1}</td>
                             <td className={`p-2.5 font-mono ${hasError || isDuplicate ? 'text-destructive' : 'text-foreground'}`}>
                               {row.lrn || <span className="italic text-destructive">missing</span>}
-                              {isDuplicate && cleanRowLrn && <span className="block text-[10px] font-sans font-semibold">DUPLICATE — iska-skip, hindi io-overwrite</span>}
+                              {isDuplicate && cleanRowLrn && <span className="block text-[10px] font-sans font-semibold">DUPLICATE — will be skipped, cannot be overwritten</span>}
                             </td>
                             <td className={`p-2.5 uppercase ${!row.full_name ? 'text-destructive italic' : 'text-foreground'}`}>{row.full_name || 'missing'}</td>
                             <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.grade_level || '—'}</td>
@@ -1590,7 +1590,7 @@ export default function Admin() {
                 </div>
                 {(bulkResult.skippedList?.length > 0) && (
                   <div className="mt-2 space-y-1">
-                    <p className="text-xs font-semibold text-amber-600">Skipped duplicates (hindi ni-overwrite):</p>
+                    <p className="text-xs font-semibold text-amber-600">Skipped duplicates (not overwritten):</p>
                     {bulkResult.skippedList.map((s, i) => (
                       <p key={i} className="text-xs text-amber-600">{s.lrn ? `${s.lrn}` : ''}{s.full_name ? ` — ${s.full_name}` : ''}: already registered, original record kept</p>
                     ))}
@@ -1672,7 +1672,7 @@ export default function Admin() {
               return (
                 <p className="mt-2 text-xs text-destructive font-medium flex items-center gap-1">
                   <AlertCircle className="w-3.5 h-3.5" />
-                  LRN {cleanLrn} already registered to "{dup.full_name}" — hindi ito mao-overwrite. Gumamit ng ibang LRN.
+                  LRN {cleanLrn} is already registered to "{dup.full_name}" — it cannot be overwritten. Please use a different LRN.
                 </p>
               );
             })()}
