@@ -439,6 +439,7 @@ DECLARE
   v_skipped_list JSONB := '[]'::jsonb;
   v_error_list JSONB := '[]'::jsonb;
   v_idx INT := 0;
+  v_seen_lrns TEXT[] := '{}';
 BEGIN
   v_admin_id := require_admin(p_token);
 
@@ -464,28 +465,23 @@ BEGIN
     v_grade := NULLIF(trim(v_row->>'grade_level'), '');
     v_section := NULLIF(trim(v_row->>'section'), '');
 
-    -- Check if voter already exists by LRN -> UPDATE if exists
+    -- TRAPPING 1: duplicate LRN sa loob mismo ng ini-upload na batch.
+    IF v_clean_lrn = ANY(v_seen_lrns) THEN
+      v_skipped := v_skipped + 1;
+      v_skipped_list := v_skipped_list || jsonb_build_array(jsonb_build_object('lrn', v_clean_lrn, 'full_name', left(v_name, 100)));
+      v_errors := v_errors + 1;
+      v_error_list := v_error_list || jsonb_build_array(jsonb_build_object('row', 'Row ' || v_idx, 'lrn', v_clean_lrn, 'reason', 'Duplicate LRN inside the uploaded file — first occurrence kept'));
+      CONTINUE;
+    END IF;
+    v_seen_lrns := v_seen_lrns || v_clean_lrn;
+
+    -- TRAPPING 2: kapag ang LRN ay nag-e-exist na, HUWAG i-overwrite.
     SELECT id INTO v_id FROM users WHERE lrn = v_clean_lrn;
     IF v_id IS NOT NULL THEN
-      UPDATE users SET full_name = left(v_name, 100) WHERE id = v_id;
-
-      IF EXISTS (SELECT 1 FROM profiles WHERE user_id = v_id) THEN
-        UPDATE profiles 
-        SET full_name = left(v_name, 100),
-            grade_level = COALESCE(left(v_grade, 50), grade_level),
-            section = COALESCE(left(v_section, 50), section),
-            archived = false
-        WHERE user_id = v_id;
-      ELSE
-        INSERT INTO profiles (id, user_id, full_name, grade_level, section, archived)
-        VALUES (gen_random_uuid(), v_id, left(v_name, 100), left(v_grade, 50), left(v_section, 50), false);
-      END IF;
-
-      IF NOT EXISTS (SELECT 1 FROM user_roles WHERE user_id = v_id AND role = 'voter') THEN
-        INSERT INTO user_roles (id, user_id, role) VALUES (gen_random_uuid(), v_id, 'voter');
-      END IF;
-
-      v_updated := v_updated + 1;
+      v_skipped := v_skipped + 1;
+      v_skipped_list := v_skipped_list || jsonb_build_array(jsonb_build_object('lrn', v_clean_lrn, 'full_name', left(v_name, 100)));
+      v_errors := v_errors + 1;
+      v_error_list := v_error_list || jsonb_build_array(jsonb_build_object('row', 'Row ' || v_idx, 'lrn', v_clean_lrn, 'reason', 'LRN already registered — original record kept, new data skipped'));
       CONTINUE;
     END IF;
 
@@ -502,7 +498,7 @@ BEGIN
   END LOOP;
 
   RETURN jsonb_build_object('inserted', v_inserted, 'updated', v_updated, 'skipped', v_skipped, 'errors', v_errors,
-    'skippedList', v_skipped_list, 'errorList', v_error_list);
+    'skippedList', v_skipped_list, 'errorList', v_error_list, 'updatedList', '[]'::jsonb);
 END;
 $$;
 

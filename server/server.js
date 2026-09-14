@@ -523,6 +523,7 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
     const updated = [];
     const skipped = [];
     const errors = [];
+    const seenInBatch = new Set();
 
     for (let i = 0; i < rows.length; i++) {
       const { lrn, full_name, grade_level, section } = rows[i] ?? {};
@@ -542,48 +543,24 @@ app.post('/api/voters/bulk', requireAuth, requireAdmin, async (req, res) => {
       const cleanGrade = grade_level && String(grade_level).trim() ? String(grade_level).trim().slice(0, 50) : null;
       const cleanSection = section && String(section).trim() ? String(section).trim().slice(0, 50) : null;
 
-      // Check if user already exists
+      // TRAPPING 1: duplicate LRN sa loob mismo ng ini-upload na file
+      if (seenInBatch.has(cleanLrn)) {
+        skipped.push({ lrn: cleanLrn, full_name: cleanName });
+        errors.push({ row: rowLabel, lrn: cleanLrn, reason: `Duplicate LRN ${cleanLrn} inside the uploaded file — first occurrence kept` });
+        continue;
+      }
+      seenInBatch.add(cleanLrn);
+
+      // TRAPPING 2: Kapag ang LRN ay nag-e-exist na, huwag i-overwrite.
+      // Ang unang may-ari ng LRN ang mananatili. I-skip at i-report bilang duplicate.
       const { data: existing } = await supabase
         .from('users')
         .select('id')
         .eq('lrn', cleanLrn);
 
       if (existing && existing.length > 0) {
-        const existingUserId = existing[0].id;
-        // Update user full_name
-        await supabase
-          .from('users')
-          .update({ full_name: cleanName })
-          .eq('id', existingUserId);
-
-        // Check profile
-        const { data: existingProf } = await supabase
-          .from('profiles')
-          .select('id, grade_level, section')
-          .eq('user_id', existingUserId);
-
-        if (existingProf && existingProf.length > 0) {
-          const profUpdates = { full_name: cleanName, archived: false };
-          if (cleanGrade) profUpdates.grade_level = cleanGrade;
-          if (cleanSection) profUpdates.section = cleanSection;
-          await supabase
-            .from('profiles')
-            .update(profUpdates)
-            .eq('user_id', existingUserId);
-        } else {
-          await supabase
-            .from('profiles')
-            .insert({
-              id: randomUUID(),
-              user_id: existingUserId,
-              full_name: cleanName,
-              grade_level: cleanGrade,
-              section: cleanSection,
-              archived: false,
-            });
-        }
-
-        updated.push({ lrn: cleanLrn, full_name: cleanName });
+        skipped.push({ lrn: cleanLrn, full_name: cleanName });
+        errors.push({ row: rowLabel, lrn: cleanLrn, reason: `LRN ${cleanLrn} already registered — original record kept, new data skipped` });
         continue;
       }
 
