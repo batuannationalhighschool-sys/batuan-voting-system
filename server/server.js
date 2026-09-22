@@ -285,6 +285,9 @@ app.post('/api/voters', requireAuth, requireAdmin, async (req, res) => {
     if (!/^\d{12}$/.test(lrn)) {
       return res.status(400).json({ error: 'LRN must be exactly 12 digits (numbers only)' });
     }
+    if (!/^[a-zA-ZñÑ\s'.-]+$/.test(full_name.trim())) {
+      return res.status(400).json({ error: 'Full name must contain letters only' });
+    }
 
     // Check if LRN already exists
     const { data: existing } = await supabase
@@ -342,6 +345,9 @@ app.put('/api/voters/:id', requireAuth, requireAdmin, async (req, res) => {
     }
     if (!/^\d{12}$/.test(lrn)) {
       return res.status(400).json({ error: 'LRN must be exactly 12 digits (numbers only)' });
+    }
+    if (!/^[a-zA-ZñÑ\s'.-]+$/.test(full_name.trim())) {
+      return res.status(400).json({ error: 'Full name must contain letters only' });
     }
 
     // Check for duplicate LRN (excluding current user)
