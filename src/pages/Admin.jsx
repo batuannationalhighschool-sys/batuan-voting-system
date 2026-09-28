@@ -2567,8 +2567,6 @@ export default function Admin() {
                               {row.position ? row.position : <span className="italic text-destructive">missing</span>}
                               {row.position && !posValid && <span className="text-[10px] block text-destructive">(invalid position)</span>}
                             </td>
-                            <td className="p-2.5 text-muted-foreground hidden sm:table-cell">{row.grade_level || '—'}</td>
-                            <td className="p-2.5 text-muted-foreground hidden sm:table-cell uppercase">{row.section || '—'}</td>
                             <td className="p-2.5 text-muted-foreground">{row.party_list || '—'}</td>
                           </tr>
                         );
