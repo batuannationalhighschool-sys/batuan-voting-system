@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
-import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File, Eye, EyeOff, Tag, Check, Flag } from "lucide-react";
+import { Settings, Users, Vote, BarChart3, Plus, Trash2, Power, UserPlus, Shield, ImagePlus, X, Pencil, KeyRound, Search, Upload, FileText, AlertCircle, CheckCircle2, Archive, RotateCcw, UserX, UserCheck, History, Clock, CloudUpload, File, Eye, EyeOff, Tag, Check, Flag, ShieldCheck, AlertTriangle, MessageSquare, Gavel } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -244,6 +244,7 @@ export default function Admin() {
   const [showAdminNewPassword, setShowAdminNewPassword] = useState(false);
   const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
   const [adminPasswordSaving, setAdminPasswordSaving] = useState(false);
+  const [adminForgotSending, setAdminForgotSending] = useState(false);
   const adminPasswordChecks = [
     { label: `At least ${ADMIN_PASSWORD_MIN_LENGTH} characters`, valid: adminNewPassword.length >= ADMIN_PASSWORD_MIN_LENGTH },
     { label: "A lowercase letter", valid: /[a-z]/.test(adminNewPassword) },
@@ -292,6 +293,15 @@ export default function Admin() {
   const [archiveElectionSearch, setArchiveElectionSearch] = useState("");
   const [archiveSubTab, setArchiveSubTab] = useState("voters");
   const [settingsSubTab, setSettingsSubTab] = useState("election");
+
+  // ── Audit & Verification / Tie Resolution state ──
+  const [auditActivePosition, setAuditActivePosition] = useState(null); // position_id being reviewed
+  const [tieComment, setTieComment] = useState("");               // admin's manual comment
+  const [tieDecisionType, setTieDecisionType] = useState("");     // e.g. "Re-vote", "Coin flip", "Manual selection"
+  const [tieResolvedWinnerId, setTieResolvedWinnerId] = useState("");
+  const [tieResolvedWinnerName, setTieResolvedWinnerName] = useState("");
+  const [auditSavingId, setAuditSavingId] = useState(null);
+  const [auditDeleteConfirm, setAuditDeleteConfirm] = useState(null);
 
   // Archive election results state
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -393,9 +403,35 @@ export default function Admin() {
       setAdminNewPassword("");
       setAdminConfirmPassword("");
       setAdminCurrentPassword("");
-      toast({ title: "Admin password updated", description: "Your existing session remains active securely.", variant: "success" });
+      toast({
+        title: "Admin password updated",
+        description: "Your password was updated and a confirmation was sent to your Gmail (batuannationalhighschool@gmail.com).",
+        variant: "success",
+      });
     }
     setAdminPasswordSaving(false);
+  };
+
+  const handleForgotPassword = async () => {
+    setAdminForgotSending(true);
+    try {
+      await api.post("/auth/admin/forgot-password", {
+        email: user?.email || "batuannationalhighschool@gmail.com",
+      });
+      toast({
+        title: "Password reset link sent!",
+        description: `We've sent a password reset link to ${user?.email || "batuannationalhighschool@gmail.com"}. Please check your Gmail inbox.`,
+        variant: "success",
+      });
+    } catch (err) {
+      toast({
+        title: "Failed to send reset link",
+        description: err.message || "An error occurred while sending the reset link. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setAdminForgotSending(false);
+    }
   };
 
   const openEditModal = (c) => {
@@ -417,6 +453,12 @@ export default function Admin() {
   const { data: stats } = useQuery({ queryKey: ["admin-stats"], queryFn: () => api.get('/stats') });
   const { data: voters } = useQuery({ queryKey: ["voters"], queryFn: () => api.get('/voters'), enabled: isAdmin });
   const { data: voterGroups } = useQuery({ queryKey: ["voter-groups"], queryFn: () => api.get('/voters/groups') });
+  const { data: voteCounts } = useQuery({ queryKey: ["admin-vote-counts"], queryFn: () => api.get('/votes/counts'), enabled: isAdmin, refetchInterval: 30000 });
+  const { data: positionVerifications, refetch: refetchVerifications } = useQuery({
+    queryKey: ["position-verifications"],
+    queryFn: () => api.get('/position-verifications'),
+    enabled: isAdmin,
+  });
   useEffect(() => {
     const timeout = setTimeout(() => setDebouncedStudentSearch(studentSearch.trim()), 250);
     return () => clearTimeout(timeout);
@@ -1161,6 +1203,56 @@ export default function Admin() {
     onError: (err) => toast({ title: "Failed", description: err.message, variant: "destructive" }),
   });
 
+  // ── Audit: Save position verification / tie resolution ──
+  const saveVerification = useMutation({
+    mutationFn: async ({ positionId, isTie, tiedCandidates, resolvedWinnerId, resolvedWinnerName, decisionType, adminComment, status }) => {
+      if (isTie && (!adminComment || !adminComment.trim())) {
+        throw new Error("Please enter a tie comment/reason. It must be written manually by the authorized administrator.");
+      }
+      return api.post('/position-verifications', {
+        position_id: positionId,
+        is_tie: isTie,
+        tied_candidates: tiedCandidates,
+        resolved_winner_id: resolvedWinnerId || null,
+        resolved_winner_name: resolvedWinnerName || null,
+        decision_type: decisionType || null,
+        admin_comment: adminComment,
+        status: status || 'finalized',
+      });
+    },
+    onSuccess: (_, vars) => {
+      toast({
+        title: "Position Verified & Finalized",
+        description: "The verification record and administrator's comment have been saved.",
+        variant: "success",
+      });
+      queryClient.invalidateQueries({ queryKey: ["position-verifications"] });
+      setAuditActivePosition(null);
+      setTieComment("");
+      setTieDecisionType("");
+      setTieResolvedWinnerId("");
+      setTieResolvedWinnerName("");
+      setAuditSavingId(null);
+    },
+    onError: (err) => {
+      toast({ title: "Verification failed", description: err.message, variant: "destructive" });
+      setAuditSavingId(null);
+    },
+  });
+
+  const deleteVerification = useMutation({
+    mutationFn: (positionId) => api.delete(`/position-verifications/${positionId}`),
+    onSuccess: () => {
+      toast({ title: "Verification removed", description: "The verification record has been cleared for this position.", variant: "success" });
+      queryClient.invalidateQueries({ queryKey: ["position-verifications"] });
+      setAuditDeleteConfirm(null);
+    },
+    onError: (err) => {
+      toast({ title: "Failed to remove", description: err.message, variant: "destructive" });
+      setAuditDeleteConfirm(null);
+    },
+  });
+
   // Voter mutations
   const addVoter = useMutation({
     mutationFn: async () => {
@@ -1821,6 +1913,22 @@ export default function Admin() {
       c.section?.toLowerCase().includes(q) ||
       c.grade_level?.toLowerCase().includes(q);
   });
+
+  // ── Audit: Build position groups with vote counts for tie detection ──
+  const auditPositionGroups = useMemo(() => {
+    if (!positions || !voteCounts) return [];
+    return positions.map((pos) => {
+      const posCandidates = (voteCounts ?? [])
+        .filter((vc) => vc.position_id === pos.id)
+        .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
+      const topVotes = posCandidates[0]?.vote_count ?? 0;
+      const hasVotes = topVotes > 0;
+      const tiedCandidates = hasVotes ? posCandidates.filter(c => c.vote_count === topVotes) : [];
+      const isTie = hasVotes && tiedCandidates.length > 1;
+      const totalVotes = posCandidates.reduce((s, c) => s + (c.vote_count ?? 0), 0);
+      return { position: pos, candidates: posCandidates, totalVotes, isTie, tiedCandidates, topVotes, hasVotes };
+    });
+  }, [positions, voteCounts]);
 
   // Candidate Selection Helpers
   const toggleCandidateSelect = (id) => {
@@ -4668,7 +4776,26 @@ export default function Admin() {
                 }`}
             >
               <Tag className="w-4 h-4" />
-              Manage Sections & Party Lists
+              Manage Sections &amp; Party Lists
+            </button>
+            <button
+              id="settings-subtab-audit"
+              onClick={() => {
+                setSettingsSubTab("audit");
+                setAuditActivePosition(null);
+                setTieComment("");
+                setTieDecisionType("");
+                setTieResolvedWinnerId("");
+                setTieResolvedWinnerName("");
+              }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${settingsSubTab === "audit" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <ShieldCheck className="w-4 h-4" />
+              Audit &amp; Verification
+              {(auditPositionGroups ?? []).some(g => g.isTie && !(positionVerifications ?? []).find(v => v.position_id === g.position.id)) && (
+                <span className="ml-0.5 inline-flex items-center justify-center w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="Unresolved tie detected" />
+              )}
             </button>
           </div>
 
@@ -5076,14 +5203,36 @@ export default function Admin() {
                       </p>
                     )}
                   </div>
-                  <button
-                    type="submit"
-                    disabled={adminPasswordSaving || !adminPasswordFormIsValid}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50"
-                  >
-                    {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
-                    {adminPasswordSaving ? "Updating…" : "Change Admin Password"}
-                  </button>
+                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                    <button
+                      type="submit"
+                      disabled={adminPasswordSaving || !adminPasswordFormIsValid}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-medium text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50 cursor-pointer"
+                    >
+                      {adminPasswordSaving ? <div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> : <KeyRound className="w-4 h-4" />}
+                      {adminPasswordSaving ? "Updating…" : "Change Admin Password"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      disabled={adminForgotSending}
+                      className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-border bg-background hover:bg-muted/70 text-foreground font-medium text-sm shadow-sm transition-all hover:border-muted-foreground/40 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                      title="Send a password reset link to batuannationalhighschool@gmail.com"
+                    >
+                      {adminForgotSending ? (
+                        <div className="w-4 h-4 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+                      ) : (
+                        <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
+                          <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                          <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                          <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
+                          <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
+                        </svg>
+                      )}
+                      <span>{adminForgotSending ? "Sending link…" : "Forget Password"}</span>
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -5274,6 +5423,348 @@ export default function Admin() {
               </div>
             </div>
           )}
+
+          {/* ── Audit & Verification Sub-panel ── */}
+          {settingsSubTab === "audit" && (
+            <div className="animate-fade-in space-y-6">
+              {/* Header */}
+              <div className="bg-card rounded-xl border border-border p-6 shadow-elegant">
+                <div className="flex items-start gap-4 flex-wrap">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-display font-bold text-foreground text-lg mb-1 flex items-center gap-2">
+                      <ShieldCheck className="w-5 h-5 text-gold" /> Audit &amp; Verification
+                    </h3>
+                    <p className="text-xs text-muted-foreground max-w-2xl">
+                      Review each position's vote results. When a <span className="font-semibold text-amber-500">tie</span> is detected, you must enter the explanation, decision, or action taken manually — no automatic comment will be generated. After submitting, the position is marked <span className="font-semibold text-emerald-500">Verified / Finalized</span> while original votes remain unchanged.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/60 px-3 py-1.5 rounded-lg border border-border shrink-0">
+                    <span>S.Y. {settings?.school_year ?? "—"}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Position list */}
+              {(!auditPositionGroups || auditPositionGroups.length === 0) ? (
+                <div className="bg-card rounded-xl border border-border p-10 shadow-elegant text-center">
+                  <ShieldCheck className="w-10 h-10 mx-auto mb-3 text-muted-foreground/30" />
+                  <p className="text-muted-foreground text-sm">No positions or vote data available yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {auditPositionGroups.map((group) => {
+                    const posId = group.position.id;
+                    const verification = (positionVerifications ?? []).find(v => v.position_id === posId);
+                    const isVerified = !!verification;
+                    const isExpanded = auditActivePosition === posId;
+                    const isTie = group.isTie;
+
+                    return (
+                      <div
+                        key={posId}
+                        id={`audit-position-${posId}`}
+                        className={`bg-card rounded-xl border shadow-elegant transition-all duration-200 overflow-hidden ${
+                          isTie && !isVerified
+                            ? "border-amber-500/50 ring-1 ring-amber-500/20"
+                            : isVerified
+                            ? "border-emerald-500/40"
+                            : "border-border"
+                        }`}
+                      >
+                        {/* Position Header Row */}
+                        <div
+                          className="flex items-center gap-3 px-5 py-4 cursor-pointer select-none hover:bg-muted/30 transition-colors"
+                          onClick={() => {
+                            if (isExpanded) {
+                              setAuditActivePosition(null);
+                            } else {
+                              setAuditActivePosition(posId);
+                              if (!isVerified) {
+                                setTieComment(verification?.admin_comment ?? "");
+                                setTieDecisionType(verification?.decision_type ?? "");
+                                setTieResolvedWinnerId(verification?.resolved_winner_id ?? "");
+                                setTieResolvedWinnerName(verification?.resolved_winner_name ?? "");
+                              } else {
+                                setTieComment(verification.admin_comment ?? "");
+                                setTieDecisionType(verification.decision_type ?? "");
+                                setTieResolvedWinnerId(verification.resolved_winner_id ?? "");
+                                setTieResolvedWinnerName(verification.resolved_winner_name ?? "");
+                              }
+                            }
+                          }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-display font-bold text-foreground text-sm">{group.position.title}</span>
+                              {isTie && !isVerified && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 text-[10px] font-bold uppercase tracking-wide border border-amber-500/30">
+                                  <AlertTriangle className="w-3 h-3" /> Tie Detected
+                                </span>
+                              )}
+                              {isVerified && (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase tracking-wide border border-emerald-500/30">
+                                  <CheckCircle2 className="w-3 h-3" /> Verified
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                              {group.totalVotes.toLocaleString()} total vote{group.totalVotes !== 1 ? "s" : ""}
+                              {group.hasVotes && (
+                                <> · Top: {group.candidates[0]?.candidate_name ?? "—"} ({group.topVotes})</>
+                              )}
+                              {!group.hasVotes && " · No votes yet"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            {isVerified && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); setAuditDeleteConfirm(posId); }}
+                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                title="Remove verification record"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                            <div className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
+                              <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Expanded Content */}
+                        {isExpanded && (
+                          <div className="border-t border-border px-5 py-5 space-y-5 animate-fade-in">
+
+                            {/* Vote Tally Table */}
+                            <div>
+                              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Current Vote Tally</p>
+                              <div className="rounded-xl overflow-hidden border border-border">
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="bg-muted/50">
+                                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">#</th>
+                                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground">Candidate</th>
+                                      <th className="text-left px-4 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">Party List</th>
+                                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground">Votes</th>
+                                      <th className="text-right px-4 py-2.5 text-xs font-semibold text-muted-foreground hidden sm:table-cell">%</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {group.candidates.length === 0 ? (
+                                      <tr><td colSpan={5} className="text-center py-4 text-muted-foreground text-xs">No candidates registered.</td></tr>
+                                    ) : group.candidates.map((c, ci) => {
+                                      const pct = group.totalVotes ? ((c.vote_count ?? 0) / group.totalVotes * 100).toFixed(1) : "0";
+                                      const isTied = isTie && (c.vote_count ?? 0) === group.topVotes;
+                                      return (
+                                        <tr key={c.candidate_id} className={`border-t border-border ${isTied ? "bg-amber-500/5" : ""}`}>
+                                          <td className="px-4 py-2.5 text-muted-foreground text-xs">{ci + 1}</td>
+                                          <td className="px-4 py-2.5 font-medium text-foreground text-xs uppercase">
+                                            {c.candidate_name}
+                                            {isTied && <span className="ml-2 text-[10px] text-amber-500 font-bold">(TIE)</span>}
+                                          </td>
+                                          <td className="px-4 py-2.5 text-muted-foreground text-xs hidden sm:table-cell">{c.party_list}</td>
+                                          <td className="px-4 py-2.5 text-right font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</td>
+                                          <td className="px-4 py-2.5 text-right text-muted-foreground text-xs hidden sm:table-cell">{pct}%</td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+
+                            {/* Already verified notice */}
+                            {isVerified && (
+                              <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 mb-2">
+                                  <CheckCircle2 className="w-4 h-4" /> Verified &amp; Finalized
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Verified by <span className="font-medium text-foreground">{verification.verified_by_name ?? "Administrator"}</span>
+                                  {verification.created_at && (
+                                    <> on {new Date(verification.created_at).toLocaleString('en-PH', { dateStyle: 'medium', timeStyle: 'short' })}</>
+                                  )}
+                                </p>
+                                {verification.is_tie && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Decision type: <span className="font-medium text-foreground">{verification.decision_type || "—"}</span>
+                                    {verification.resolved_winner_name && (
+                                      <> · Resolved winner: <span className="font-medium text-gold uppercase">{verification.resolved_winner_name}</span></>
+                                    )}
+                                  </p>
+                                )}
+                                {verification.admin_comment && (
+                                  <div className="mt-3 p-3 rounded-lg bg-background border border-border">
+                                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1 flex items-center gap-1">
+                                      <MessageSquare className="w-3 h-3" /> Administrator's Comment
+                                    </p>
+                                    <p className="text-xs text-foreground whitespace-pre-wrap">{verification.admin_comment}</p>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Verification / Tie Resolution Form */}
+                            <div className={`rounded-xl border p-5 space-y-4 ${isTie ? "border-amber-500/40 bg-amber-500/5" : "border-border bg-muted/20"}`}>
+                              <p className="text-xs font-semibold text-foreground flex items-center gap-2">
+                                <Gavel className="w-4 h-4 text-gold" />
+                                {isTie ? "Tie Resolution — Administrator Action Required" : "Verification Record"}
+                              </p>
+
+                              {isTie && (
+                                <>
+                                  {/* Decision Type */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground mb-1.5">
+                                      Decision / Action Taken
+                                    </label>
+                                    <select
+                                      value={tieDecisionType}
+                                      onChange={e => setTieDecisionType(e.target.value)}
+                                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                      <option value="">— Select decision type —</option>
+                                      <option value="Re-vote conducted">Re-vote conducted</option>
+                                      <option value="Coin flip / Draw of lots">Coin flip / Draw of lots</option>
+                                      <option value="Committee decision">Committee decision</option>
+                                      <option value="Administrative selection">Administrative selection</option>
+                                      <option value="Other">Other (see comment)</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Resolved Winner */}
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground mb-1.5">
+                                      Declared Winner (optional — leave blank if no single winner)
+                                    </label>
+                                    <select
+                                      value={tieResolvedWinnerId}
+                                      onChange={e => {
+                                        const cId = e.target.value;
+                                        setTieResolvedWinnerId(cId);
+                                        const found = group.tiedCandidates.find(c => c.candidate_id === cId);
+                                        setTieResolvedWinnerName(found?.candidate_name ?? "");
+                                      }}
+                                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                    >
+                                      <option value="">— None selected (no single winner) —</option>
+                                      {group.tiedCandidates.map(c => (
+                                        <option key={c.candidate_id} value={c.candidate_id}>{c.candidate_name}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </>
+                              )}
+
+                              {/* Mandatory comment area */}
+                              <div>
+                                <label htmlFor={`tie-comment-${posId}`} className="block text-xs font-medium text-foreground mb-1.5">
+                                  {isTie ? (
+                                    <>
+                                      <span className="text-destructive">*</span> Tie Explanation / Comment{" "}
+                                      <span className="text-muted-foreground font-normal">(must be entered manually — no auto-generated text)</span>
+                                    </>
+                                  ) : (
+                                    "Administrator's Comment / Note (optional)"
+                                  )}
+                                </label>
+                                <textarea
+                                  id={`tie-comment-${posId}`}
+                                  rows={4}
+                                  value={tieComment}
+                                  onChange={e => setTieComment(e.target.value)}
+                                  placeholder={
+                                    isTie
+                                      ? "Enter the explanation for the tie, the decision made, and/or the action taken. This comment is required and will be saved as part of the official audit record…"
+                                      : "Enter any notes or remarks about this position's results (optional)…"
+                                  }
+                                  className={`w-full px-3 py-2.5 rounded-xl bg-background border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none ${
+                                    isTie && !tieComment.trim() ? "border-amber-500/60 focus:ring-amber-500/40" : "border-border"
+                                  }`}
+                                />
+                                {isTie && !tieComment.trim() && (
+                                  <p className="mt-1 text-[10px] text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                                    <AlertTriangle className="w-3 h-3" /> This field is required for tie resolution.
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Submit */}
+                              <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+                                <p className="text-[10px] text-muted-foreground">
+                                  Original vote counts are <span className="font-medium text-foreground">not changed</span>. The position will be marked <span className="font-medium text-emerald-500">Verified / Finalized</span>.
+                                </p>
+                                <button
+                                  id={`audit-submit-${posId}`}
+                                  type="button"
+                                  disabled={auditSavingId === posId || saveVerification.isPending || (isTie && !tieComment.trim())}
+                                  onClick={() => {
+                                    setAuditSavingId(posId);
+                                    saveVerification.mutate({
+                                      positionId: posId,
+                                      isTie,
+                                      tiedCandidates: group.tiedCandidates.map(c => ({ id: c.candidate_id, name: c.candidate_name, votes: c.vote_count })),
+                                      resolvedWinnerId: tieResolvedWinnerId || null,
+                                      resolvedWinnerName: tieResolvedWinnerName || null,
+                                      decisionType: tieDecisionType || null,
+                                      adminComment: tieComment,
+                                      status: "finalized",
+                                    });
+                                  }}
+                                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity disabled:opacity-50 shrink-0"
+                                >
+                                  {auditSavingId === posId && saveVerification.isPending ? (
+                                    <><div className="w-4 h-4 border-2 border-accent-foreground/30 border-t-accent-foreground rounded-full animate-spin" /> Saving…</>
+                                  ) : (
+                                    <><ShieldCheck className="w-4 h-4" /> {isVerified ? "Update Verification" : "Verify & Finalize"}</>
+                                  )}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Audit Delete Confirmation Modal ── */}
+      {auditDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setAuditDeleteConfirm(null)}>
+          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-destructive" /> Remove Verification?
+              </h3>
+              <button onClick={() => setAuditDeleteConfirm(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground mb-2">
+              This will remove the <span className="font-medium text-foreground">Verified / Finalized</span> record for this position. The position will return to unverified status.
+            </p>
+            <p className="text-xs text-muted-foreground mb-5">Original vote counts are not affected.</p>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={() => setAuditDeleteConfirm(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteVerification.mutate(auditDeleteConfirm)}
+                disabled={deleteVerification.isPending}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {deleteVerification.isPending
+                  ? <><div className="w-4 h-4 border-2 border-destructive-foreground/30 border-t-destructive-foreground rounded-full animate-spin" /> Removing…</>
+                  : <><Trash2 className="w-4 h-4" /> Yes, Remove</>}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
