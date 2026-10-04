@@ -2,11 +2,12 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import bcrypt from 'bcryptjs';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHmac } from 'node:crypto';
 import multer from 'multer';
 import path from 'path';
 import supabase from './db.js';
 import { requireAuth, requireAdmin } from './middleware/auth.js';
+import { sendAdminPasswordChangedEmail, sendForgotPasswordEmail, isMailerConfigured } from './mailer.js';
 
 // Multer config — temporary in-memory storage before uploading to Supabase Storage
 const upload = multer({
@@ -166,10 +167,130 @@ app.post('/api/auth/admin/change-password', requireAuth, requireAdmin, async (re
     });
 
     if (error) return res.status(400).json({ error: error.message });
+
+    // Send email notification to admin after successful password change (non-blocking)
+    sendAdminPasswordChangedEmail({
+      adminName: req.profile?.full_name || req.user?.lrn || 'Administrator',
+      adminEmail: req.user?.email || process.env.GMAIL_USER,
+      changedAt: new Date().toISOString(),
+    }).catch((err) => console.error('[mailer] Unexpected error in password-change email:', err.message));
+
     return res.json(data);
   } catch (err) {
     console.error('Admin password change error:', err.message);
     return res.status(500).json({ error: 'Failed to change admin password' });
+  }
+});
+
+// ── Forgot Admin Password ──────────────────────────────────────────────────
+// Generates a 15-minute HMAC-signed reset token and emails a reset link
+// to the admin email address stored in the database.
+const RESET_TOKEN_EXPIRY_MS = 15 * 60 * 1000; // 15 minutes
+const RESET_HMAC_SECRET = process.env.SUPABASE_SERVICE_ROLE_KEY || 'batuan-reset-fallback-secret';
+
+function signResetToken(userId, expiresAt) {
+  const payload = `${userId}:${expiresAt}`;
+  const sig = createHmac('sha256', RESET_HMAC_SECRET).update(payload).digest('hex');
+  return Buffer.from(`${payload}:${sig}`).toString('base64url');
+}
+
+function verifyResetToken(token) {
+  try {
+    const decoded = Buffer.from(token, 'base64url').toString('utf8');
+    const parts = decoded.split(':');
+    if (parts.length < 3) return null;
+    const sig = parts.pop();
+    const expiresAt = Number(parts.pop());
+    const userId = parts.join(':'); // UUID may contain colons in edge cases
+    if (Date.now() > expiresAt) return null; // expired
+    const expectedSig = createHmac('sha256', RESET_HMAC_SECRET).update(`${userId}:${expiresAt}`).digest('hex');
+    if (sig !== expectedSig) return null;
+    return { userId, expiresAt };
+  } catch {
+    return null;
+  }
+}
+
+app.post('/api/auth/admin/forgot-password', async (req, res) => {
+  try {
+    if (!isMailerConfigured()) {
+      return res.status(400).json({
+        error: 'Hindi pa naka-set ang Gmail App Password sa server/.env! Paki-set ang GMAIL_APP_PASSWORD sa iyong 16-character Google App Password.',
+      });
+    }
+
+    // Find admin user
+    const { data: adminRows, error } = await supabase
+      .from('users')
+      .select('id, full_name, email')
+      .not('email', 'is', null)
+      .limit(1)
+      .single();
+
+    if (error || !adminRows) {
+      return res.status(404).json({ error: 'Walang nahanap na administrator account na may email.' });
+    }
+
+    const expiresAt = Date.now() + RESET_TOKEN_EXPIRY_MS;
+    const token = signResetToken(adminRows.id, expiresAt);
+
+    // Build reset URL — works on any host (localhost or production)
+    const origin = req.headers.origin || req.headers.referer?.replace(/\/$/, '') || 'http://localhost:5173';
+    const resetUrl = `${origin}/?reset_token=${token}`;
+
+    await sendForgotPasswordEmail({
+      adminName: adminRows.full_name || 'Administrator',
+      adminEmail: adminRows.email || 'batuannationalhighschool@gmail.com',
+      resetUrl,
+      expiresMinutes: 15,
+    });
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Forgot password error:', err.message);
+    return res.status(500).json({ error: err.message || 'Failed to send reset email' });
+  }
+});
+
+// ── Reset Admin Password via Token ────────────────────────────────────────
+app.post('/api/auth/admin/reset-password', async (req, res) => {
+  try {
+    const { token, new_password } = req.body;
+    if (!token || !new_password) {
+      return res.status(400).json({ error: 'Token and new password are required' });
+    }
+
+    const payload = verifyResetToken(token);
+    if (!payload) {
+      return res.status(400).json({ error: 'Reset link is invalid or has expired. Please request a new one.' });
+    }
+
+    // Hash the new password and update
+    const password_hash = await bcrypt.hash(new_password, 12);
+    const { error } = await supabase
+      .from('users')
+      .update({ password_hash, must_change_password: false })
+      .eq('id', payload.userId);
+
+    if (error) return res.status(400).json({ error: error.message });
+
+    // Fetch admin info for the confirmation email
+    const { data: adminRows } = await supabase
+      .from('users')
+      .select('full_name, email')
+      .eq('id', payload.userId)
+      .single();
+
+    sendAdminPasswordChangedEmail({
+      adminName: adminRows?.full_name || 'Administrator',
+      adminEmail: adminRows?.email || process.env.GMAIL_USER,
+      changedAt: new Date().toISOString(),
+    }).catch(() => {});
+
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Reset password error:', err.message);
+    return res.status(500).json({ error: 'Failed to reset password' });
   }
 });
 
@@ -1425,6 +1546,62 @@ app.put('/api/election-settings/:id', requireAuth, requireAdmin, async (req, res
     return res.json(data || { success: true });
   } catch (err) {
     res.status(500).json({ error: 'Failed to update election settings' });
+  }
+});
+
+// ─── Position Verifications & Tie Resolutions ─────────────────────
+
+app.get('/api/position-verifications', async (req, res) => {
+  try {
+    const { school_year } = req.query;
+    const { data, error } = await supabase.rpc('app_get_position_verifications', {
+      p_school_year: school_year || null,
+    });
+    if (error) throw error;
+    return res.json(data || []);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch position verifications' });
+  }
+});
+
+app.post('/api/position-verifications', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { position_id, is_tie, tied_candidates, resolved_winner_id, resolved_winner_name, decision_type, admin_comment, status } = req.body;
+    if (is_tie && (!admin_comment || !admin_comment.trim())) {
+      return res.status(400).json({ error: 'Tie comment/reason must be entered manually by the authorized administrator.' });
+    }
+    const { data, error } = await supabase.rpc('app_save_position_verification', {
+      p_token: req.authToken,
+      p_position_id,
+      p_is_tie: !!is_tie,
+      p_tied_candidates: tied_candidates || [],
+      p_resolved_winner_id: resolved_winner_id || null,
+      p_resolved_winner_name: resolved_winner_name || null,
+      p_decision_type: decision_type || null,
+      p_admin_comment: admin_comment ? admin_comment.trim() : '',
+      p_status: status || 'finalized',
+    });
+    if (error) {
+      return res.status(400).json({ error: error.message || 'Failed to save position verification' });
+    }
+    return res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save position verification' });
+  }
+});
+
+app.delete('/api/position-verifications/:positionId', requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const { data, error } = await supabase.rpc('app_delete_position_verification', {
+      p_token: req.authToken,
+      p_position_id: req.params.positionId,
+    });
+    if (error) {
+      return res.status(400).json({ error: error.message || 'Failed to delete position verification' });
+    }
+    return res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to delete position verification' });
   }
 });
 

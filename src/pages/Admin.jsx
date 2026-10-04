@@ -2098,6 +2098,137 @@ export default function Admin() {
             <StatCard icon={BarChart3} label="Turnout" value={`${turnout}%`} delay={200} />
             <StatCard icon={Users} label="Candidates" value={(candidates ?? []).length} variant="navy" delay={300} />
           </div>
+
+          {/* Live Election Results & Verification Status in Admin Overview */}
+          <div className="bg-card rounded-xl border border-border p-6 shadow-elegant space-y-5">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-gold" /> Election Results &amp; Audit Status
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Live position standings, tie resolutions, and administrator decisions
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => { setActiveTab("settings"); setSettingsSubTab("audit"); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" /> Open Audit &amp; Verification
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/results")}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-muted text-foreground hover:bg-muted/80 border border-border transition-colors"
+                >
+                  <Eye className="w-3.5 h-3.5" /> View Public Results Page
+                </button>
+              </div>
+            </div>
+
+            {(!auditPositionGroups || auditPositionGroups.length === 0) ? (
+              <p className="text-xs text-muted-foreground italic py-4">No positions or vote tallies recorded yet.</p>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {auditPositionGroups.map((group) => {
+                  const verif = (positionVerifications ?? []).find(v => v.position_id === group.position.id);
+                  const isVerified = !!verif;
+                  const isTie = group.isTie;
+                  const topCand = group.candidates[0];
+
+                  return (
+                    <div
+                      key={group.position.id}
+                      className={`rounded-xl border p-4 transition-all ${
+                        isVerified
+                          ? "border-emerald-500/40 bg-emerald-500/5 dark:bg-emerald-950/20"
+                          : isTie
+                          ? "border-amber-500/50 bg-amber-500/5 dark:bg-amber-950/20"
+                          : "border-border bg-card"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-2 mb-2">
+                        <div>
+                          <p className="text-xs font-bold text-foreground uppercase">{group.position.title}</p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {group.totalVotes.toLocaleString()} total vote{group.totalVotes !== 1 ? 's' : ''}
+                          </p>
+                        </div>
+                        {isVerified ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            <ShieldCheck className="w-3 h-3" />
+                            {verif.is_tie ? "Tie Resolved" : "Verified"}
+                          </span>
+                        ) : isTie ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 animate-pulse">
+                            <AlertTriangle className="w-3 h-3" /> Tie Detected
+                          </span>
+                        ) : null}
+                      </div>
+
+                      {/* Leader or Winner */}
+                      <div className="py-2 border-y border-border/60 text-xs">
+                        {verif?.resolved_winner_name ? (
+                          <div className="flex items-center gap-1.5 text-gold font-bold uppercase">
+                            <Trophy className="w-3.5 h-3.5 shrink-0" />
+                            <span>Winner: {verif.resolved_winner_name}</span>
+                            <span className="text-[10px] font-normal text-muted-foreground capitalize">({verif.decision_type || "Admin decision"})</span>
+                          </div>
+                        ) : topCand && (topCand.vote_count ?? 0) > 0 ? (
+                          <div className="flex items-center justify-between text-muted-foreground">
+                            <span className="text-foreground font-semibold uppercase">{topCand.candidate_name}</span>
+                            <span>{(topCand.vote_count ?? 0).toLocaleString()} votes</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground italic">No votes cast yet</span>
+                        )}
+                      </div>
+
+                      {/* Display Decision / Action Taken and Admin Comment */}
+                      {isVerified && (
+                        <div className="mt-3 space-y-2 text-xs">
+                          {verif.decision_type && (
+                            <div className="flex items-start gap-1.5 text-[11px]">
+                              <Gavel className="w-3.5 h-3.5 text-gold shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-semibold text-muted-foreground uppercase text-[10px] block">Decision / Action Taken:</span>
+                                <span className="font-medium text-foreground">{verif.decision_type}</span>
+                              </div>
+                            </div>
+                          )}
+                          {verif.admin_comment && (
+                            <div className="p-2.5 rounded-lg bg-background border border-border text-[11px]">
+                              <p className="font-semibold text-muted-foreground uppercase text-[9px] mb-1 flex items-center gap-1">
+                                <MessageSquare className="w-3 h-3 text-gold" /> Admin Comment:
+                              </p>
+                              <p className="text-foreground whitespace-pre-wrap">{verif.admin_comment}</p>
+                            </div>
+                          )}
+                          <p className="text-[10px] text-muted-foreground">
+                            Verified by {verif.verified_by_name || "Admin"}
+                            {verif.created_at && <> · {new Date(verif.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</>}
+                          </p>
+                        </div>
+                      )}
+
+                      {!isVerified && isTie && (
+                        <div className="mt-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs">
+                          <p className="font-semibold text-amber-600 dark:text-amber-400 text-[11px] flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3" /> Administrator Action Required
+                          </p>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Tie between {group.tiedCandidates.map(c => c.candidate_name).join(' & ')}. Enter decision &amp; comment in Audit &amp; Verification tab.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -5514,6 +5645,25 @@ export default function Admin() {
                               )}
                               {!group.hasVotes && " · No votes yet"}
                             </p>
+                            {isVerified && (
+                              <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[11px]">
+                                {verification.decision_type && (
+                                  <span className="font-semibold text-foreground bg-muted px-2 py-0.5 rounded border border-border">
+                                    Action: {verification.decision_type}
+                                  </span>
+                                )}
+                                {verification.resolved_winner_name && (
+                                  <span className="font-bold text-gold uppercase bg-gold/10 px-2 py-0.5 rounded border border-gold/20">
+                                    Winner: {verification.resolved_winner_name}
+                                  </span>
+                                )}
+                                {verification.admin_comment && (
+                                  <span className="text-muted-foreground truncate max-w-sm italic">
+                                    "{verification.admin_comment}"
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
                             {isVerified && (

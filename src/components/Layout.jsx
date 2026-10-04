@@ -6,6 +6,7 @@ import { useElection } from "@/contexts/ElectionContext";
 import { useQuery } from "@tanstack/react-query";
 import api from "@/api/client";
 import schoolSeal from "@/assets/school-seal.jpg";
+import ResetPasswordModal from "@/components/ResetPasswordModal";
 
 export default function Layout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -196,6 +197,7 @@ export default function Layout({ children }) {
           </div>
         </div>
       )}
+      <ResetPasswordModal />
     </div>
   );
 }

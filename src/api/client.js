@@ -132,6 +132,23 @@ async function handleGet(path) {
     return data;
   }
 
+  if (pathname === '/position-verifications') {
+    const { data, error } = await supabase.rpc('app_get_position_verifications', {
+      p_school_year: params.school_year || null,
+    });
+    if (error) {
+      if (isMissingRpc(error)) {
+        const { data: directData, error: dirErr } = await supabase
+          .from('position_verifications')
+          .select('*');
+        if (dirErr) throw new Error(dirErr.message);
+        return directData || [];
+      }
+      throw new Error(error.message);
+    }
+    return data || [];
+  }
+
   let m = pathname.match(/^\/election-history\/([^/]+)\/groups$/);
   if (m) {
     const { data, error } = await supabase.rpc('app_get_archived_voter_groups', {
@@ -188,13 +205,31 @@ async function handlePost(path, body) {
   }
 
   if (pathname === '/auth/admin/change-password') {
-    const { data, error } = await supabase.rpc('app_change_admin_password', {
-      p_token: getToken(),
-      p_current_password: body.current_password,
-      p_new_password: body.new_password,
-    });
-    if (error) throw new Error(error.message);
-    return data;
+    // Send to Express server so it triggers the Gmail notification to batuannationalhighschool@gmail.com
+    const apiBase = import.meta.env.VITE_API_URL
+      || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
+    try {
+      const resp = await fetch(`${apiBase}/auth/admin/change-password`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data?.error || 'Failed to change admin password');
+      return data;
+    } catch (serverErr) {
+      console.warn('Express server error, falling back to direct Supabase RPC:', serverErr.message);
+      const { data, error } = await supabase.rpc('app_change_admin_password', {
+        p_token: getToken(),
+        p_current_password: body.current_password,
+        p_new_password: body.new_password,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    }
   }
 
   if (pathname === '/voters') {
@@ -238,6 +273,22 @@ async function handlePost(path, body) {
 
   if (pathname === '/election-history/archive') {
     const { data, error } = await supabase.rpc('app_archive_election_results', { p_token: getToken() });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  if (pathname === '/position-verifications') {
+    const { data, error } = await supabase.rpc('app_save_position_verification', {
+      p_token: getToken(),
+      p_position_id: body.position_id,
+      p_is_tie: !!body.is_tie,
+      p_tied_candidates: body.tied_candidates || [],
+      p_resolved_winner_id: body.resolved_winner_id || null,
+      p_resolved_winner_name: body.resolved_winner_name || null,
+      p_decision_type: body.decision_type || null,
+      p_admin_comment: body.admin_comment,
+      p_status: body.status || 'finalized',
+    });
     if (error) throw new Error(error.message);
     return data;
   }
@@ -325,7 +376,36 @@ async function handlePost(path, body) {
     return data;
   }
 
+  if (pathname === '/auth/admin/forgot-password') {
+    // This must go to the Express server (nodemailer + HMAC token — no Supabase RPC)
+    const apiBase = import.meta.env.VITE_API_URL
+      || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
+    const resp = await fetch(`${apiBase}/auth/admin/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data?.error || 'Failed to send reset email');
+    return data;
+  }
+
+  if (pathname === '/auth/admin/reset-password') {
+    // This must go to the Express server (HMAC token verification + bcrypt)
+    const apiBase = import.meta.env.VITE_API_URL
+      || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
+    const resp = await fetch(`${apiBase}/auth/admin/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data?.error || 'Failed to reset password');
+    return data;
+  }
+
   throw new Error(`Unknown POST route: ${pathname}`);
+
 }
 
 // ─── PUT Router ─────────────────────────────────────────────────────
@@ -517,6 +597,17 @@ async function handleDelete(path) {
   m = pathname.match(/^\/positions\/([^/]+)$/);
   if (m) {
     const { data, error } = await supabase.rpc('app_delete_position', { p_token: getToken(), p_id: m[1] });
+    if (error) throw new Error(error.message);
+    return data;
+  }
+
+  // /position-verifications/:id
+  m = pathname.match(/^\/position-verifications\/([^/]+)$/);
+  if (m) {
+    const { data, error } = await supabase.rpc('app_delete_position_verification', {
+      p_token: getToken(),
+      p_position_id: m[1],
+    });
     if (error) throw new Error(error.message);
     return data;
   }

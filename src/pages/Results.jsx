@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer, History, Calendar, Award } from "lucide-react";
+import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer, History, Calendar, Award, ShieldCheck, AlertTriangle, Gavel, MessageSquare, CheckCircle2 } from "lucide-react";
 import schoolSeal from "@/assets/school-seal.jpg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
@@ -105,15 +105,25 @@ export default function Results() {
     queryFn: () => api.get('/election-settings'),
   });
 
-  // ── Supabase Realtime: instant vote updates ──
+  // ── Position Verifications & Tie Resolutions (Public / Student / Admin) ──
+  const { data: liveVerifications } = useQuery({
+    queryKey: ["position-verifications"],
+    queryFn: () => api.get('/position-verifications'),
+    refetchInterval: 15000,
+  });
+
+  // ── Supabase Realtime: instant vote & verification updates ──
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
 
   useEffect(() => {
     const channel = supabase
-      .channel('live-votes')
+      .channel('live-votes-and-verifications')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'votes' }, () => {
         queryClient.invalidateQueries({ queryKey: ["vote-counts"] });
         queryClient.invalidateQueries({ queryKey: ["stats"] });
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'position_verifications' }, () => {
+        queryClient.invalidateQueries({ queryKey: ["position-verifications"] });
       })
       .subscribe((status) => {
         setIsRealtimeConnected(status === 'SUBSCRIBED');
@@ -128,6 +138,12 @@ export default function Results() {
   const { data: electionHistory } = useQuery({
     queryKey: ["election-history"],
     queryFn: () => api.get('/election-history'),
+  });
+
+  const { data: historyVerifications } = useQuery({
+    queryKey: ["position-verifications", selectedYear],
+    queryFn: () => api.get(`/position-verifications?school_year=${encodeURIComponent(selectedYear)}`),
+    enabled: activeTab === "history" && !!selectedYear,
   });
 
   // Auto-select first year when history loads
@@ -265,7 +281,19 @@ export default function Results() {
       .filter((vc) => vc.position_id === pos.id)
       .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
     const totalPosVotes = posCandidates.reduce((sum, c) => sum + (c.vote_count ?? 0), 0);
-    return { position: pos, candidates: posCandidates, totalVotes: totalPosVotes };
+    const topVotes = posCandidates[0]?.vote_count ?? 0;
+    const hasVotes = topVotes > 0;
+    const tiedCandidates = hasVotes ? posCandidates.filter(c => c.vote_count === topVotes) : [];
+    const isTie = hasVotes && tiedCandidates.length > 1;
+    return {
+      position: pos,
+      candidates: posCandidates,
+      totalVotes: totalPosVotes,
+      topVotes,
+      hasVotes,
+      tiedCandidates,
+      isTie,
+    };
   });
 
   const relevantGrouped = useMemo(() => {
@@ -639,14 +667,46 @@ export default function Results() {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filtered.map((group) => {
+                  const verification = (liveVerifications ?? []).find(v => v.position_id === group.position.id);
+                  const isVerified = !!verification;
+                  const declaredWinner = verification?.resolved_winner_name;
                   const topCandidate = group.candidates[0];
                   const hasVotes = topCandidate && (topCandidate.vote_count ?? 0) > 0;
+                  const isLiveTie = group.isTie;
+
                   return (
-                    <div key={group.position.id} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-muted/60 border border-border">
-                      <Trophy className={`w-4 h-4 flex-shrink-0 mt-0.5 ${hasVotes ? "text-gold" : "text-muted-foreground/30"}`} />
+                    <div key={group.position.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${
+                      isVerified
+                        ? "bg-emerald-500/5 border-emerald-500/30"
+                        : isLiveTie
+                        ? "bg-amber-500/5 border-amber-500/30"
+                        : "bg-muted/60 border-border"
+                    }`}>
+                      <Trophy className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
+                        declaredWinner || (hasVotes && !isLiveTie) ? "text-gold" : "text-muted-foreground/30"
+                      }`} />
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold">{group.position.title}</p>
-                        {hasVotes ? (
+                        <div className="flex items-center justify-between gap-1">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold truncate">{group.position.title}</p>
+                          {isVerified && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                              <ShieldCheck className="w-2.5 h-2.5" /> Verified
+                            </span>
+                          )}
+                          {!isVerified && isLiveTie && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                              <AlertTriangle className="w-2.5 h-2.5" /> Tie
+                            </span>
+                          )}
+                        </div>
+                        {declaredWinner ? (
+                          <>
+                            <p className="text-sm font-semibold text-foreground truncate uppercase">{declaredWinner}</p>
+                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              Declared Winner · {verification.decision_type || "Admin verified"}
+                            </p>
+                          </>
+                        ) : hasVotes ? (
                           <>
                             <p className="text-sm font-semibold text-foreground truncate uppercase">{topCandidate.candidate_name}</p>
                             <p className="text-[10px] text-muted-foreground">
@@ -668,63 +728,233 @@ export default function Results() {
           )}
 
           <div className="space-y-6">
-            {filtered.map((group, gi) => (
-              <div
-                key={group.position.id}
-                id={`position-${group.position.id}`}
-                className={`bg-card rounded-xl border overflow-hidden shadow-elegant animate-fade-in transition-all duration-300 ${activePosition !== "all" && String(activePosition) === String(group.position.id)
-                  ? "ring-2 ring-gold border-gold shadow-gold-sm scale-[1.01]"
-                  : "border-border"
+            {filtered.map((group, gi) => {
+              const verification = (liveVerifications ?? []).find(v => v.position_id === group.position.id);
+              const isVerified = !!verification;
+              const isLiveTie = group.isTie;
+              const declaredWinner = verification?.resolved_winner_name;
+
+              return (
+                <div
+                  key={group.position.id}
+                  id={`position-${group.position.id}`}
+                  className={`bg-card rounded-xl border overflow-hidden shadow-elegant animate-fade-in transition-all duration-300 ${
+                    activePosition !== "all" && String(activePosition) === String(group.position.id)
+                      ? "ring-2 ring-gold border-gold shadow-gold-sm scale-[1.01]"
+                      : isVerified
+                      ? "border-emerald-500/40"
+                      : isLiveTie
+                      ? "border-amber-500/50"
+                      : "border-border"
                   }`}
-                style={{ animationDelay: `${gi * 100}ms` }}
-              >
-                <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <h2 className="font-display font-bold text-primary-foreground text-lg">{group.position.title}</h2>
-                    <p className="text-xs text-primary-foreground/50">
-                      {group.totalVotes.toLocaleString()} total votes
-                      {hasVoterFilter && (
-                        <span className="ml-2 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-semibold uppercase tracking-wider">
-                          Filtered
-                        </span>
-                      )}
-                    </p>
-                  </div>
-                  {group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-gold" />
-                      <span className="text-sm font-semibold text-gold uppercase">{group.candidates[0].candidate_name}</span>
+                  style={{ animationDelay: `${gi * 100}ms` }}
+                >
+                  <div className="gradient-navy p-4 md:p-5 flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="font-display font-bold text-primary-foreground text-lg">{group.position.title}</h2>
+                        {isVerified && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            {verification.is_tie ? "Tie Resolved & Verified" : "Verified & Finalized"}
+                          </span>
+                        )}
+                        {!isVerified && isLiveTie && (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/50 animate-pulse">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            Official Tie Detected
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-primary-foreground/50 mt-0.5">
+                        {group.totalVotes.toLocaleString()} total votes
+                        {hasVoterFilter && (
+                          <span className="ml-2 px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 text-[10px] font-semibold uppercase tracking-wider">
+                            Filtered
+                          </span>
+                        )}
+                      </p>
                     </div>
-                  )}
-                </div>
-                <div className="p-4 md:p-5 space-y-4">
-                  {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates registered.</p>}
-                  {group.candidates.map((c, ci) => {
-                    const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
-                    return (
-                      <div key={c.candidate_id} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${ci === 0 ? "gradient-gold text-accent-foreground" : "bg-muted text-muted-foreground"}`}>{ci + 1}</span>
-                            <div>
-                              <p className="font-semibold text-foreground text-sm uppercase">{c.candidate_name}</p>
-                              <p className="text-xs text-muted-foreground">{c.party_list}</p>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <span className="font-display font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</span>
-                            <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
-                          </div>
-                        </div>
-                        <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-                          <div className={`h-full rounded-full transition-all duration-1000 ${ci === 0 ? "gradient-gold" : "bg-navy-light/50"}`} style={{ width: `${pct}%` }} />
+
+                    {/* Winner / Status in header */}
+                    {declaredWinner ? (
+                      <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-lg border border-gold/30">
+                        <Trophy className="w-4 h-4 text-gold" />
+                        <div>
+                          <p className="text-xs font-bold text-gold uppercase">{declaredWinner}</p>
+                          <p className="text-[9px] text-emerald-300 font-medium">Declared Winner</p>
                         </div>
                       </div>
-                    );
-                  })}
+                    ) : group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && !isLiveTie ? (
+                      <div className="flex items-center gap-2">
+                        <Trophy className="w-4 h-4 text-gold" />
+                        <span className="text-sm font-semibold text-gold uppercase">{group.candidates[0].candidate_name}</span>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="p-4 md:p-5 space-y-4">
+                    {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates registered.</p>}
+                    {group.candidates.map((c, ci) => {
+                      const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
+                      const isTiedCandidate = isLiveTie && (c.vote_count ?? 0) === group.topVotes;
+                      const isDeclaredWinnerCandidate = declaredWinner && c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase();
+
+                      return (
+                        <div key={c.candidate_id} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-3">
+                              <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                                isDeclaredWinnerCandidate
+                                  ? "bg-emerald-500 text-white shadow"
+                                  : ci === 0 && !isLiveTie
+                                  ? "gradient-gold text-accent-foreground"
+                                  : isTiedCandidate
+                                  ? "bg-amber-500 text-white font-bold"
+                                  : "bg-muted text-muted-foreground"
+                              }`}>
+                                {isDeclaredWinnerCandidate ? <Check className="w-3.5 h-3.5" /> : ci + 1}
+                              </span>
+                              <div>
+                                <p className="font-semibold text-foreground text-sm uppercase flex items-center gap-2 flex-wrap">
+                                  {c.candidate_name}
+                                  {isDeclaredWinnerCandidate && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                      <Award className="w-3 h-3" /> Declared Winner
+                                    </span>
+                                  )}
+                                  {isTiedCandidate && !isDeclaredWinnerCandidate && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                      TIE ({c.vote_count ?? 0} votes)
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{c.party_list}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="font-display font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</span>
+                              <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                            </div>
+                          </div>
+                          <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ${
+                                isDeclaredWinnerCandidate
+                                  ? "bg-emerald-500"
+                                  : ci === 0 && !isLiveTie
+                                  ? "gradient-gold"
+                                  : isTiedCandidate
+                                  ? "bg-amber-500"
+                                  : "bg-navy-light/50"
+                              }`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* ── Official Administrator Verification & Tie Resolution Panel ── */}
+                    {isVerified && (
+                      <div className="mt-5 pt-4 border-t border-border">
+                        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 p-4 sm:p-5 space-y-3.5">
+                          {/* Header banner */}
+                          <div className="flex items-start sm:items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-emerald-500/20">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shrink-0">
+                                <ShieldCheck className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <h4 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wide flex items-center gap-2 flex-wrap">
+                                  Official Administrator Decision &amp; Verification
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/30">
+                                    {verification.is_tie ? "Tie Resolved" : "Verified & Finalized"}
+                                  </span>
+                                </h4>
+                                <p className="text-[11px] text-muted-foreground mt-0.5">
+                                  Verified by <span className="font-semibold text-foreground">{verification.verified_by_name || "Authorized Administrator"}</span>
+                                  {verification.created_at && (
+                                    <> on {new Date(verification.created_at).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true })}</>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Decision / Action Taken & Declared Winner */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            {verification.decision_type && (
+                              <div className="p-3 rounded-lg bg-card border border-border">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                  <Gavel className="w-3.5 h-3.5 text-gold shrink-0" /> Decision / Action Taken
+                                </p>
+                                <p className="text-xs sm:text-sm font-semibold text-foreground">
+                                  {verification.decision_type}
+                                </p>
+                              </div>
+                            )}
+
+                            {declaredWinner ? (
+                              <div className="p-3 rounded-lg bg-card border border-gold/40">
+                                <p className="text-[10px] font-bold text-gold uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                  <Trophy className="w-3.5 h-3.5 text-gold shrink-0" /> Declared Official Winner
+                                </p>
+                                <p className="text-xs sm:text-sm font-bold text-foreground uppercase">
+                                  {declaredWinner}
+                                </p>
+                              </div>
+                            ) : verification.decision_type ? (
+                              <div className="p-3 rounded-lg bg-card border border-border">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" /> Status
+                                </p>
+                                <p className="text-xs sm:text-sm font-semibold text-foreground">
+                                  Original Vote Tallies Preserved
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {/* Administrator's Comment / Official Statement */}
+                          {verification.admin_comment ? (
+                            <div className="p-3.5 rounded-lg bg-card border border-border">
+                              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                                <MessageSquare className="w-3.5 h-3.5 text-gold shrink-0" /> Administrator's Comment / Official Statement
+                              </p>
+                              <p className="text-xs sm:text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                                {verification.admin_comment}
+                              </p>
+                            </div>
+                          ) : null}
+
+                          {/* Integrity reassurance note */}
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground pt-0.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            <span>Original vote counts above remain intact and unaltered as officially recorded.</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Notice for unverified active tie */}
+                    {!isVerified && isLiveTie && (
+                      <div className="mt-5 pt-4 border-t border-border">
+                        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
+                          <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs sm:text-sm">
+                            <AlertTriangle className="w-4 h-4 shrink-0" />
+                            <span>Official Tie Detected ({group.topVotes} votes each)</span>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            A tie has occurred between: <strong className="text-foreground">{group.tiedCandidates.map(c => c.candidate_name).join(" and ")}</strong>. The authorized administrator's manual explanation, decision, and official action taken will be displayed here once finalized.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1004,6 +1234,60 @@ export default function Results() {
                           );
                         })}
                       </div>
+
+                      {/* ── Historical Administrator Verification & Decision Display ── */}
+                      {(() => {
+                        const histVerif = (historyVerifications ?? []).find(
+                          v => v.position_title === group.title || v.position_id === group.candidates[0]?.position_id
+                        );
+                        if (!histVerif) return null;
+
+                        return (
+                          <div className="px-4 pb-4 md:px-5 md:pb-5">
+                            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 p-4 space-y-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-emerald-500/20">
+                                <div className="flex items-center gap-2">
+                                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                                  <h4 className="text-xs font-bold text-foreground uppercase tracking-wide">
+                                    Official Audit &amp; Administrator Decision
+                                  </h4>
+                                </div>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/30 uppercase">
+                                  {histVerif.is_tie ? "Tie Resolved" : "Verified & Finalized"}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                {histVerif.decision_type && (
+                                  <div className="p-2.5 rounded-lg bg-card border border-border text-xs">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                                      <Gavel className="w-3 h-3 text-gold" /> Decision / Action Taken
+                                    </p>
+                                    <p className="font-semibold text-foreground">{histVerif.decision_type}</p>
+                                  </div>
+                                )}
+                                {histVerif.resolved_winner_name && (
+                                  <div className="p-2.5 rounded-lg bg-card border border-gold/40 text-xs">
+                                    <p className="text-[10px] font-bold text-gold uppercase tracking-wider mb-0.5 flex items-center gap-1">
+                                      <Trophy className="w-3 h-3 text-gold" /> Declared Winner
+                                    </p>
+                                    <p className="font-bold text-foreground uppercase">{histVerif.resolved_winner_name}</p>
+                                  </div>
+                                )}
+                              </div>
+
+                              {histVerif.admin_comment && (
+                                <div className="p-3 rounded-lg bg-card border border-border text-xs">
+                                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 flex items-center gap-1">
+                                    <MessageSquare className="w-3 h-3 text-gold" /> Administrator's Comment
+                                  </p>
+                                  <p className="text-foreground whitespace-pre-wrap leading-relaxed">{histVerif.admin_comment}</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
