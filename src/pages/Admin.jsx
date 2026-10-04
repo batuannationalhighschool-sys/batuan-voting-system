@@ -1784,17 +1784,6 @@ export default function Admin() {
     return candidates.filter((c) => selectedCandidateIds.has(c.id));
   }, [candidates, selectedCandidateIds]);
 
-  if (!isAdmin) {
-    return (
-      <div className="container py-16 text-center animate-fade-in">
-        <Shield className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-        <h1 className="text-2xl font-display font-bold text-foreground mb-2">Admin Access Required</h1>
-        <p className="text-muted-foreground mb-6">You need admin privileges to access this page.</p>
-        <button onClick={() => navigate("/")} className="px-6 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold">Back to Dashboard</button>
-      </div>
-    );
-  }
-
   const tabs = [
     { id: "overview", label: "Overview", icon: BarChart3 },
     { id: "voters", label: "Voters", icon: Users },
@@ -2071,6 +2060,17 @@ export default function Admin() {
       (h.election_date && String(h.election_date).toLowerCase().includes(q))
     );
   });
+
+  if (!isAdmin) {
+    return (
+      <div className="container py-16 text-center animate-fade-in">
+        <Shield className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+        <h1 className="text-2xl font-display font-bold text-foreground mb-2">Admin Access Required</h1>
+        <p className="text-muted-foreground mb-6">You need admin privileges to access this page.</p>
+        <button onClick={() => navigate("/")} className="px-6 py-3 rounded-xl gradient-navy text-primary-foreground font-semibold">Back to Dashboard</button>
+      </div>
+    );
+  }
 
   return (
     <div className="container py-8 md:py-12">

@@ -32,9 +32,9 @@ export default class ErrorBoundary extends Component {
               </div>
             </div>
 
-            <details className="text-xs text-muted-foreground bg-muted rounded-lg p-4 space-y-2 cursor-pointer">
+            <details open className="text-xs text-muted-foreground bg-muted rounded-lg p-4 space-y-2 cursor-pointer">
               <summary className="font-semibold text-foreground cursor-pointer mb-2">
-                Error Details (click to expand)
+                Error Details
               </summary>
               <pre className="whitespace-pre-wrap break-all font-mono text-red-500">
                 {this.state.error?.message || String(this.state.error)}
