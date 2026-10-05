@@ -277,20 +277,34 @@ export default function Results() {
   }, [positions, voterGrade]);
 
   const grouped = (positions ?? []).map((pos) => {
+    const maxVotes = pos.max_votes ?? 1;
     const posCandidates = (voteCounts ?? [])
       .filter((vc) => vc.position_id === pos.id)
       .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
     const totalPosVotes = posCandidates.reduce((sum, c) => sum + (c.vote_count ?? 0), 0);
     const topVotes = posCandidates[0]?.vote_count ?? 0;
     const hasVotes = topVotes > 0;
-    const tiedCandidates = hasVotes ? posCandidates.filter(c => c.vote_count === topVotes) : [];
-    const isTie = hasVotes && tiedCandidates.length > 1;
+
+    // Tie occurs across the winning threshold (maxVotes).
+    // A tie exists if a candidate outside the winning seats (index >= maxVotes)
+    // has the exact same vote count as the candidate at the last winning seat (index maxVotes - 1).
+    let isTie = false;
+    let tiedCandidates = [];
+    if (hasVotes && posCandidates.length > maxVotes) {
+      const cutoffVotes = posCandidates[maxVotes - 1]?.vote_count ?? 0;
+      if (cutoffVotes > 0 && posCandidates[maxVotes]?.vote_count === cutoffVotes) {
+        isTie = true;
+        tiedCandidates = posCandidates.filter(c => c.vote_count === cutoffVotes);
+      }
+    }
+
     return {
       position: pos,
       candidates: posCandidates,
       totalVotes: totalPosVotes,
       topVotes,
       hasVotes,
+      maxVotes,
       tiedCandidates,
       isTie,
     };
@@ -667,11 +681,15 @@ export default function Results() {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {filtered.map((group) => {
+                  const maxVotes = group.position?.max_votes ?? group.maxVotes ?? 1;
                   const verification = (liveVerifications ?? []).find(v => v.position_id === group.position.id);
                   const isVerified = !!verification;
                   const declaredWinner = verification?.resolved_winner_name;
-                  const topCandidate = group.candidates[0];
-                  const hasVotes = topCandidate && (topCandidate.vote_count ?? 0) > 0;
+                  const leadingWinners = group.candidates
+                    .slice(0, maxVotes)
+                    .filter(c => (c.vote_count ?? 0) > 0);
+                  const hasVotes = leadingWinners.length > 0;
+                  const runnerUp = group.candidates[maxVotes];
                   const isLiveTie = group.isTie;
 
                   return (
@@ -687,7 +705,14 @@ export default function Results() {
                       }`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
-                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold truncate">{group.position.title}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold truncate">
+                            {group.position.title}
+                            {maxVotes > 1 && (
+                              <span className="ml-1 text-[9px] font-normal text-muted-foreground lowercase">
+                                (2 seats)
+                              </span>
+                            )}
+                          </p>
                           {isVerified && (
                             <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                               <ShieldCheck className="w-2.5 h-2.5" /> Verified
@@ -706,16 +731,32 @@ export default function Results() {
                               Official Winner · {isAdmin && verification.decision_type ? verification.decision_type : "Verified / Finalized"}
                             </p>
                           </>
-                        ) : hasVotes ? (
-                          <>
-                            <p className="text-sm font-semibold text-foreground truncate uppercase">{topCandidate.candidate_name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {(topCandidate.vote_count ?? 0).toLocaleString()} vote{topCandidate.vote_count !== 1 ? "s" : ""}
-                              {group.candidates.length > 1 && group.candidates[1]?.candidate_name
-                                ? ` · vs ${group.candidates[1].candidate_name.toUpperCase()} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
-                                : ""}
-                            </p>
-                          </>
+                        ) : leadingWinners.length > 0 ? (
+                          <div className="space-y-1.5 mt-0.5">
+                            {leadingWinners.map((w, idx) => (
+                              <div key={w.candidate_id || w.candidate_name || idx} className="border-b border-border/30 last:border-b-0 pb-1 last:pb-0">
+                                <div className="flex items-center justify-between gap-1">
+                                  <p className="text-sm font-semibold text-foreground truncate uppercase">{w.candidate_name}</p>
+                                  {maxVotes > 1 && (
+                                    <span className="shrink-0 text-[8px] font-bold px-1.5 py-0.2 rounded bg-gold/15 text-gold border border-gold/30 uppercase">
+                                      Seat {idx + 1}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-[10px] text-muted-foreground">
+                                  {(w.vote_count ?? 0).toLocaleString()} vote{(w.vote_count ?? 0) !== 1 ? "s" : ""}
+                                  {maxVotes === 1 && group.candidates.length > 1 && group.candidates[1]?.candidate_name
+                                    ? ` · vs ${group.candidates[1].candidate_name.toUpperCase()} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
+                                    : ""}
+                                </p>
+                              </div>
+                            ))}
+                            {maxVotes > 1 && runnerUp && (runnerUp.vote_count ?? 0) > 0 && (
+                              <p className="text-[9px] text-muted-foreground/80 italic pt-0.5">
+                                Next: {runnerUp.candidate_name.toUpperCase()} ({(runnerUp.vote_count ?? 0).toLocaleString()})
+                              </p>
+                            )}
+                          </div>
                         ) : (
                           <p className="text-xs text-muted-foreground italic">No votes yet</p>
                         )}
@@ -787,20 +828,38 @@ export default function Results() {
                           </p>
                         </div>
                       </div>
-                    ) : group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && (!isLiveTie || !isAdmin) ? (
-                      <div className="flex items-center gap-2">
-                        <Trophy className="w-4 h-4 text-gold" />
-                        <span className="text-sm font-semibold text-gold uppercase">{group.candidates[0].candidate_name}</span>
-                      </div>
-                    ) : null}
+                    ) : (() => {
+                      const maxVotes = group.position?.max_votes ?? group.maxVotes ?? 1;
+                      const leadingWinners = group.candidates
+                        .slice(0, maxVotes)
+                        .filter(c => (c.vote_count ?? 0) > 0);
+                      if (leadingWinners.length > 0 && (!isLiveTie || !isAdmin)) {
+                        return (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Trophy className="w-4 h-4 text-gold" />
+                            <span className="text-sm font-semibold text-gold uppercase">
+                              {leadingWinners.map(w => w.candidate_name).join(" & ")}
+                            </span>
+                            {maxVotes > 1 && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/20 text-gold border border-gold/40">
+                                {leadingWinners.length} Winner{leadingWinners.length !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
 
                   <div className="p-4 md:p-5 space-y-4">
                     {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates registered.</p>}
                     {group.candidates.map((c, ci) => {
+                      const maxVotes = group.position?.max_votes ?? group.maxVotes ?? 1;
                       const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
-                      const isTiedCandidate = isAdmin && isLiveTie && (c.vote_count ?? 0) === group.topVotes;
+                      const isTiedCandidate = isAdmin && isLiveTie && group.tiedCandidates.some(tc => tc.candidate_id === c.candidate_id);
                       const isDeclaredWinnerCandidate = declaredWinner && c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase();
+                      const isWinnerCandidate = (ci < maxVotes) && (c.vote_count ?? 0) > 0 && (!isLiveTie || !isAdmin);
 
                       return (
                         <div key={c.candidate_id} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
@@ -809,8 +868,8 @@ export default function Results() {
                               <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
                                 isDeclaredWinnerCandidate
                                   ? "bg-emerald-500 text-white shadow"
-                                  : ci === 0 && !isLiveTie
-                                  ? "gradient-gold text-accent-foreground"
+                                  : isWinnerCandidate
+                                  ? "gradient-gold text-accent-foreground shadow-sm"
                                   : isTiedCandidate
                                   ? "bg-amber-500 text-white font-bold"
                                   : "bg-muted text-muted-foreground"
@@ -823,6 +882,11 @@ export default function Results() {
                                   {isDeclaredWinnerCandidate && (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                                       <Award className="w-3 h-3" /> Declared Winner
+                                    </span>
+                                  )}
+                                  {isWinnerCandidate && !isDeclaredWinnerCandidate && (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-gold/15 text-gold border border-gold/30">
+                                      <Award className="w-3 h-3" /> {maxVotes > 1 ? `Winner (Seat ${ci + 1})` : "Leading"}
                                     </span>
                                   )}
                                   {isTiedCandidate && !isDeclaredWinnerCandidate && (
@@ -844,7 +908,7 @@ export default function Results() {
                               className={`h-full rounded-full transition-all duration-1000 ${
                                 isDeclaredWinnerCandidate
                                   ? "bg-emerald-500"
-                                  : ci === 0 && !isLiveTie
+                                  : isWinnerCandidate
                                   ? "gradient-gold"
                                   : isTiedCandidate
                                   ? "bg-amber-500"

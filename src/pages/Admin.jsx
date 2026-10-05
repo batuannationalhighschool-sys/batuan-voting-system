@@ -1874,15 +1874,23 @@ export default function Admin() {
   const auditPositionGroups = useMemo(() => {
     if (!positions || !voteCounts) return [];
     return positions.map((pos) => {
+      const maxVotes = pos.max_votes ?? 1;
       const posCandidates = (voteCounts ?? [])
         .filter((vc) => vc.position_id === pos.id)
         .sort((a, b) => (b.vote_count ?? 0) - (a.vote_count ?? 0));
       const topVotes = posCandidates[0]?.vote_count ?? 0;
       const hasVotes = topVotes > 0;
-      const tiedCandidates = hasVotes ? posCandidates.filter(c => c.vote_count === topVotes) : [];
-      const isTie = hasVotes && tiedCandidates.length > 1;
+      let isTie = false;
+      let tiedCandidates = [];
+      if (hasVotes && posCandidates.length > maxVotes) {
+        const cutoffVotes = posCandidates[maxVotes - 1]?.vote_count ?? 0;
+        if (cutoffVotes > 0 && posCandidates[maxVotes]?.vote_count === cutoffVotes) {
+          isTie = true;
+          tiedCandidates = posCandidates.filter(c => c.vote_count === cutoffVotes);
+        }
+      }
       const totalVotes = posCandidates.reduce((s, c) => s + (c.vote_count ?? 0), 0);
-      return { position: pos, candidates: posCandidates, totalVotes, isTie, tiedCandidates, topVotes, hasVotes };
+      return { position: pos, candidates: posCandidates, totalVotes, isTie, tiedCandidates, topVotes, hasVotes, maxVotes };
     });
   }, [positions, voteCounts]);
 
@@ -5458,9 +5466,10 @@ export default function Admin() {
                             <p className="text-[11px] text-muted-foreground mt-0.5">
                               {group.totalVotes.toLocaleString()} total vote{group.totalVotes !== 1 ? "s" : ""}
                               {group.hasVotes && (
-                                <> · Top: {group.candidates[0]?.candidate_name ?? "—"} ({group.topVotes})</>
+                                <> · Top: {group.candidates.slice(0, group.maxVotes ?? 1).map(c => `${c.candidate_name} (${c.vote_count})`).join(" & ")}</>
                               )}
                               {!group.hasVotes && " · No votes yet"}
+                              {(group.maxVotes ?? 1) > 1 && ` · 2 seats`}
                             </p>
                             {isVerified && (
                               <div className="mt-1.5 flex items-center gap-2 flex-wrap text-[11px]">
@@ -5512,7 +5521,7 @@ export default function Admin() {
                                       <tr><td colSpan={5} className="text-center py-4 text-muted-foreground text-xs">No candidates registered.</td></tr>
                                     ) : group.candidates.map((c, ci) => {
                                       const pct = group.totalVotes ? ((c.vote_count ?? 0) / group.totalVotes * 100).toFixed(1) : "0";
-                                      const isTied = isTie && (c.vote_count ?? 0) === group.topVotes;
+                                      const isTied = isTie && group.tiedCandidates.some(tc => tc.candidate_id === c.candidate_id);
                                       return (
                                         <tr key={c.candidate_id} className={`border-t border-border ${isTied ? "bg-amber-500/5" : ""}`}>
                                           <td className="px-4 py-2.5 text-muted-foreground text-xs">{ci + 1}</td>
