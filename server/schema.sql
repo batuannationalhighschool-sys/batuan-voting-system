@@ -640,7 +640,8 @@ BEGIN
   UPDATE profiles SET has_voted = false WHERE user_id IS NOT NULL;
   DELETE FROM ballot_submissions WHERE voter_id IS NOT NULL;
   DELETE FROM votes WHERE id IS NOT NULL;
-  RETURN jsonb_build_object('success', true, 'message', 'All voting statuses reset successfully');
+  DELETE FROM public.position_verifications;
+  RETURN jsonb_build_object('success', true, 'message', 'All voting statuses and verifications reset successfully');
 END;
 $$;
 

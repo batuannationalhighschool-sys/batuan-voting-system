@@ -301,7 +301,6 @@ export default function Admin() {
   const [tieResolvedWinnerId, setTieResolvedWinnerId] = useState("");
   const [tieResolvedWinnerName, setTieResolvedWinnerName] = useState("");
   const [auditSavingId, setAuditSavingId] = useState(null);
-  const [auditDeleteConfirm, setAuditDeleteConfirm] = useState(null);
 
   // Archive election results state
   const [showArchiveConfirm, setShowArchiveConfirm] = useState(false);
@@ -1077,6 +1076,7 @@ export default function Admin() {
       toast({ title: "Results archived!", description: "Election results have been saved to history. Students can view them under Past Elections.", variant: "success" });
       setShowArchiveConfirm(false);
       queryClient.invalidateQueries({ queryKey: ["election-history"] });
+      queryClient.invalidateQueries({ queryKey: ["position-verifications"] });
     },
     onError: (err) => {
       toast({ title: "Failed to archive", description: err.message, variant: "destructive" });
@@ -1216,19 +1216,6 @@ export default function Admin() {
     onError: (err) => {
       toast({ title: "Verification failed", description: err.message, variant: "destructive" });
       setAuditSavingId(null);
-    },
-  });
-
-  const deleteVerification = useMutation({
-    mutationFn: (positionId) => api.delete(`/position-verifications/${positionId}`),
-    onSuccess: () => {
-      toast({ title: "Verification removed", description: "The verification record has been cleared for this position.", variant: "success" });
-      queryClient.invalidateQueries({ queryKey: ["position-verifications"] });
-      setAuditDeleteConfirm(null);
-    },
-    onError: (err) => {
-      toast({ title: "Failed to remove", description: err.message, variant: "destructive" });
-      setAuditDeleteConfirm(null);
     },
   });
 
@@ -1621,6 +1608,7 @@ export default function Admin() {
       queryClient.invalidateQueries({ queryKey: ["election-history"] });
       queryClient.invalidateQueries({ queryKey: ["archived-results"] });
       queryClient.invalidateQueries({ queryKey: ["voter-groups"] });
+      queryClient.invalidateQueries({ queryKey: ["position-verifications"] });
       setShowResetAllVotedConfirm(false);
     },
     onError: (err) => toast({ title: "Reset failed", description: err.message, variant: "destructive" }),
@@ -5495,16 +5483,6 @@ export default function Admin() {
                             )}
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            {isVerified && (
-                              <button
-                                type="button"
-                                onClick={(e) => { e.stopPropagation(); setAuditDeleteConfirm(posId); }}
-                                className="p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                title="Remove verification record"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
                             <div className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}>
                               <svg className="w-4 h-4 text-muted-foreground" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
                             </div>
@@ -5713,39 +5691,6 @@ export default function Admin() {
         </div>
       )}
 
-      {/* ── Audit Delete Confirmation Modal ── */}
-      {auditDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={() => setAuditDeleteConfirm(null)}>
-          <div className="bg-card rounded-2xl border border-border p-6 shadow-2xl w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-display font-bold text-foreground text-lg flex items-center gap-2">
-                <Trash2 className="w-5 h-5 text-destructive" /> Remove Verification?
-              </h3>
-              <button onClick={() => setAuditDeleteConfirm(null)} className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <p className="text-sm text-muted-foreground mb-2">
-              This will remove the <span className="font-medium text-foreground">Verified / Finalized</span> record for this position. The position will return to unverified status.
-            </p>
-            <p className="text-xs text-muted-foreground mb-5">Original vote counts are not affected.</p>
-            <div className="flex items-center justify-end gap-3">
-              <button onClick={() => setAuditDeleteConfirm(null)} className="px-5 py-2.5 rounded-xl bg-muted text-foreground font-medium text-sm hover:bg-muted/80 transition-colors">
-                Cancel
-              </button>
-              <button
-                onClick={() => deleteVerification.mutate(auditDeleteConfirm)}
-                disabled={deleteVerification.isPending}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-destructive text-destructive-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50"
-              >
-                {deleteVerification.isPending
-                  ? <><div className="w-4 h-4 border-2 border-destructive-foreground/30 border-t-destructive-foreground rounded-full animate-spin" /> Removing…</>
-                  : <><Trash2 className="w-4 h-4" /> Yes, Remove</>}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ── Rename Section Confirmation Modal ── */}
       {renameSectionConfirm && (

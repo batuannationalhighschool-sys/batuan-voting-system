@@ -190,6 +190,9 @@ BEGIN
     v_archived_count := v_archived_count + 1;
   END LOOP;
 
+  -- Automatically reset position verifications upon archiving
+  DELETE FROM public.position_verifications WHERE school_year = v_settings.school_year;
+
   -- Return success
   RETURN jsonb_build_object('success', true, 'archived_count', v_archived_count);
 END;
@@ -385,11 +388,12 @@ DECLARE
 BEGIN
   v_admin_id := require_admin(p_token);
 
-  -- Reset voter statuses and clear live votes (manual archiving is left to the admin)
+  -- Reset voter statuses, clear live votes, and reset verifications
   UPDATE profiles SET has_voted = false WHERE user_id IS NOT NULL;
   DELETE FROM votes WHERE id IS NOT NULL;
+  DELETE FROM public.position_verifications;
 
-  RETURN jsonb_build_object('success', true, 'message', 'All voting statuses reset successfully.');
+  RETURN jsonb_build_object('success', true, 'message', 'All voting statuses and verifications reset successfully.');
 END;
 $$;
 

@@ -678,23 +678,23 @@ export default function Results() {
                     <div key={group.position.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${
                       isVerified
                         ? "bg-emerald-500/5 border-emerald-500/30"
-                        : isLiveTie
+                        : isLiveTie && isAdmin
                         ? "bg-amber-500/5 border-amber-500/30"
                         : "bg-muted/60 border-border"
                     }`}>
                       <Trophy className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
-                        declaredWinner || (hasVotes && !isLiveTie) ? "text-gold" : "text-muted-foreground/30"
+                        declaredWinner || (hasVotes && (!isLiveTie || !isAdmin)) ? "text-gold" : "text-muted-foreground/30"
                       }`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
                           <p className="text-[10px] text-muted-foreground uppercase tracking-wide font-semibold truncate">{group.position.title}</p>
                           {isVerified && (
-                            <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                            <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                               <ShieldCheck className="w-2.5 h-2.5" /> Verified
                             </span>
                           )}
-                          {!isVerified && isLiveTie && (
-                            <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                          {!isVerified && isLiveTie && isAdmin && (
+                            <span className="shrink-0 inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                               <AlertTriangle className="w-2.5 h-2.5" /> Tie
                             </span>
                           )}
@@ -703,7 +703,7 @@ export default function Results() {
                           <>
                             <p className="text-sm font-semibold text-foreground truncate uppercase">{declaredWinner}</p>
                             <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              Declared Winner · {verification.decision_type || "Admin verified"}
+                              Official Winner · {isAdmin && verification.decision_type ? verification.decision_type : "Verified / Finalized"}
                             </p>
                           </>
                         ) : hasVotes ? (
@@ -743,7 +743,7 @@ export default function Results() {
                       ? "ring-2 ring-gold border-gold shadow-gold-sm scale-[1.01]"
                       : isVerified
                       ? "border-emerald-500/40"
-                      : isLiveTie
+                      : isLiveTie && isAdmin
                       ? "border-amber-500/50"
                       : "border-border"
                   }`}
@@ -756,10 +756,10 @@ export default function Results() {
                         {isVerified && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                             <ShieldCheck className="w-3.5 h-3.5" />
-                            {verification.is_tie ? "Tie Resolved & Verified" : "Verified & Finalized"}
+                            {isAdmin && verification.is_tie ? "Tie Resolved & Verified" : "Verified / Finalized"}
                           </span>
                         )}
-                        {!isVerified && isLiveTie && (
+                        {!isVerified && isLiveTie && isAdmin && (
                           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/25 text-amber-300 border border-amber-500/50 animate-pulse">
                             <AlertTriangle className="w-3.5 h-3.5" />
                             Official Tie Detected
@@ -782,10 +782,12 @@ export default function Results() {
                         <Trophy className="w-4 h-4 text-gold" />
                         <div>
                           <p className="text-xs font-bold text-gold uppercase">{declaredWinner}</p>
-                          <p className="text-[9px] text-emerald-300 font-medium">Declared Winner</p>
+                          <p className="text-[9px] text-emerald-300 font-medium">
+                            {isAdmin ? "Declared Winner" : "Official Winner"}
+                          </p>
                         </div>
                       </div>
-                    ) : group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && !isLiveTie ? (
+                    ) : group.candidates[0] && (group.candidates[0].vote_count ?? 0) > 0 && (!isLiveTie || !isAdmin) ? (
                       <div className="flex items-center gap-2">
                         <Trophy className="w-4 h-4 text-gold" />
                         <span className="text-sm font-semibold text-gold uppercase">{group.candidates[0].candidate_name}</span>
@@ -797,7 +799,7 @@ export default function Results() {
                     {group.candidates.length === 0 && <p className="text-muted-foreground text-sm">No candidates registered.</p>}
                     {group.candidates.map((c, ci) => {
                       const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
-                      const isTiedCandidate = isLiveTie && (c.vote_count ?? 0) === group.topVotes;
+                      const isTiedCandidate = isAdmin && isLiveTie && (c.vote_count ?? 0) === group.topVotes;
                       const isDeclaredWinnerCandidate = declaredWinner && c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase();
 
                       return (
@@ -869,7 +871,7 @@ export default function Results() {
                                 <h4 className="text-xs sm:text-sm font-bold text-foreground uppercase tracking-wide flex items-center gap-2 flex-wrap">
                                   Official Administrator Decision &amp; Verification
                                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/30">
-                                    {verification.is_tie ? "Tie Resolved" : "Verified & Finalized"}
+                                    {isAdmin && verification.is_tie ? "Tie Resolved" : "Verified / Finalized"}
                                   </span>
                                 </h4>
                                 <p className="text-[11px] text-muted-foreground mt-0.5">
@@ -937,16 +939,28 @@ export default function Results() {
                       </div>
                     )}
 
-                    {/* Notice for unverified active tie */}
-                    {!isVerified && isLiveTie && (
+                    {/* Notice for unverified active tie - Admin view only */}
+                    {!isVerified && isLiveTie && isAdmin && (
                       <div className="mt-5 pt-4 border-t border-border">
                         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
                           <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs sm:text-sm">
                             <AlertTriangle className="w-4 h-4 shrink-0" />
-                            <span>Official Tie Detected ({group.topVotes} votes each)</span>
+                            <span>Official Tie Detected ({group.topVotes} votes each) — Administrator Action Required</span>
                           </div>
                           <p className="text-xs text-muted-foreground">
-                            A tie has occurred between: <strong className="text-foreground">{group.tiedCandidates.map(c => c.candidate_name).join(" and ")}</strong>. The authorized administrator's manual explanation, decision, and official action taken will be displayed here once finalized.
+                            A tie has occurred between: <strong className="text-foreground">{group.tiedCandidates.map(c => c.candidate_name).join(" and ")}</strong>. Go to <strong>Admin &gt; Settings &gt; Audit &amp; Verification</strong> to manually enter your decision.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Post-election status notice for students and visitors when position is awaiting admin finalization */}
+                    {!isVerified && settings?.status === "completed" && !isAdmin && (
+                      <div className="mt-5 pt-4 border-t border-border">
+                        <div className="rounded-xl border border-border bg-muted/40 p-4 flex items-center gap-3">
+                          <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
+                          <p className="text-xs text-muted-foreground">
+                            Official results for this position are undergoing administrator review. <span className="font-semibold text-foreground">The position will be marked Verified / Finalized</span> once officially confirmed.
                           </p>
                         </div>
                       </div>
@@ -1253,7 +1267,7 @@ export default function Results() {
                                   </h4>
                                 </div>
                                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 font-semibold border border-emerald-500/30 uppercase">
-                                  {histVerif.is_tie ? "Tie Resolved" : "Verified & Finalized"}
+                                  {isAdmin && histVerif.is_tie ? "Tie Resolved" : "Verified / Finalized"}
                                 </span>
                               </div>
 
