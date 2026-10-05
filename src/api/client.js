@@ -205,7 +205,7 @@ async function handlePost(path, body) {
   }
 
   if (pathname === '/auth/admin/change-password') {
-    // Send to Express server so it triggers the Gmail notification to batuannationalhighschool@gmail.com
+    // Send to Express server so it triggers the email notification to the admin
     const apiBase = import.meta.env.VITE_API_URL
       || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
     try {
@@ -373,34 +373,6 @@ async function handlePost(path, body) {
   if (pathname === '/voters/archived/delete-selected') {
     const { data, error } = await supabase.rpc('app_permanent_delete_selected_voters', { p_token: getToken(), p_ids: body.ids });
     if (error) throw new Error(error.message);
-    return data;
-  }
-
-  if (pathname === '/auth/admin/forgot-password') {
-    // This must go to the Express server (nodemailer + HMAC token — no Supabase RPC)
-    const apiBase = import.meta.env.VITE_API_URL
-      || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
-    const resp = await fetch(`${apiBase}/auth/admin/forgot-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data?.error || 'Failed to send reset email');
-    return data;
-  }
-
-  if (pathname === '/auth/admin/reset-password') {
-    // This must go to the Express server (HMAC token verification + bcrypt)
-    const apiBase = import.meta.env.VITE_API_URL
-      || (import.meta.env.DEV ? 'http://localhost:3001/api' : '/api');
-    const resp = await fetch(`${apiBase}/auth/admin/reset-password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data?.error || 'Failed to reset password');
     return data;
   }
 

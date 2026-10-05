@@ -199,7 +199,7 @@ INSERT INTO users (id, lrn, email, password_hash, full_name, must_change_passwor
 VALUES (
   'a0000000-0000-0000-0000-000000000001',
   'admin',
-  'batuannationalhighschool@gmail.com',
+  'Noli_Admin',
   '$2a$10$qJuWvaZPekXNKtP8hr60SeYNgdeZVoze0/nRIQxgmWrglNH7ObvY.',
   'Administrator',
   TRUE

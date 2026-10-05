@@ -35,7 +35,7 @@ BEGIN
     SELECT id
     INTO v_existing_id
     FROM public.users
-    WHERE lower(email) = 'batuannationalhighschool@gmail.com'
+    WHERE lower(email) = 'noli_admin'
       AND id <> v_admin_id;
 
     IF v_existing_id IS NOT NULL THEN
@@ -43,9 +43,9 @@ BEGIN
     END IF;
 
     UPDATE public.users AS u
-    SET email = 'batuannationalhighschool@gmail.com',
+    SET email = 'Noli_Admin',
         must_change_password = CASE
-          WHEN u.email IS DISTINCT FROM 'batuannationalhighschool@gmail.com' THEN true
+          WHEN u.email IS DISTINCT FROM 'Noli_Admin' THEN true
           ELSE u.must_change_password
         END
     WHERE u.id = v_admin_id;
