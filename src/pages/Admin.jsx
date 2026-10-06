@@ -297,7 +297,9 @@ export default function Admin() {
   // ── Audit & Verification / Tie Resolution state ──
   const [auditActivePosition, setAuditActivePosition] = useState(null); // position_id being reviewed
   const [tieComment, setTieComment] = useState("");               // admin's manual comment
-  const [tieDecisionType, setTieDecisionType] = useState("");     // e.g. "Re-vote", "Coin flip", "Manual selection"
+  const [tieDecisionType, setTieDecisionType] = useState("");     // "Toss coin"
+  const [tieCoinSide, setTieCoinSide] = useState("");             // "Head" | "Tail"
+  const [tieSwapHeadTail, setTieSwapHeadTail] = useState(false);
   const [tieResolvedWinnerId, setTieResolvedWinnerId] = useState("");
   const [tieResolvedWinnerName, setTieResolvedWinnerName] = useState("");
   const [auditSavingId, setAuditSavingId] = useState(null);
@@ -1209,6 +1211,8 @@ export default function Admin() {
       setAuditActivePosition(null);
       setTieComment("");
       setTieDecisionType("");
+      setTieCoinSide("");
+      setTieSwapHeadTail(false);
       setTieResolvedWinnerId("");
       setTieResolvedWinnerName("");
       setAuditSavingId(null);
@@ -4760,6 +4764,8 @@ export default function Admin() {
                 setAuditActivePosition(null);
                 setTieComment("");
                 setTieDecisionType("");
+                setTieCoinSide("");
+                setTieSwapHeadTail(false);
                 setTieResolvedWinnerId("");
                 setTieResolvedWinnerName("");
               }}
@@ -5435,16 +5441,21 @@ export default function Admin() {
                               setAuditActivePosition(null);
                             } else {
                               setAuditActivePosition(posId);
-                              if (!isVerified) {
-                                setTieComment(verification?.admin_comment ?? "");
-                                setTieDecisionType(verification?.decision_type ?? "");
-                                setTieResolvedWinnerId(verification?.resolved_winner_id ?? "");
-                                setTieResolvedWinnerName(verification?.resolved_winner_name ?? "");
+                              setTieSwapHeadTail(false);
+                              const verif = isVerified ? verification : verification;
+                              const rawType = verif?.decision_type ?? "";
+                              const isCoin = rawType.toLowerCase().includes("coin") || rawType.toLowerCase().includes("toss");
+                              const isOther = rawType.toLowerCase().includes("other");
+                              setTieComment(verif?.admin_comment ?? "");
+                              setTieDecisionType(isCoin ? "Toss coin" : (isOther ? "Others" : rawType));
+                              setTieResolvedWinnerId(verif?.resolved_winner_id ?? "");
+                              setTieResolvedWinnerName(verif?.resolved_winner_name ?? "");
+                              if (rawType.includes("Head") || verif?.admin_comment?.includes("Head")) {
+                                setTieCoinSide("Head");
+                              } else if (rawType.includes("Tail") || verif?.admin_comment?.includes("Tail")) {
+                                setTieCoinSide("Tail");
                               } else {
-                                setTieComment(verification.admin_comment ?? "");
-                                setTieDecisionType(verification.decision_type ?? "");
-                                setTieResolvedWinnerId(verification.resolved_winner_id ?? "");
-                                setTieResolvedWinnerName(verification.resolved_winner_name ?? "");
+                                setTieCoinSide("");
                               }
                             }
                           }}
@@ -5580,24 +5591,98 @@ export default function Admin() {
 
                               {isTie && (
                                 <>
-                                  {/* Decision Type */}
+                                  {/* Decision Type - Keep only Toss coin */}
                                   <div>
                                     <label className="block text-xs font-medium text-foreground mb-1.5">
                                       Decision / Action Taken
                                     </label>
                                     <select
                                       value={tieDecisionType}
-                                      onChange={e => setTieDecisionType(e.target.value)}
+                                      onChange={e => {
+                                        const val = e.target.value;
+                                        setTieDecisionType(val);
+                                        if (val !== "Toss coin" && val !== "Coin flip / Draw of lots") {
+                                          setTieCoinSide("");
+                                        }
+                                      }}
                                       className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                                     >
                                       <option value="">— Select decision type —</option>
-                                      <option value="Re-vote conducted">Re-vote conducted</option>
-                                      <option value="Coin flip / Draw of lots">Coin flip / Draw of lots</option>
-                                      <option value="Committee decision">Committee decision</option>
-                                      <option value="Administrative selection">Administrative selection</option>
-                                      <option value="Other">Other (see comment)</option>
+                                      <option value="Toss coin">Toss coin</option>
+                                      <option value="Others">Others</option>
                                     </select>
                                   </div>
+
+                                  {/* Coin Toss Selector (Head or Tail) - appears when Toss coin is selected */}
+                                  {(tieDecisionType === "Toss coin" || tieDecisionType === "Coin flip / Draw of lots") && (
+                                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-2.5 animate-fade-in">
+                                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                                        <label className="block text-xs font-medium text-foreground">
+                                          Coin Toss (Head or Tail)
+                                        </label>
+                                        {group.tiedCandidates && group.tiedCandidates.length >= 2 && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const nextSwap = !tieSwapHeadTail;
+                                              setTieSwapHeadTail(nextSwap);
+                                              if (tieCoinSide) {
+                                                const headsCand = group.tiedCandidates[nextSwap ? 1 : 0];
+                                                const tailsCand = group.tiedCandidates[nextSwap ? 0 : 1];
+                                                const win = tieCoinSide === "Head" ? headsCand : tailsCand;
+                                                if (win) {
+                                                  setTieResolvedWinnerId(win.candidate_id);
+                                                  setTieResolvedWinnerName(win.candidate_name);
+                                                  setTieComment(`Tie-breaker resolved via Toss Coin. Result: ${tieCoinSide}. Declared winner: ${win.candidate_name}.`);
+                                                }
+                                              }
+                                            }}
+                                            className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-medium transition-colors"
+                                            title="Switch which candidate is assigned Head and Tail"
+                                          >
+                                            ⇄ Swap Candidate Sides
+                                          </button>
+                                        )}
+                                      </div>
+
+                                      <select
+                                        value={tieCoinSide}
+                                        onChange={e => {
+                                          const side = e.target.value;
+                                          setTieCoinSide(side);
+                                          if (group.tiedCandidates && group.tiedCandidates.length >= 2) {
+                                            const headsCand = group.tiedCandidates[tieSwapHeadTail ? 1 : 0];
+                                            const tailsCand = group.tiedCandidates[tieSwapHeadTail ? 0 : 1];
+                                            const win = side === "Head" ? headsCand : side === "Tail" ? tailsCand : null;
+                                            if (win) {
+                                              setTieResolvedWinnerId(win.candidate_id);
+                                              setTieResolvedWinnerName(win.candidate_name);
+                                              setTieComment(`Tie-breaker resolved via Toss Coin. Result: ${side}. Declared winner: ${win.candidate_name}.`);
+                                            } else if (!side) {
+                                              setTieResolvedWinnerId("");
+                                              setTieResolvedWinnerName("");
+                                            }
+                                          }
+                                        }}
+                                        className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                      >
+                                        <option value="">— Select Head or Tail —</option>
+                                        <option value="Head">Head</option>
+                                        <option value="Tail">Tail</option>
+                                      </select>
+
+                                      {group.tiedCandidates && group.tiedCandidates.length >= 2 && (
+                                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5 px-1 flex-wrap gap-2">
+                                          <span>
+                                            🪙 <strong className="text-foreground">Head:</strong> {group.tiedCandidates[tieSwapHeadTail ? 1 : 0]?.candidate_name}
+                                          </span>
+                                          <span>
+                                            🪙 <strong className="text-foreground">Tail:</strong> {group.tiedCandidates[tieSwapHeadTail ? 0 : 1]?.candidate_name}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
 
                                   {/* Resolved Winner */}
                                   <div>
@@ -5667,13 +5752,17 @@ export default function Admin() {
                                   disabled={auditSavingId === posId || saveVerification.isPending || (isTie && !tieComment.trim())}
                                   onClick={() => {
                                     setAuditSavingId(posId);
+                                    const finalDecisionType = (tieDecisionType === "Toss coin" || tieDecisionType === "Coin flip / Draw of lots")
+                                      ? (tieCoinSide ? `Toss coin (${tieCoinSide})` : "Toss coin")
+                                      : (tieDecisionType || null);
+
                                     saveVerification.mutate({
                                       positionId: posId,
                                       isTie,
                                       tiedCandidates: group.tiedCandidates.map(c => ({ id: c.candidate_id, name: c.candidate_name, votes: c.vote_count })),
                                       resolvedWinnerId: tieResolvedWinnerId || null,
                                       resolvedWinnerName: tieResolvedWinnerName || null,
-                                      decisionType: tieDecisionType || null,
+                                      decisionType: finalDecisionType,
                                       adminComment: tieComment,
                                       status: "finalized",
                                     });
