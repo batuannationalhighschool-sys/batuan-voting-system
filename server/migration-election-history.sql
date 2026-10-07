@@ -391,7 +391,7 @@ BEGIN
   -- Reset voter statuses, clear live votes, and reset verifications
   UPDATE profiles SET has_voted = false WHERE user_id IS NOT NULL;
   DELETE FROM votes WHERE id IS NOT NULL;
-  DELETE FROM public.position_verifications;
+  DELETE FROM public.position_verifications WHERE id IS NOT NULL;
 
   RETURN jsonb_build_object('success', true, 'message', 'All voting statuses and verifications reset successfully.');
 END;
