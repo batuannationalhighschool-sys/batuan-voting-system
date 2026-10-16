@@ -105,6 +105,24 @@ export default function Results() {
     queryFn: () => api.get('/election-settings'),
   });
 
+  // ── Paper size state (short: 8.5x11" Letter, long: 8.5x13" Folio) ──
+  const [paperSize, setPaperSize] = useState(() => {
+    try {
+      return localStorage.getItem("bnhs_paper_size") || "short";
+    } catch (_) {
+      return "short";
+    }
+  });
+
+  useEffect(() => {
+    if (settings?.paper_size) {
+      setPaperSize(settings.paper_size);
+      try {
+        localStorage.setItem("bnhs_paper_size", settings.paper_size);
+      } catch (_) {}
+    }
+  }, [settings?.paper_size]);
+
   // ── Position Verifications & Tie Resolutions (Public / Student / Admin) ──
   const { data: liveVerifications } = useQuery({
     queryKey: ["position-verifications"],
@@ -426,51 +444,298 @@ export default function Results() {
   // Check if any history exists
   const hasHistory = (electionHistory ?? []).length > 0;
 
+  const isLong = paperSize === "long";
+
   return (
     <div className="container py-8 md:py-12">
       <style>{`
         @media print {
+          /* ── Base reset — Universal Arial Typography ── */
+          body, table, th, td, div, p, span, h1, h2, h3, h4 {
+            font-family: Arial, Helvetica, sans-serif !important;
+          }
           body {
             background: #fff !important;
             color: #000 !important;
+            font-size: ${isLong ? '9pt' : '8.5pt'} !important;
+            line-height: ${isLong ? '1.25' : '1.2'} !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
+          * {
+            box-shadow: none !important;
+            text-shadow: none !important;
+            animation: none !important;
+            transition: none !important;
+          }
+
+          /* ── Page setup — tailored for Long (8.5x13" Folio) vs Short (8.5x11" Letter) ── */
+          @page {
+            size: ${isLong ? '8.5in 13in' : '8.5in 11in'};
+            margin: ${isLong ? '8mm 8mm 8mm 8mm' : '6.5mm 6.5mm 6.5mm 6.5mm'};
+          }
+
+          /* ── Container — full width, no outer spacing ── */
           .container {
             max-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
           }
+
+          /* ── Hide screen-only components, navbar & footer ── */
+          .print\\:hidden,
+          [class*="print:hidden"],
+          header.gradient-navy,
+          footer.gradient-navy,
+          .flex.justify-between.items-start,
+          .bg-card.border-gold\\/20,
+          [class*="border-gold/20"],
+          [class*="border-emerald-500/30"],
+          [class*="bg-emerald-500/5"],
+          [class*="border-amber-500/40"] {
+            display: none !important;
+          }
+
+          /* ── Show print-only elements ── */
+          .hidden.print\\:flex,
+          [class*="hidden"][class*="print:flex"] {
+            display: flex !important;
+          }
+          .hidden.print\\:grid,
+          [class*="hidden"][class*="print:grid"] {
+            display: grid !important;
+          }
+
+          /* ── Print letterhead — Compact & Crisp ── */
+          .hidden.print\\:flex {
+            padding-bottom: ${isLong ? '5px' : '4px'} !important;
+            margin-bottom: ${isLong ? '8px' : '6px'} !important;
+            border-bottom: 1.5px solid #000 !important;
+          }
+          .hidden.print\\:flex img {
+            width: ${isLong ? '40px' : '36px'} !important;
+            height: ${isLong ? '40px' : '36px'} !important;
+          }
+          .hidden.print\\:flex h2 {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: ${isLong ? '14px' : '13px'} !important;
+            font-weight: 700 !important;
+            line-height: 1.1 !important;
+            color: #000 !important;
+            text-transform: uppercase !important;
+          }
+          .hidden.print\\:flex p {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 8.5px !important;
+            line-height: 1.15 !important;
+            color: #333 !important;
+            margin-top: 0 !important;
+          }
+          .hidden.print\\:flex .text-right p {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 8.5px !important;
+            line-height: 1.15 !important;
+            color: #333 !important;
+          }
+          .hidden.print\\:flex .text-right .text-sm {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 9.5px !important;
+            font-weight: 700 !important;
+            color: #000 !important;
+            text-transform: uppercase !important;
+          }
+
+          /* ── Seamless Connected Positions Container (No Empty Gaps) ── */
+          .space-y-6 {
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+          }
+          .space-y-6 > :not([hidden]) ~ :not([hidden]),
+          .space-y-6 > div {
+            display: block !important;
+            width: 100% !important;
+            margin: 0 !important;
+            margin-top: 0 !important;
+            margin-bottom: 0 !important;
+            padding: 0 !important;
+            border: 1px solid #000 !important;
+            border-bottom: none !important;
+            border-radius: 0 !important;
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+          .space-y-6 > div:last-child {
+            border-bottom: 1px solid #000 !important;
+          }
+
+          /* ── Position Card ── */
           .bg-card {
             background: #fff !important;
-            border: 1px solid #cbd5e1 !important;
+            border: none !important;
             box-shadow: none !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-            margin-bottom: 1.5rem !important;
+            margin: 0 !important;
+            border-radius: 0 !important;
+            break-inside: auto !important;
+            page-break-inside: auto !important;
           }
+
+          /* ── Position Header (Arial 14) — Compact & Clean ── */
           .gradient-navy {
             background: #f8fafc !important;
-            border-bottom: 2px solid #000 !important;
+            border-bottom: 1px solid #000 !important;
             color: #000 !important;
+            padding: ${isLong ? '4.5px 8px' : '3.5px 8px'} !important;
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
-          .gradient-navy h2, .gradient-navy p, .gradient-navy span {
+          .gradient-navy h2 {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: 14px !important;
+            font-weight: 700 !important;
             color: #000 !important;
+            line-height: 1.1 !important;
+            display: inline-block !important;
+            margin-right: 6px !important;
+            text-transform: uppercase !important;
           }
-          .text-gold, .text-primary-foreground, .text-primary-foreground/50 {
-            color: #000 !important;
+          .gradient-navy p {
+            font-family: Arial, Helvetica, sans-serif !important;
+            color: #475569 !important;
+            font-size: 9.5px !important;
+            margin-top: 0 !important;
+            line-height: 1 !important;
           }
-          .gradient-gold {
-            background: #e2e8f0 !important;
-            color: #000 !important;
+          .gradient-navy span.inline-flex {
+            display: inline-flex !important;
+            font-family: Arial, Helvetica, sans-serif !important;
+            border: 1px solid #10b981 !important;
+            color: #047857 !important;
+            background: #ecfdf5 !important;
+            font-size: 8.5px !important;
+            font-weight: 600 !important;
+            padding: 0 5px !important;
+            border-radius: 3px !important;
+            line-height: 1.2 !important;
           }
-          .bg-muted {
+          .gradient-navy span.inline-flex svg {
+            width: 10px !important;
+            height: 10px !important;
+            color: #047857 !important;
+          }
+          .gradient-navy .bg-black\\/30 {
+            display: none !important;
+          }
+
+          /* ── Position Body — Compact Padding to fit 2-3 pages ── */
+          .bg-card > .p-4,
+          .bg-card > [class*="p-4"],
+          .bg-card > [class*="p-5"] {
+            padding: ${isLong ? '3px 8px' : '2px 8px'} !important;
+            background: #fff !important;
+          }
+          .bg-card .space-y-4 {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 0 !important;
+          }
+          .bg-card .space-y-4 > div {
+            margin: 0 !important;
+            padding: ${isLong ? '3.8px 0' : '2.8px 0'} !important;
+            border-bottom: 1px solid #e2e8f0 !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .bg-card .space-y-4 > div:last-child {
+            border-bottom: none !important;
+            padding-bottom: 2px !important;
+          }
+
+          /* ── Candidate Rank Circle: (1), (2), (3)... ── */
+          .bg-card .space-y-4 .w-7.h-7 {
+            width: ${isLong ? '18px' : '16px'} !important;
+            height: ${isLong ? '18px' : '16px'} !important;
+            min-width: ${isLong ? '18px' : '16px'} !important;
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: ${isLong ? '9.5px' : '8.5px'} !important;
+            font-weight: 700 !important;
             background: #f1f5f9 !important;
-            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            border: 1px solid #94a3b8 !important;
+            border-radius: 9999px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+
+          /* ── Candidate Name (Clean Arial) ── */
+          .bg-card .space-y-4 .font-semibold.text-foreground.text-sm {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: ${isLong ? '11.5px' : '11px'} !important;
+            font-weight: 700 !important;
+            line-height: 1.15 !important;
+            color: #000 !important;
+            text-transform: uppercase !important;
+          }
+
+          /* ── Candidate Party-List Subtitle ── */
+          .bg-card .space-y-4 .text-xs.text-muted-foreground {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: ${isLong ? '9.5px' : '9px'} !important;
+            line-height: 1 !important;
+            color: #475569 !important;
+            margin-top: 0 !important;
+          }
+
+          /* ── Vote count on the right (WALANG PERCENT) ── */
+          .bg-card .space-y-4 .font-display.font-bold {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: ${isLong ? '12.5px' : '12px'} !important;
+            font-weight: 700 !important;
+            color: #000 !important;
+            line-height: 1 !important;
+          }
+
+          /* ── COMPLETELY HIDE PERCENTAGE IN PRINT ── */
+          .bg-card .space-y-4 .text-xs.text-muted-foreground.ml-1\\.5 {
+            display: none !important;
+          }
+
+          /* ── Clean plain presentation — hide progress bar in print ── */
+          .bg-card .h-2\\.5 {
+            display: none !important;
+          }
+
+          /* ── Signature block — Presentable Official Footer ── */
+          .hidden.print\\:grid {
+            display: grid !important;
+            grid-template-columns: 1fr 1fr !important;
+            margin-top: ${isLong ? '18px' : '12px'} !important;
+            padding-top: ${isLong ? '10px' : '8px'} !important;
+            gap: 20px !important;
+            border-top: 1px solid #000 !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+          .hidden.print\\:grid .mt-8 {
+            margin-top: ${isLong ? '26px' : '20px'} !important;
+            border-bottom: 1px solid #000 !important;
+            width: ${isLong ? '200px' : '180px'} !important;
+          }
+          .hidden.print\\:grid p {
+            font-family: Arial, Helvetica, sans-serif !important;
+            font-size: ${isLong ? '9px' : '8.5px'} !important;
+            line-height: 1.2 !important;
           }
         }
       `}</style>
 
       {/* Print-only letterhead / Header */}
-      <div className="hidden print:flex items-center justify-between border-b-2 border-slate-900 pb-4 mb-8">
+      <div className="hidden print:flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
         <div className="flex items-center gap-4">
           <img src={schoolSeal} alt={schoolTitle} className="w-16 h-16 rounded-full object-cover border border-slate-200" />
           <div>
@@ -486,7 +751,7 @@ export default function Results() {
         </div>
       </div>
 
-      <div className="flex justify-between items-start flex-wrap gap-4 mb-8">
+      <div className="flex justify-between items-start flex-wrap gap-4 mb-8 print:hidden">
         <div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground flex items-center gap-3">
             <BarChart3 className="w-8 h-8 text-gold" /> Election Results
@@ -900,7 +1165,7 @@ export default function Results() {
                             </div>
                             <div className="text-right">
                               <span className="font-display font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</span>
-                              <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                              <span className="text-xs text-muted-foreground ml-1.5 print:hidden">({pct}%)</span>
                             </div>
                           </div>
                           <div className="h-2.5 bg-muted rounded-full overflow-hidden">
@@ -923,7 +1188,7 @@ export default function Results() {
 
                     {/* ── Official Administrator Verification & Tie Resolution Panel ── */}
                     {isVerified && (
-                      <div className="mt-5 pt-4 border-t border-border">
+                      <div className="mt-5 pt-4 border-t border-border print:hidden">
                         <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 p-4 sm:p-5 space-y-3.5">
                           {/* Header banner */}
                           <div className="flex items-start sm:items-center justify-between flex-wrap gap-2 pb-2.5 border-b border-emerald-500/20">
@@ -1005,7 +1270,7 @@ export default function Results() {
 
                     {/* Notice for unverified active tie - Admin view only */}
                     {!isVerified && isLiveTie && isAdmin && (
-                      <div className="mt-5 pt-4 border-t border-border">
+                      <div className="mt-5 pt-4 border-t border-border print:hidden">
                         <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 space-y-2">
                           <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 font-semibold text-xs sm:text-sm">
                             <AlertTriangle className="w-4 h-4 shrink-0" />
@@ -1020,7 +1285,7 @@ export default function Results() {
 
                     {/* Post-election status notice for students and visitors when position is awaiting admin finalization */}
                     {!isVerified && settings?.status === "completed" && !isAdmin && (
-                      <div className="mt-5 pt-4 border-t border-border">
+                      <div className="mt-5 pt-4 border-t border-border print:hidden">
                         <div className="rounded-xl border border-border bg-muted/40 p-4 flex items-center gap-3">
                           <ShieldCheck className="w-5 h-5 text-emerald-500 shrink-0" />
                           <p className="text-xs text-muted-foreground">
@@ -1180,7 +1445,7 @@ export default function Results() {
 
               {/* Winners Summary Card */}
               {displayedArchivedGroups.length > 0 && (
-                <div className="bg-card border border-gold/20 rounded-xl p-5 mb-6 shadow-elegant">
+                <div className="bg-card border border-gold/20 rounded-xl p-5 mb-6 shadow-elegant print:hidden">
                   <h3 className="font-display font-bold text-foreground text-base mb-4 flex items-center gap-2">
                     <Award className="w-5 h-5 text-gold" /> Winners Summary
                     {(historyGradeFilter !== "all" || historySectionFilter !== "all" || historyPositionFilter !== "all") && (
@@ -1299,7 +1564,7 @@ export default function Results() {
                                 </div>
                                 <div className="text-right">
                                   <span className="font-display font-bold text-foreground">{(c.vote_count ?? 0).toLocaleString()}</span>
-                                  <span className="text-xs text-muted-foreground ml-1.5">({pct}%)</span>
+                                  <span className="text-xs text-muted-foreground ml-1.5 print:hidden">({pct}%)</span>
                                 </div>
                               </div>
                               <div className="h-2.5 bg-muted rounded-full overflow-hidden">
@@ -1321,7 +1586,7 @@ export default function Results() {
                         if (!histVerif) return null;
 
                         return (
-                          <div className="px-4 pb-4 md:px-5 md:pb-5">
+                          <div className="px-4 pb-4 md:px-5 md:pb-5 print:hidden">
                             <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 dark:bg-emerald-950/20 p-4 space-y-3">
                               <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-emerald-500/20">
                                 <div className="flex items-center gap-2">

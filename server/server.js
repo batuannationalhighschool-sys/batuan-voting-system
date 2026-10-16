@@ -1401,7 +1401,7 @@ app.get('/api/election-settings', async (req, res) => {
 
 app.put('/api/election-settings/:id', requireAuth, requireAdmin, async (req, res) => {
   try {
-    const { status, name, school_year, election_date, voting_start, voting_end, school_name, auto_end_enabled } = req.body;
+    const { status, name, school_year, election_date, voting_start, voting_end, school_name, auto_end_enabled, paper_size } = req.body;
 
     const updateData = {};
     if (status) updateData.status = status;
@@ -1412,9 +1412,24 @@ app.put('/api/election-settings/:id', requireAuth, requireAdmin, async (req, res
     if (voting_end) updateData.voting_end = voting_end;
     if (school_name !== undefined) updateData.school_name = school_name;
     if (auto_end_enabled !== undefined) updateData.auto_end_enabled = !!auto_end_enabled;
+    if (paper_size !== undefined) {
+      updateData.paper_size = paper_size === 'long' ? 'long' : 'short';
+    }
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    // Direct update for paper_size and other supported fields to ensure persistence
+    if (paper_size !== undefined) {
+      try {
+        await supabase
+          .from('election_settings')
+          .update({ paper_size: updateData.paper_size })
+          .eq('id', req.params.id);
+      } catch (colErr) {
+        console.warn('[election-settings] direct paper_size update note:', colErr?.message);
+      }
     }
 
     // Route compatibility updates through the same guarded RPC used by the
@@ -1689,6 +1704,13 @@ async function runMigrations() {
       checkCol: 'school_name',
       sql: [
         "ALTER TABLE election_settings ADD COLUMN IF NOT EXISTS school_name VARCHAR(150) DEFAULT 'Batuan National High School — Batuan, Bohol, Philippines';",
+      ],
+    },
+    {
+      name: 'election_settings',
+      checkCol: 'paper_size',
+      sql: [
+        "ALTER TABLE election_settings ADD COLUMN IF NOT EXISTS paper_size VARCHAR(20) DEFAULT 'short';",
       ],
     },
   ];

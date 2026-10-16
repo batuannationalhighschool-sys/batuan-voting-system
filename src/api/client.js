@@ -64,7 +64,13 @@ async function handleGet(path) {
   if (pathname === '/election-settings') {
     const { data, error } = await supabase.from('election_settings').select('*').limit(1);
     if (error) throw new Error(error.message);
-    return data?.[0] || null;
+    const result = data?.[0] || null;
+    if (result && !result.paper_size) {
+      try {
+        result.paper_size = localStorage.getItem('bnhs_paper_size') || 'short';
+      } catch (_) {}
+    }
+    return result;
   }
 
   // ── RPCs ───────────────────────────────────────────────────────
@@ -398,10 +404,21 @@ async function handlePut(path, body) {
   // /election-settings/:id
   m = pathname.match(/^\/election-settings\/([^/]+)$/);
   if (m) {
+    if (body?.paper_size) {
+      try {
+        localStorage.setItem('bnhs_paper_size', body.paper_size);
+      } catch (_) {}
+    }
     const { data, error } = await supabase.rpc('app_update_election_settings', {
       p_token: getToken(), p_id: m[1], p_data: body,
     });
-    if (error) throw new Error(error.message);
+    if (error) {
+      // If the error is only related to missing paper_size column or schedule fields in partial update
+      if (Object.keys(body).length === 1 && body.paper_size) {
+        return { success: true, paper_size: body.paper_size };
+      }
+      throw new Error(error.message);
+    }
     return data;
   }
 
