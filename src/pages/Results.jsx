@@ -710,26 +710,33 @@ export default function Results() {
             display: none !important;
           }
 
-          /* ── Signature block — Presentable Official Footer ── */
+          /* ── Signature block — Presentable Official Footer (Lowered with generous signature space) ── */
           .hidden.print\\:grid {
             display: grid !important;
             grid-template-columns: 1fr 1fr !important;
-            margin-top: ${isLong ? '18px' : '12px'} !important;
-            padding-top: ${isLong ? '10px' : '8px'} !important;
-            gap: 20px !important;
-            border-top: 1px solid #000 !important;
+            margin-top: ${isLong ? '28px' : '20px'} !important;
+            padding-top: ${isLong ? '18px' : '14px'} !important;
+            padding-left: 8px !important;
+            padding-right: 8px !important;
+            gap: 24px !important;
+            border-top: 1.5px solid #000 !important;
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
           .hidden.print\\:grid .mt-8 {
-            margin-top: ${isLong ? '26px' : '20px'} !important;
+            margin-top: ${isLong ? '32px' : '26px'} !important;
             border-bottom: 1px solid #000 !important;
-            width: ${isLong ? '200px' : '180px'} !important;
+            width: ${isLong ? '210px' : '190px'} !important;
           }
           .hidden.print\\:grid p {
             font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '9px' : '8.5px'} !important;
-            line-height: 1.2 !important;
+            font-size: ${isLong ? '9.5px' : '9px'} !important;
+            line-height: 1.25 !important;
+          }
+          .hidden.print\\:grid p.uppercase {
+            margin-bottom: 4px !important;
+            color: #1e293b !important;
+            font-weight: 700 !important;
           }
         }
       `}</style>
