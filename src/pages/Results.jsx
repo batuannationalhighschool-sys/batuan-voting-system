@@ -28,7 +28,20 @@ function gradeMatchesPosition(voterGrade, positionTitle) {
   return title === allowedRep || title.includes(allowedRep.replace(' representative', ''));
 }
 
+export function parseDeclaredWinners(str) {
+  if (!str || typeof str !== "string") return [];
+  return str
+    .split(/\s*&\s*|\s*,\s*|\s*;\s*|\s+and\s+/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
 
+export function isDeclaredWinner(candidateName, declaredWinnerString) {
+  if (!candidateName || !declaredWinnerString) return false;
+  const list = parseDeclaredWinners(declaredWinnerString);
+  const target = candidateName.trim().toUpperCase();
+  return list.some(item => item.toUpperCase() === target);
+}
 
 export default function Results() {
   const [activePosition, setActivePosition] = useState("all");
@@ -575,19 +588,42 @@ export default function Results() {
           v => v.position_id === g.position.id || v.position_title === posTitle
         );
         const declaredWinner = verif?.resolved_winner_name;
+        const declaredList = parseDeclaredWinners(declaredWinner);
+        const cutoffVotes = (g.tiedCandidates && g.tiedCandidates.length > 0)
+          ? (g.tiedCandidates[0].vote_count ?? 0)
+          : (g.candidates[maxVotes - 1]?.vote_count ?? 0);
 
         let winners = [];
-        let isTie = g.isTie && !declaredWinner;
+        let isTie = g.isTie && declaredList.length === 0;
 
-        if (declaredWinner) {
-          const found = g.candidates.find(c => c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase());
-          winners = [{
-            name: declaredWinner,
-            party: found?.party_list || "INDEPENDENT",
-            voteCount: found?.vote_count ?? 0,
-            isDeclaredWinner: true,
-            status: "Declared Winner (Tie Resolution)",
-          }];
+        if (declaredList.length > 0) {
+          // Include clean winners who scored higher than cutoffVotes
+          const cleanWinners = (g.candidates || []).filter(
+            (c, idx) => idx < maxVotes && (c.vote_count ?? 0) > cutoffVotes && (c.vote_count ?? 0) > 0
+          );
+          cleanWinners.forEach((c) => {
+            winners.push({
+              name: c.candidate_name,
+              party: c.party_list || "INDEPENDENT",
+              voteCount: c.vote_count ?? 0,
+              isDeclaredWinner: false,
+              status: maxVotes > 1 ? `Proclaimed Winner (Seat ${winners.length + 1})` : "Proclaimed Winner",
+            });
+          });
+
+          // Include all declared tiebreak winners
+          declaredList.forEach((wName) => {
+            const found = (g.candidates || []).find(
+              c => c.candidate_name?.toUpperCase() === wName.toUpperCase()
+            );
+            winners.push({
+              name: wName,
+              party: found?.party_list || "INDEPENDENT",
+              voteCount: found?.vote_count ?? 0,
+              isDeclaredWinner: true,
+              status: maxVotes > 1 ? `Declared Winner (Seat ${winners.length + 1})` : "Declared Winner (Tie Resolution)",
+            });
+          });
         } else if (!isTie) {
           winners = g.candidates
             .slice(0, maxVotes)
@@ -645,6 +681,9 @@ export default function Results() {
           v => v.position_id === g.position.id || v.position_title === posTitle
         );
         const declaredWinner = verif?.resolved_winner_name;
+        const cutoffVotes = (g.tiedCandidates && g.tiedCandidates.length > 0)
+          ? (g.tiedCandidates[0].vote_count ?? 0)
+          : 0;
 
         return {
           title: posTitle,
@@ -654,9 +693,10 @@ export default function Results() {
           tiedCandidates: g.tiedCandidates,
           verification: verif,
           candidates: g.candidates.map((c, idx) => {
-            const isDeclared = Boolean(declaredWinner && c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase());
-            const isWinner = isDeclared || (idx < maxVotes && (c.vote_count ?? 0) > 0 && !g.isTie);
-            const isTied = !isDeclared && g.isTie && g.tiedCandidates?.some(tc => tc.candidate_id === c.candidate_id);
+            const isDeclared = isDeclaredWinner(c.candidate_name, declaredWinner);
+            const isCleanWinner = (idx < maxVotes) && (c.vote_count ?? 0) > cutoffVotes && (c.vote_count ?? 0) > 0;
+            const isWinner = isDeclared || isCleanWinner || (idx < maxVotes && (c.vote_count ?? 0) > 0 && !g.isTie);
+            const isTied = !isDeclared && !declaredWinner && g.isTie && g.tiedCandidates?.some(tc => tc.candidate_id === c.candidate_id);
             return {
               name: c.candidate_name,
               party: c.party_list || "INDEPENDENT",
@@ -943,12 +983,50 @@ export default function Results() {
                   const verification = (liveVerifications ?? []).find(v => v.position_id === group.position.id);
                   const isVerified = !!verification;
                   const declaredWinner = verification?.resolved_winner_name;
+                  const declaredList = parseDeclaredWinners(declaredWinner);
                   const leadingWinners = group.candidates
                     .slice(0, maxVotes)
                     .filter(c => (c.vote_count ?? 0) > 0);
                   const hasVotes = leadingWinners.length > 0;
                   const runnerUp = group.candidates[maxVotes];
                   const isLiveTie = group.isTie;
+
+                  const cutoffVotes = (group.tiedCandidates && group.tiedCandidates.length > 0)
+                    ? (group.tiedCandidates[0].vote_count ?? 0)
+                    : 0;
+
+                  let displayWinners = [];
+                  if (declaredList.length > 0) {
+                    const cleanWinners = (group.candidates || []).filter(
+                      (c, idx) => idx < maxVotes && (c.vote_count ?? 0) > cutoffVotes && (c.vote_count ?? 0) > 0
+                    );
+                    cleanWinners.forEach((c) => {
+                      displayWinners.push({
+                        candidate_id: c.candidate_id || c.id,
+                        candidate_name: c.candidate_name,
+                        vote_count: c.vote_count ?? 0,
+                        isDeclared: false,
+                      });
+                    });
+                    declaredList.forEach((name) => {
+                      const found = (group.candidates || []).find(
+                        c => (c.candidate_name || "").toUpperCase() === name.toUpperCase()
+                      );
+                      displayWinners.push({
+                        candidate_id: found?.candidate_id || found?.id,
+                        candidate_name: name,
+                        vote_count: found?.vote_count ?? cutoffVotes ?? 0,
+                        isDeclared: true,
+                      });
+                    });
+                  } else if (hasVotes && (!isLiveTie || !isAdmin)) {
+                    displayWinners = leadingWinners.map(w => ({
+                      candidate_id: w.candidate_id || w.id,
+                      candidate_name: w.candidate_name,
+                      vote_count: w.vote_count ?? 0,
+                      isDeclared: false,
+                    }));
+                  }
 
                   return (
                     <div key={group.position.id} className={`flex items-start gap-3 px-3 py-2.5 rounded-lg border ${
@@ -959,7 +1037,7 @@ export default function Results() {
                         : "bg-muted/60 border-border"
                     }`}>
                       <Trophy className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
-                        declaredWinner || (hasVotes && (!isLiveTie || !isAdmin)) ? "text-gold" : "text-muted-foreground/30"
+                        displayWinners.length > 0 ? "text-gold" : "text-muted-foreground/30"
                       }`} />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center justify-between gap-1">
@@ -982,41 +1060,48 @@ export default function Results() {
                             </span>
                           )}
                         </div>
-                        {declaredWinner ? (
-                          <>
-                            <p className="text-sm font-semibold text-foreground truncate uppercase">{declaredWinner}</p>
-                            <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                              Official Winner · {isAdmin && verification.decision_type ? verification.decision_type : "Verified / Finalized"}
-                            </p>
-                          </>
-                        ) : leadingWinners.length > 0 ? (
+
+                        {displayWinners.length > 0 ? (
                           <div className="space-y-1.5 mt-0.5">
-                            {leadingWinners.map((w, idx) => (
+                            {displayWinners.map((w, idx) => (
                               <div key={w.candidate_id || w.candidate_name || idx} className="border-b border-border/30 last:border-b-0 pb-1 last:pb-0">
                                 <div className="flex items-center justify-between gap-1">
                                   <p className="text-sm font-semibold text-foreground truncate uppercase">{w.candidate_name}</p>
-                                  {maxVotes > 1 && (
+                                  {maxVotes > 1 ? (
                                     <span className="shrink-0 text-[8px] font-bold px-1.5 py-0.2 rounded bg-gold/15 text-gold border border-gold/30 uppercase">
                                       Seat {idx + 1}
                                     </span>
-                                  )}
+                                  ) : w.isDeclared ? (
+                                    <span className="shrink-0 text-[8px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 uppercase">
+                                      Winner
+                                    </span>
+                                  ) : null}
                                 </div>
-                                <p className="text-[10px] text-muted-foreground">
-                                  {(w.vote_count ?? 0).toLocaleString()} vote{(w.vote_count ?? 0) !== 1 ? "s" : ""}
-                                  {maxVotes === 1 && group.candidates.length > 1 && group.candidates[1]?.candidate_name
-                                    ? ` · vs ${group.candidates[1].candidate_name.toUpperCase()} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
-                                    : ""}
+                                <p className="text-[10px] text-muted-foreground flex items-center justify-between gap-1">
+                                  <span>
+                                    {(w.vote_count ?? 0).toLocaleString()} vote{(w.vote_count ?? 0) !== 1 ? "s" : ""}
+                                    {maxVotes === 1 && group.candidates.length > 1 && group.candidates[1]?.candidate_name
+                                      ? ` · vs ${group.candidates[1].candidate_name.toUpperCase()} (${(group.candidates[1].vote_count ?? 0).toLocaleString()})`
+                                      : ""}
+                                  </span>
+                                  {w.isDeclared && verification?.decision_type && (
+                                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium italic">
+                                      via {verification.decision_type}
+                                    </span>
+                                  )}
                                 </p>
                               </div>
                             ))}
-                            {maxVotes > 1 && runnerUp && (runnerUp.vote_count ?? 0) > 0 && (
+                            {maxVotes > 1 && runnerUp && (runnerUp.vote_count ?? 0) > 0 && displayWinners.length < maxVotes && (
                               <p className="text-[9px] text-muted-foreground/80 italic pt-0.5">
                                 Next: {runnerUp.candidate_name.toUpperCase()} ({(runnerUp.vote_count ?? 0).toLocaleString()})
                               </p>
                             )}
                           </div>
                         ) : (
-                          <p className="text-xs text-muted-foreground italic">No votes yet</p>
+                          <p className="text-xs text-muted-foreground italic">
+                            {isLiveTie ? "Tie pending resolution" : "No votes yet"}
+                          </p>
                         )}
                       </div>
                     </div>
@@ -1032,6 +1117,7 @@ export default function Results() {
               const isVerified = !!verification;
               const isLiveTie = group.isTie;
               const declaredWinner = verification?.resolved_winner_name;
+              const declaredList = parseDeclaredWinners(declaredWinner);
 
               return (
                 <div
@@ -1082,7 +1168,7 @@ export default function Results() {
                         <div>
                           <p className="text-xs font-bold text-gold uppercase">{declaredWinner}</p>
                           <p className="text-[9px] text-emerald-300 font-medium">
-                            {isAdmin ? "Declared Winner" : "Official Winner"}
+                            {isAdmin ? ((group.position?.max_votes ?? group.maxVotes ?? 1) > 1 ? "Declared Winners" : "Declared Winner") : ((group.position?.max_votes ?? group.maxVotes ?? 1) > 1 ? "Official Winners" : "Official Winner")}
                           </p>
                         </div>
                       </div>
@@ -1115,9 +1201,16 @@ export default function Results() {
                     {group.candidates.map((c, ci) => {
                       const maxVotes = group.position?.max_votes ?? group.maxVotes ?? 1;
                       const pct = group.totalVotes ? (((c.vote_count ?? 0) / group.totalVotes) * 100).toFixed(1) : "0";
-                      const isTiedCandidate = isAdmin && isLiveTie && group.tiedCandidates.some(tc => tc.candidate_id === c.candidate_id);
-                      const isDeclaredWinnerCandidate = declaredWinner && c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase();
-                      const isWinnerCandidate = (ci < maxVotes) && (c.vote_count ?? 0) > 0 && (!isLiveTie || !isAdmin);
+                      const cutoffVotes = (group.tiedCandidates && group.tiedCandidates.length > 0)
+                        ? (group.tiedCandidates[0].vote_count ?? 0)
+                        : 0;
+                      const cleanWinners = (group.candidates || []).filter(
+                        (cand, idx) => idx < maxVotes && (cand.vote_count ?? 0) > cutoffVotes && (cand.vote_count ?? 0) > 0
+                      );
+                      const isDeclaredWinnerCandidate = isDeclaredWinner(c.candidate_name, declaredWinner);
+                      const isCleanWinner = (ci < maxVotes) && (c.vote_count ?? 0) > cutoffVotes && (c.vote_count ?? 0) > 0;
+                      const isWinnerCandidate = isDeclaredWinnerCandidate || isCleanWinner || ((ci < maxVotes) && (c.vote_count ?? 0) > 0 && (!isLiveTie || !isAdmin));
+                      const isTiedCandidate = isAdmin && isLiveTie && !isDeclaredWinnerCandidate && group.tiedCandidates.some(tc => tc.candidate_id === c.candidate_id);
 
                       return (
                         <div key={c.candidate_id} className="animate-fade-in" style={{ animationDelay: `${ci * 60}ms` }}>
@@ -1139,7 +1232,7 @@ export default function Results() {
                                   {c.candidate_name}
                                   {isDeclaredWinnerCandidate && (
                                     <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                                      <Award className="w-3 h-3" /> Declared Winner
+                                      <Award className="w-3 h-3" /> {maxVotes > 1 ? `Declared Winner (Seat ${cleanWinners.length + Math.max(0, declaredList.findIndex(d => d.toUpperCase() === c.candidate_name?.toUpperCase())) + 1})` : "Declared Winner"}
                                     </span>
                                   )}
                                   {isWinnerCandidate && !isDeclaredWinnerCandidate && (
@@ -1886,12 +1979,7 @@ export default function Results() {
                                       ) : c.isWinner ? (
                                         <span className="text-[6pt] font-bold px-1 py-0.2 rounded border border-black bg-slate-100 text-black">
                                           Winner
-                                        </span>
-                                      ) : c.isTied ? (
-                                        <span className="text-[6pt] font-bold px-1 py-0.2 rounded border border-amber-600 text-amber-700 bg-amber-50">
-                                          Tie
-                                        </span>
-                                      ) : null}
+                                        </span> ) : null}
                                     </div>
                                     {(c.grade || c.section) && (
                                       <p className="text-[6.5pt] text-slate-500">

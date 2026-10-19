@@ -108,6 +108,14 @@ function gradeMatchesPosition(grade, positionTitle) {
   return title === allowedRep || title.includes(allowedRep.replace(' representative', ''));
 }
 
+export function parseDeclaredWinners(str) {
+  if (!str || typeof str !== "string") return [];
+  return str
+    .split(/\s*&\s*|\s*,\s*|\s*;\s*|\s+and\s+/i)
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
 function filterLettersOnly(text) {
   return String(text || '').replace(/[^a-zA-ZñÑ\s'-]/g, '');
 }
@@ -302,6 +310,7 @@ export default function Admin() {
   const [tieSwapHeadTail, setTieSwapHeadTail] = useState(false);
   const [tieResolvedWinnerId, setTieResolvedWinnerId] = useState("");
   const [tieResolvedWinnerName, setTieResolvedWinnerName] = useState("");
+  const [selectedTieWinnerNames, setSelectedTieWinnerNames] = useState([]);
   const [auditSavingId, setAuditSavingId] = useState(null);
 
   // Archive election results state
@@ -1215,6 +1224,7 @@ export default function Admin() {
       setTieSwapHeadTail(false);
       setTieResolvedWinnerId("");
       setTieResolvedWinnerName("");
+      setSelectedTieWinnerNames([]);
       setAuditSavingId(null);
     },
     onError: (err) => {
@@ -4768,6 +4778,7 @@ export default function Admin() {
                 setTieSwapHeadTail(false);
                 setTieResolvedWinnerId("");
                 setTieResolvedWinnerName("");
+                setSelectedTieWinnerNames([]);
               }}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${settingsSubTab === "audit" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -5450,6 +5461,7 @@ export default function Admin() {
                               setTieDecisionType(isCoin ? "Toss coin" : (isOther ? "Others" : rawType));
                               setTieResolvedWinnerId(verif?.resolved_winner_id ?? "");
                               setTieResolvedWinnerName(verif?.resolved_winner_name ?? "");
+                              setSelectedTieWinnerNames(parseDeclaredWinners(verif?.resolved_winner_name ?? ""));
                               if (rawType.includes("Head") || verif?.admin_comment?.includes("Head")) {
                                 setTieCoinSide("Head");
                               } else if (rawType.includes("Tail") || verif?.admin_comment?.includes("Tail")) {
@@ -5589,124 +5601,225 @@ export default function Admin() {
                                 {isTie ? "Tie Resolution — Administrator Action Required" : "Verification Record"}
                               </p>
 
-                              {isTie && (
-                                <>
-                                  {/* Decision Type - Keep only Toss coin */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground mb-1.5">
-                                      Decision / Action Taken
-                                    </label>
-                                    <select
-                                      value={tieDecisionType}
-                                      onChange={e => {
-                                        const val = e.target.value;
-                                        setTieDecisionType(val);
-                                        if (val !== "Toss coin" && val !== "Coin flip / Draw of lots") {
-                                          setTieCoinSide("");
-                                        }
-                                      }}
-                                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                                    >
-                                      <option value="">— Select decision type —</option>
-                                      <option value="Toss coin">Toss coin</option>
-                                      <option value="Others">Others</option>
-                                    </select>
-                                  </div>
+                              {isTie && (() => {
+                                const maxVotes = group.maxVotes ?? group.position?.max_votes ?? 1;
+                                const cutoffVotes = (group.tiedCandidates && group.tiedCandidates.length > 0)
+                                  ? (group.tiedCandidates[0].vote_count ?? 0)
+                                  : 0;
+                                const cleanWinners = (group.candidates || []).filter(
+                                  (c, idx) => idx < maxVotes && (c.vote_count ?? 0) > cutoffVotes && (c.vote_count ?? 0) > 0
+                                );
+                                const neededTieWinners = Math.max(1, maxVotes - cleanWinners.length);
 
-                                  {/* Coin Toss Selector (Head or Tail) - appears when Toss coin is selected */}
-                                  {(tieDecisionType === "Toss coin" || tieDecisionType === "Coin flip / Draw of lots") && (
-                                    <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-2.5 animate-fade-in">
-                                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                                        <label className="block text-xs font-medium text-foreground">
-                                          Coin Toss (Head or Tail)
-                                        </label>
-                                        {group.tiedCandidates && group.tiedCandidates.length >= 2 && (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const nextSwap = !tieSwapHeadTail;
-                                              setTieSwapHeadTail(nextSwap);
-                                              if (tieCoinSide) {
-                                                const headsCand = group.tiedCandidates[nextSwap ? 1 : 0];
-                                                const tailsCand = group.tiedCandidates[nextSwap ? 0 : 1];
-                                                const win = tieCoinSide === "Head" ? headsCand : tailsCand;
-                                                if (win) {
-                                                  setTieResolvedWinnerId(win.candidate_id);
-                                                  setTieResolvedWinnerName(win.candidate_name);
-                                                  setTieComment(`Tie-breaker resolved via Toss Coin. Result: ${tieCoinSide}. Declared winner: ${win.candidate_name}.`);
-                                                }
-                                              }
-                                            }}
-                                            className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-medium transition-colors"
-                                            title="Switch which candidate is assigned Head and Tail"
-                                          >
-                                            ⇄ Swap Candidate Sides
-                                          </button>
-                                        )}
-                                      </div>
-
+                                return (
+                                  <>
+                                    {/* Decision Type */}
+                                    <div>
+                                      <label className="block text-xs font-medium text-foreground mb-1.5">
+                                        Decision / Action Taken
+                                      </label>
                                       <select
-                                        value={tieCoinSide}
+                                        value={tieDecisionType}
                                         onChange={e => {
-                                          const side = e.target.value;
-                                          setTieCoinSide(side);
-                                          if (group.tiedCandidates && group.tiedCandidates.length >= 2) {
-                                            const headsCand = group.tiedCandidates[tieSwapHeadTail ? 1 : 0];
-                                            const tailsCand = group.tiedCandidates[tieSwapHeadTail ? 0 : 1];
-                                            const win = side === "Head" ? headsCand : side === "Tail" ? tailsCand : null;
-                                            if (win) {
-                                              setTieResolvedWinnerId(win.candidate_id);
-                                              setTieResolvedWinnerName(win.candidate_name);
-                                              setTieComment(`Tie-breaker resolved via Toss Coin. Result: ${side}. Declared winner: ${win.candidate_name}.`);
-                                            } else if (!side) {
-                                              setTieResolvedWinnerId("");
-                                              setTieResolvedWinnerName("");
-                                            }
+                                          const val = e.target.value;
+                                          setTieDecisionType(val);
+                                          if (val !== "Toss coin" && val !== "Coin flip / Draw of lots") {
+                                            setTieCoinSide("");
                                           }
                                         }}
                                         className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
                                       >
-                                        <option value="">— Select Head or Tail —</option>
-                                        <option value="Head">Head</option>
-                                        <option value="Tail">Tail</option>
+                                        <option value="">— Select decision type —</option>
+                                        <option value="Draw of lots">Draw of lots / Drawing of lots (DepEd Standard)</option>
+                                        <option value="Toss coin">Toss coin (Head or Tail)</option>
+                                        <option value="Committee Resolution">Committee Resolution / Agreement</option>
+                                        <option value="Others">Others</option>
                                       </select>
+                                    </div>
 
-                                      {group.tiedCandidates && group.tiedCandidates.length >= 2 && (
-                                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5 px-1 flex-wrap gap-2">
-                                          <span>
-                                            🪙 <strong className="text-foreground">Head:</strong> {group.tiedCandidates[tieSwapHeadTail ? 1 : 0]?.candidate_name}
+                                    {/* Coin Toss Selector (Head or Tail) */}
+                                    {(tieDecisionType === "Toss coin" || tieDecisionType === "Coin flip / Draw of lots") && (
+                                      <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 space-y-2.5 animate-fade-in">
+                                        {group.tiedCandidates.length > 2 || neededTieWinners > 1 ? (
+                                          <div className="text-xs text-amber-800 dark:text-amber-200">
+                                            <p className="font-semibold mb-1">
+                                              Notice on Multi-Candidate / Multi-Seat Tie:
+                                            </p>
+                                            <p className="text-[11px] leading-relaxed">
+                                              This position has <strong>{group.tiedCandidates.length} tied candidates</strong> and <strong>{neededTieWinners} winning seat(s)</strong> to fill. Under DepEd SSLG rules, ties among 3 or more candidates are resolved via <em>Draw of Lots (Bunutan)</em> or playoff rounds. Please select the declared {neededTieWinners} winner(s) using the checkboxes below.
+                                            </p>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                              <label className="block text-xs font-medium text-foreground">
+                                                Coin Toss (Head or Tail)
+                                              </label>
+                                              {group.tiedCandidates && group.tiedCandidates.length >= 2 && (
+                                                <button
+                                                  type="button"
+                                                  onClick={() => {
+                                                    const nextSwap = !tieSwapHeadTail;
+                                                    setTieSwapHeadTail(nextSwap);
+                                                    if (tieCoinSide) {
+                                                      const headsCand = group.tiedCandidates[nextSwap ? 1 : 0];
+                                                      const tailsCand = group.tiedCandidates[nextSwap ? 0 : 1];
+                                                      const win = tieCoinSide === "Head" ? headsCand : tailsCand;
+                                                      if (win) {
+                                                        setTieResolvedWinnerId(win.candidate_id);
+                                                        setTieResolvedWinnerName(win.candidate_name);
+                                                        setSelectedTieWinnerNames([win.candidate_name]);
+                                                        setTieComment(`Tie-breaker resolved via Toss Coin. Result: ${tieCoinSide}. Declared winner: ${win.candidate_name}.`);
+                                                      }
+                                                    }
+                                                  }}
+                                                  className="text-[11px] text-amber-600 dark:text-amber-400 hover:underline flex items-center gap-1 font-medium transition-colors"
+                                                  title="Switch which candidate is assigned Head and Tail"
+                                                >
+                                                  ⇄ Swap Candidate Sides
+                                                </button>
+                                              )}
+                                            </div>
+
+                                            <select
+                                              value={tieCoinSide}
+                                              onChange={e => {
+                                                const side = e.target.value;
+                                                setTieCoinSide(side);
+                                                if (group.tiedCandidates && group.tiedCandidates.length >= 2) {
+                                                  const headsCand = group.tiedCandidates[tieSwapHeadTail ? 1 : 0];
+                                                  const tailsCand = group.tiedCandidates[tieSwapHeadTail ? 0 : 1];
+                                                  const win = side === "Head" ? headsCand : side === "Tail" ? tailsCand : null;
+                                                  if (win) {
+                                                    setTieResolvedWinnerId(win.candidate_id);
+                                                    setTieResolvedWinnerName(win.candidate_name);
+                                                    setSelectedTieWinnerNames([win.candidate_name]);
+                                                    setTieComment(`Tie-breaker resolved via Toss Coin. Result: ${side}. Declared winner: ${win.candidate_name}.`);
+                                                  } else if (!side) {
+                                                    setTieResolvedWinnerId("");
+                                                    setTieResolvedWinnerName("");
+                                                    setSelectedTieWinnerNames([]);
+                                                  }
+                                                }
+                                              }}
+                                              className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                            >
+                                              <option value="">— Select Head or Tail —</option>
+                                              <option value="Head">Head</option>
+                                              <option value="Tail">Tail</option>
+                                            </select>
+
+                                            {group.tiedCandidates && group.tiedCandidates.length >= 2 && (
+                                              <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5 px-1 flex-wrap gap-2">
+                                                <span>
+                                                  🪙 <strong className="text-foreground">Head:</strong> {group.tiedCandidates[tieSwapHeadTail ? 1 : 0]?.candidate_name}
+                                                </span>
+                                                <span>
+                                                  🪙 <strong className="text-foreground">Tail:</strong> {group.tiedCandidates[tieSwapHeadTail ? 0 : 1]?.candidate_name}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Resolved Winner Selection */}
+                                    <div>
+                                      <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                                        <label className="block text-xs font-medium text-foreground">
+                                          {neededTieWinners > 1
+                                            ? `Declared Winners (Select ${neededTieWinners} winners from the tied candidates)`
+                                            : `Declared Winner (optional — select 1 winner)`}
+                                        </label>
+                                        {neededTieWinners > 1 && (
+                                          <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                            selectedTieWinnerNames.length === neededTieWinners
+                                              ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30"
+                                              : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                                          }`}>
+                                            {selectedTieWinnerNames.length} of {neededTieWinners} selected
                                           </span>
-                                          <span>
-                                            🪙 <strong className="text-foreground">Tail:</strong> {group.tiedCandidates[tieSwapHeadTail ? 0 : 1]?.candidate_name}
-                                          </span>
+                                        )}
+                                      </div>
+
+                                      {cleanWinners.length > 0 && (
+                                        <div className="mb-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-700 dark:text-emerald-300">
+                                          ✓ <strong>Qualified for Seat 1:</strong> {cleanWinners.map(c => `${c.candidate_name} (${c.vote_count} votes)`).join(", ")}.
+                                          <span className="block text-muted-foreground mt-0.5">Please select the {neededTieWinners} winner(s) below to fill the remaining seat(s).</span>
                                         </div>
                                       )}
-                                    </div>
-                                  )}
 
-                                  {/* Resolved Winner */}
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground mb-1.5">
-                                      Declared Winner (optional — leave blank if no single winner)
-                                    </label>
-                                    <select
-                                      value={tieResolvedWinnerId}
-                                      onChange={e => {
-                                        const cId = e.target.value;
-                                        setTieResolvedWinnerId(cId);
-                                        const found = group.tiedCandidates.find(c => c.candidate_id === cId);
-                                        setTieResolvedWinnerName(found?.candidate_name ?? "");
-                                      }}
-                                      className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-                                    >
-                                      <option value="">— None selected (no single winner) —</option>
-                                      {group.tiedCandidates.map(c => (
-                                        <option key={c.candidate_id} value={c.candidate_id}>{c.candidate_name}</option>
-                                      ))}
-                                    </select>
-                                  </div>
-                                </>
-                              )}
+                                      {neededTieWinners > 1 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                          {group.tiedCandidates.map((c) => {
+                                            const isChecked = selectedTieWinnerNames.includes(c.candidate_name);
+                                            return (
+                                              <label
+                                                key={c.candidate_id}
+                                                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                                                  isChecked
+                                                    ? "border-gold bg-gold/10 text-foreground font-semibold shadow-sm"
+                                                    : "border-border bg-card hover:bg-muted/40 text-foreground"
+                                                }`}
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isChecked}
+                                                  onChange={() => {
+                                                    let next;
+                                                    if (isChecked) {
+                                                      next = selectedTieWinnerNames.filter(n => n !== c.candidate_name);
+                                                    } else {
+                                                      if (selectedTieWinnerNames.length >= neededTieWinners) {
+                                                        next = [...selectedTieWinnerNames.slice(1), c.candidate_name];
+                                                      } else {
+                                                        next = [...selectedTieWinnerNames, c.candidate_name];
+                                                      }
+                                                    }
+                                                    setSelectedTieWinnerNames(next);
+                                                    setTieResolvedWinnerName(next.join(" & "));
+                                                    const firstCand = group.tiedCandidates.find(tc => tc.candidate_name === next[0]);
+                                                    setTieResolvedWinnerId(firstCand?.candidate_id || "");
+                                                  }}
+                                                  className="w-4 h-4 rounded text-gold focus:ring-gold"
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                  <p className="text-xs uppercase font-bold text-foreground truncate">{c.candidate_name}</p>
+                                                  <p className="text-[10px] text-muted-foreground truncate">{c.party_list || 'INDEPENDENT'} · {c.vote_count ?? 1} vote</p>
+                                                </div>
+                                                {isChecked && (
+                                                  <span className="shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded bg-gold text-accent-foreground uppercase">
+                                                    Seat {selectedTieWinnerNames.indexOf(c.candidate_name) + (cleanWinners.length + 1)}
+                                                  </span>
+                                                )}
+                                              </label>
+                                            );
+                                          })}
+                                        </div>
+                                      ) : (
+                                        <select
+                                          value={tieResolvedWinnerId}
+                                          onChange={e => {
+                                            const cId = e.target.value;
+                                            setTieResolvedWinnerId(cId);
+                                            const found = group.tiedCandidates.find(c => c.candidate_id === cId);
+                                            const name = found?.candidate_name ?? "";
+                                            setTieResolvedWinnerName(name);
+                                            setSelectedTieWinnerNames(name ? [name] : []);
+                                          }}
+                                          className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-ring"
+                                        >
+                                          <option value="">— None selected (no single winner) —</option>
+                                          {group.tiedCandidates.map(c => (
+                                            <option key={c.candidate_id} value={c.candidate_id}>{c.candidate_name}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                    </div>
+                                  </>
+                                );
+                              })()}
 
                               {/* Mandatory comment area */}
                               <div>
