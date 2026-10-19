@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer, History, Calendar, Award, ShieldCheck, AlertTriangle, Gavel, MessageSquare, CheckCircle2 } from "lucide-react";
+import { BarChart3, Trophy, TrendingUp, Pencil, Check, X, Printer, History, Calendar, Award, ShieldCheck, AlertTriangle, Gavel, MessageSquare, CheckCircle2, Users, FileText, ChevronRight } from "lucide-react";
 import schoolSeal from "@/assets/school-seal.jpg";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/api/client";
@@ -28,6 +28,8 @@ function gradeMatchesPosition(voterGrade, positionTitle) {
   return title === allowedRep || title.includes(allowedRep.replace(' representative', ''));
 }
 
+
+
 export default function Results() {
   const [activePosition, setActivePosition] = useState("all");
   const [voterGrade, setVoterGrade] = useState("all");
@@ -47,6 +49,39 @@ export default function Results() {
   const [historyPositionFilter, setHistoryPositionFilter] = useState("all");
   const [historyGradeFilter, setHistoryGradeFilter] = useState("all");
   const [historySectionFilter, setHistorySectionFilter] = useState("all");
+
+  // ── Print Mode state & modal ──
+  // 'candidates': Only Candidates (No numbers, positions & party lists only)
+  // 'winners': Only Candidates Winners (Proclamation sheet for each position)
+  // 'final': Final Results (Complete system results tally)
+  const [showPrintModal, setShowPrintModal] = useState(false);
+  const [printMode, setPrintMode] = useState("final");
+
+  // Close print modal on Escape
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && showPrintModal) {
+        setShowPrintModal(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showPrintModal]);
+
+  const handleTriggerPrint = (mode) => {
+    setPrintMode(mode);
+    setShowPrintModal(false);
+    setTimeout(() => {
+      window.print();
+    }, 120);
+  };
+
+  const handlePaperSizeChange = (newSize) => {
+    setPaperSize(newSize);
+    try {
+      localStorage.setItem("bnhs_paper_size", newSize);
+    } catch (_) {}
+  };
 
   // Scroll to active position in Live tab
   useEffect(() => {
@@ -128,6 +163,12 @@ export default function Results() {
     queryKey: ["position-verifications"],
     queryFn: () => api.get('/position-verifications'),
     refetchInterval: 15000,
+  });
+
+  // ── All registered candidates (for Option 1: ONLY CANDIDATES roster) ──
+  const { data: allLiveCandidates } = useQuery({
+    queryKey: ["all-candidates-list"],
+    queryFn: () => api.get('/candidates'),
   });
 
   // ── Supabase Realtime: instant vote & verification updates ──
@@ -446,19 +487,206 @@ export default function Results() {
 
   const isLong = paperSize === "long";
 
+  // ── Normalized candidates for Choice 1 (ONLY CANDIDATE) ──
+  // Rule: Strictly candidate names, positions, and parties ONLY. NO NUMBERS AT ALL.
+  const printCandidatesData = useMemo(() => {
+    if (activeTab === "history") {
+      const groups = displayedArchivedGroups.length > 0 ? displayedArchivedGroups : filteredArchivedGrouped;
+      return groups.map(g => {
+        const sortedCand = [...g.candidates].sort((a, b) =>
+          (a.candidate_name || "").localeCompare(b.candidate_name || "")
+        );
+        return {
+          title: g.title,
+          candidates: sortedCand.map(c => ({
+            name: c.candidate_name,
+            party: c.candidate_party || c.party_list || "INDEPENDENT",
+            grade: c.candidate_grade,
+            section: c.candidate_section,
+          })),
+        };
+      });
+    } else {
+      const posList = relevantPositions.length > 0 ? relevantPositions : (positions ?? []);
+      return posList.map(pos => {
+        let candList = (allLiveCandidates ?? []).filter(c => c.position_id === pos.id);
+        if (candList.length === 0) {
+          candList = (voteCounts ?? [])
+            .filter(vc => vc.position_id === pos.id)
+            .map(vc => ({
+              id: vc.candidate_id,
+              name: vc.candidate_name,
+              party_list: vc.party_list,
+              grade_level: vc.grade_level,
+              section: vc.section,
+            }));
+        }
+        const sortedCand = [...candList].sort((a, b) =>
+          (a.name || "").localeCompare(b.name || "")
+        );
+        return {
+          title: pos.title,
+          candidates: sortedCand.map(c => ({
+            name: c.name,
+            party: c.party_list || "INDEPENDENT",
+            grade: c.grade_level,
+            section: c.section,
+          })),
+        };
+      });
+    }
+  }, [activeTab, displayedArchivedGroups, filteredArchivedGrouped, relevantPositions, positions, allLiveCandidates, voteCounts]);
+
+  // ── Normalized winners for Choice 2 (ONLY CANDIDATES WINNERS) ──
+  const printWinnersData = useMemo(() => {
+    if (activeTab === "history") {
+      const groups = displayedArchivedGroups.length > 0 ? displayedArchivedGroups : filteredArchivedGrouped;
+      return groups.map(g => {
+        const officialWinners = g.candidates.filter(c => c.is_winner);
+        const topCandidate = g.candidates[0];
+        let winners = [];
+        if (officialWinners.length > 0) {
+          winners = officialWinners.map(w => ({
+            name: w.candidate_name,
+            party: w.candidate_party || w.party_list || "INDEPENDENT",
+            voteCount: w.vote_count ?? 0,
+            status: "Proclaimed Winner",
+          }));
+        } else if (topCandidate && (topCandidate.vote_count ?? 0) > 0) {
+          winners = [{
+            name: topCandidate.candidate_name,
+            party: topCandidate.candidate_party || topCandidate.party_list || "INDEPENDENT",
+            voteCount: topCandidate.vote_count ?? 0,
+            status: "Leading Candidate",
+          }];
+        }
+        return {
+          title: g.title,
+          totalVotes: g.totalVotes,
+          winners,
+        };
+      });
+    } else {
+      const list = relevantGrouped.length > 0 ? relevantGrouped : grouped;
+      return list.map(g => {
+        const posTitle = g.position?.title ?? "Position";
+        const maxVotes = g.position?.max_votes ?? g.maxVotes ?? 1;
+        const verif = (liveVerifications ?? []).find(
+          v => v.position_id === g.position.id || v.position_title === posTitle
+        );
+        const declaredWinner = verif?.resolved_winner_name;
+
+        let winners = [];
+        let isTie = g.isTie && !declaredWinner;
+
+        if (declaredWinner) {
+          const found = g.candidates.find(c => c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase());
+          winners = [{
+            name: declaredWinner,
+            party: found?.party_list || "INDEPENDENT",
+            voteCount: found?.vote_count ?? 0,
+            isDeclaredWinner: true,
+            status: "Declared Winner (Tie Resolution)",
+          }];
+        } else if (!isTie) {
+          winners = g.candidates
+            .slice(0, maxVotes)
+            .filter(c => (c.vote_count ?? 0) > 0)
+            .map((c, idx) => ({
+              name: c.candidate_name,
+              party: c.party_list || "INDEPENDENT",
+              voteCount: c.vote_count ?? 0,
+              isDeclaredWinner: false,
+              status: maxVotes > 1 ? `Proclaimed Winner (Seat ${idx + 1})` : "Proclaimed Winner",
+            }));
+        }
+
+        return {
+          title: posTitle,
+          maxVotes,
+          totalVotes: g.totalVotes ?? 0,
+          winners,
+          isTie,
+          tiedCandidates: isTie ? g.tiedCandidates : [],
+        };
+      });
+    }
+  }, [activeTab, displayedArchivedGroups, filteredArchivedGrouped, relevantGrouped, grouped, liveVerifications]);
+
+  // ── Normalized full results for Choice 3 (FINAL RESULTS) ──
+  const printFinalResultsData = useMemo(() => {
+    if (activeTab === "history") {
+      const groups = displayedArchivedGroups.length > 0 ? displayedArchivedGroups : filteredArchivedGrouped;
+      return groups.map(g => {
+        const histVerif = (historyVerifications ?? []).find(
+          v => v.position_title === g.title || v.position_id === g.candidates[0]?.position_id
+        );
+        return {
+          title: g.title,
+          totalVotes: g.totalVotes,
+          candidates: g.candidates.map((c, idx) => ({
+            name: c.candidate_name,
+            party: c.candidate_party || c.party_list || "INDEPENDENT",
+            grade: c.candidate_grade,
+            section: c.candidate_section,
+            voteCount: c.vote_count ?? 0,
+            rank: c.rank ?? idx + 1,
+            isWinner: c.is_winner || (idx === 0 && (c.vote_count ?? 0) > 0),
+          })),
+          verification: histVerif,
+        };
+      });
+    } else {
+      const list = relevantGrouped.length > 0 ? relevantGrouped : grouped;
+      return list.map(g => {
+        const posTitle = g.position?.title ?? "Position";
+        const maxVotes = g.position?.max_votes ?? g.maxVotes ?? 1;
+        const verif = (liveVerifications ?? []).find(
+          v => v.position_id === g.position.id || v.position_title === posTitle
+        );
+        const declaredWinner = verif?.resolved_winner_name;
+
+        return {
+          title: posTitle,
+          maxVotes,
+          totalVotes: g.totalVotes ?? 0,
+          isTie: g.isTie,
+          tiedCandidates: g.tiedCandidates,
+          verification: verif,
+          candidates: g.candidates.map((c, idx) => {
+            const isDeclared = Boolean(declaredWinner && c.candidate_name?.toUpperCase() === declaredWinner.toUpperCase());
+            const isWinner = isDeclared || (idx < maxVotes && (c.vote_count ?? 0) > 0 && !g.isTie);
+            const isTied = !isDeclared && g.isTie && g.tiedCandidates?.some(tc => tc.candidate_id === c.candidate_id);
+            return {
+              name: c.candidate_name,
+              party: c.party_list || "INDEPENDENT",
+              grade: c.grade_level,
+              section: c.section,
+              voteCount: c.vote_count ?? 0,
+              rank: idx + 1,
+              isWinner,
+              isDeclared,
+              isTied,
+            };
+          }),
+        };
+      });
+    }
+  }, [activeTab, displayedArchivedGroups, filteredArchivedGrouped, relevantGrouped, grouped, liveVerifications, historyVerifications]);
+
   return (
     <div className="container py-8 md:py-12">
       <style>{`
         @media print {
-          /* ── Base reset — Universal Arial Typography ── */
+          /* ── Universal Arial DepEd Print Standard ── */
           body, table, th, td, div, p, span, h1, h2, h3, h4 {
             font-family: Arial, Helvetica, sans-serif !important;
           }
           body {
             background: #fff !important;
             color: #000 !important;
-            font-size: ${isLong ? '9pt' : '8.5pt'} !important;
-            line-height: ${isLong ? '1.25' : '1.2'} !important;
+            font-size: ${isLong ? '8pt' : '7.5pt'} !important;
+            line-height: ${isLong ? '1.2' : '1.15'} !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -472,293 +700,51 @@ export default function Results() {
           /* ── Page setup — tailored for Long (8.5x13" Folio) vs Short (8.5x11" Letter) ── */
           @page {
             size: ${isLong ? '8.5in 13in' : '8.5in 11in'};
-            margin: ${isLong ? '8mm 8mm 8mm 8mm' : '6.5mm 6.5mm 6.5mm 6.5mm'};
+            margin: ${isLong ? '5.5mm 6.5mm 5.5mm 6.5mm' : '4.5mm 5.5mm 4.5mm 5.5mm'};
           }
 
-          /* ── Container — full width, no outer spacing ── */
+          /* ── Container — full width, zero outer padding in print ── */
           .container {
             max-width: 100% !important;
             padding: 0 !important;
             margin: 0 !important;
           }
 
-          /* ── Hide screen-only components, navbar & footer ── */
+          /* ── Hide entire screen interface, navbar, footer & modal in print ── */
           .print\\:hidden,
           [class*="print:hidden"],
           header.gradient-navy,
           footer.gradient-navy,
-          .flex.justify-between.items-start,
-          .bg-card.border-gold\\/20,
-          [class*="border-gold/20"],
-          [class*="border-emerald-500/30"],
-          [class*="bg-emerald-500/5"],
-          [class*="border-amber-500/40"] {
+          header,
+          footer {
             display: none !important;
           }
 
-          /* ── Show print-only elements ── */
-          .hidden.print\\:flex,
-          [class*="hidden"][class*="print:flex"] {
-            display: flex !important;
-          }
-          .hidden.print\\:grid,
-          [class*="hidden"][class*="print:grid"] {
-            display: grid !important;
-          }
-
-          /* ── Print letterhead — Compact & Crisp ── */
-          .hidden.print\\:flex {
-            padding-bottom: ${isLong ? '5px' : '4px'} !important;
-            margin-bottom: ${isLong ? '8px' : '6px'} !important;
-            border-bottom: 1.5px solid #000 !important;
-          }
-          .hidden.print\\:flex img {
-            width: ${isLong ? '40px' : '36px'} !important;
-            height: ${isLong ? '40px' : '36px'} !important;
-          }
-          .hidden.print\\:flex h2 {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '14px' : '13px'} !important;
-            font-weight: 700 !important;
-            line-height: 1.1 !important;
-            color: #000 !important;
-            text-transform: uppercase !important;
-          }
-          .hidden.print\\:flex p {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: 8.5px !important;
-            line-height: 1.15 !important;
-            color: #333 !important;
-            margin-top: 0 !important;
-          }
-          .hidden.print\\:flex .text-right p {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: 8.5px !important;
-            line-height: 1.15 !important;
-            color: #333 !important;
-          }
-          .hidden.print\\:flex .text-right .text-sm {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: 9.5px !important;
-            font-weight: 700 !important;
-            color: #000 !important;
-            text-transform: uppercase !important;
-          }
-
-          /* ── Seamless Connected Positions Container (No Empty Gaps) ── */
-          .space-y-6 {
+          /* ── Show dedicated print document root ── */
+          .hidden.print\\:block,
+          [class*="hidden"][class*="print:block"] {
             display: block !important;
-            margin: 0 !important;
-            padding: 0 !important;
-            border: none !important;
           }
-          .space-y-6 > :not([hidden]) ~ :not([hidden]),
-          .space-y-6 > div {
+
+          .print-document-root {
             display: block !important;
             width: 100% !important;
-            margin: 0 !important;
-            margin-top: 0 !important;
-            margin-bottom: 0 !important;
-            padding: 0 !important;
-            border: 1px solid #000 !important;
-            border-bottom: none !important;
-            border-radius: 0 !important;
-            break-inside: auto !important;
-            page-break-inside: auto !important;
-          }
-          .space-y-6 > div:last-child {
-            border-bottom: 1px solid #000 !important;
-          }
-
-          /* ── Position Card ── */
-          .bg-card {
             background: #fff !important;
-            border: none !important;
-            box-shadow: none !important;
-            margin: 0 !important;
-            border-radius: 0 !important;
-            break-inside: auto !important;
-            page-break-inside: auto !important;
+            color: #000 !important;
           }
 
-          /* ── Position Header (Arial 14) — Compact & Clean ── */
-          .gradient-navy {
-            background: #f8fafc !important;
-            border-bottom: 1px solid #000 !important;
-            color: #000 !important;
-            padding: ${isLong ? '4.5px 8px' : '3.5px 8px'} !important;
-            display: flex !important;
-            justify-content: space-between !important;
-            align-items: center !important;
+          /* ── Strict pagination controllers ── */
+          .break-inside-avoid,
+          .page-break-inside-avoid {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
-          }
-          .gradient-navy h2 {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: 14px !important;
-            font-weight: 700 !important;
-            color: #000 !important;
-            line-height: 1.1 !important;
-            display: inline-block !important;
-            margin-right: 6px !important;
-            text-transform: uppercase !important;
-          }
-          .gradient-navy p {
-            font-family: Arial, Helvetica, sans-serif !important;
-            color: #475569 !important;
-            font-size: 9.5px !important;
-            margin-top: 0 !important;
-            line-height: 1 !important;
-          }
-          .gradient-navy span.inline-flex {
-            display: inline-flex !important;
-            font-family: Arial, Helvetica, sans-serif !important;
-            border: 1px solid #10b981 !important;
-            color: #047857 !important;
-            background: #ecfdf5 !important;
-            font-size: 8.5px !important;
-            font-weight: 600 !important;
-            padding: 0 5px !important;
-            border-radius: 3px !important;
-            line-height: 1.2 !important;
-          }
-          .gradient-navy span.inline-flex svg {
-            width: 10px !important;
-            height: 10px !important;
-            color: #047857 !important;
-          }
-          .gradient-navy .bg-black\\/30 {
-            display: none !important;
-          }
-
-          /* ── Position Body — Compact Padding to fit 2-3 pages ── */
-          .bg-card > .p-4,
-          .bg-card > [class*="p-4"],
-          .bg-card > [class*="p-5"] {
-            padding: ${isLong ? '3px 8px' : '2px 8px'} !important;
-            background: #fff !important;
-          }
-          .bg-card .space-y-4 {
-            display: flex !important;
-            flex-direction: column !important;
-            gap: 0 !important;
-          }
-          .bg-card .space-y-4 > div {
-            margin: 0 !important;
-            padding: ${isLong ? '3.8px 0' : '2.8px 0'} !important;
-            border-bottom: 1px solid #e2e8f0 !important;
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-          }
-          .bg-card .space-y-4 > div:last-child {
-            border-bottom: none !important;
-            padding-bottom: 2px !important;
-          }
-
-          /* ── Candidate Rank Circle: (1), (2), (3)... ── */
-          .bg-card .space-y-4 .w-7.h-7 {
-            width: ${isLong ? '18px' : '16px'} !important;
-            height: ${isLong ? '18px' : '16px'} !important;
-            min-width: ${isLong ? '18px' : '16px'} !important;
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '9.5px' : '8.5px'} !important;
-            font-weight: 700 !important;
-            background: #f1f5f9 !important;
-            color: #0f172a !important;
-            border: 1px solid #94a3b8 !important;
-            border-radius: 9999px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-          }
-
-          /* ── Candidate Name (Clean Arial) ── */
-          .bg-card .space-y-4 .font-semibold.text-foreground.text-sm {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '11.5px' : '11px'} !important;
-            font-weight: 700 !important;
-            line-height: 1.15 !important;
-            color: #000 !important;
-            text-transform: uppercase !important;
-          }
-
-          /* ── Candidate Party-List Subtitle ── */
-          .bg-card .space-y-4 .text-xs.text-muted-foreground {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '9.5px' : '9px'} !important;
-            line-height: 1 !important;
-            color: #475569 !important;
-            margin-top: 0 !important;
-          }
-
-          /* ── Vote count on the right (WALANG PERCENT) ── */
-          .bg-card .space-y-4 .font-display.font-bold {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '12.5px' : '12px'} !important;
-            font-weight: 700 !important;
-            color: #000 !important;
-            line-height: 1 !important;
-          }
-
-          /* ── COMPLETELY HIDE PERCENTAGE IN PRINT ── */
-          .bg-card .space-y-4 .text-xs.text-muted-foreground.ml-1\\.5 {
-            display: none !important;
-          }
-
-          /* ── Clean plain presentation — hide progress bar in print ── */
-          .bg-card .h-2\\.5 {
-            display: none !important;
-          }
-
-          /* ── Signature block — Presentable Official Footer (Lowered with generous signature space) ── */
-          .hidden.print\\:grid {
-            display: grid !important;
-            grid-template-columns: 1fr 1fr !important;
-            margin-top: ${isLong ? '28px' : '20px'} !important;
-            padding-top: ${isLong ? '18px' : '14px'} !important;
-            padding-left: 8px !important;
-            padding-right: 8px !important;
-            gap: 24px !important;
-            border-top: 1.5px solid #000 !important;
-            break-inside: avoid !important;
-            page-break-inside: avoid !important;
-          }
-          .hidden.print\\:grid .mt-8 {
-            margin-top: ${isLong ? '32px' : '26px'} !important;
-            border-bottom: 1px solid #000 !important;
-            width: ${isLong ? '210px' : '190px'} !important;
-          }
-          .hidden.print\\:grid p {
-            font-family: Arial, Helvetica, sans-serif !important;
-            font-size: ${isLong ? '9.5px' : '9px'} !important;
-            line-height: 1.25 !important;
-          }
-          .hidden.print\\:grid p.uppercase {
-            margin-bottom: 4px !important;
-            color: #1e293b !important;
-            font-weight: 700 !important;
           }
         }
       `}</style>
 
-      {/* Print-only letterhead / Header */}
-      <div className="hidden print:flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-4">
-        <div className="flex items-center gap-4">
-          <img src={schoolSeal} alt={schoolTitle} className="w-16 h-16 rounded-full object-cover border border-slate-200" />
-          <div>
-            <h2 className="text-xl font-bold font-display text-slate-900 leading-tight">{schoolTitle}</h2>
-            <p className="text-xs text-slate-500 font-medium">{schoolLocation}</p>
-            <p className="text-xs text-slate-400 mt-0.5">Supreme Student Learner Government Election System</p>
-          </div>
-        </div>
-        <div className="text-right text-xs text-slate-500">
-          <p className="text-sm font-bold text-slate-900 uppercase tracking-wider mb-1">Official Results Tally</p>
-          <p>Election: <span className="font-semibold text-slate-800">{activeTab === "history" && selectedElection ? selectedElection.election_name : electionName}</span></p>
-          <p>Tally Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}</p>
-        </div>
-      </div>
-
-      <div className="flex justify-between items-start flex-wrap gap-4 mb-8 print:hidden">
+      {/* ── Screen Interactive Interface Wrapper (Hidden during Print) ── */}
+      <div className="print:hidden">
+      <div className="flex justify-between items-start flex-wrap gap-4 mb-8">
         <div>
           <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground flex items-center gap-3">
             <BarChart3 className="w-8 h-8 text-gold" /> Election Results
@@ -821,7 +807,7 @@ export default function Results() {
 
         {isAdmin && (
           <button
-            onClick={() => window.print()}
+            onClick={() => setShowPrintModal(true)}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl gradient-gold text-accent-foreground font-semibold text-sm shadow-gold hover:opacity-90 transition-opacity print:hidden"
           >
             <Printer className="w-4 h-4" /> Print Results Tally
@@ -1646,20 +1632,458 @@ export default function Results() {
           )}
         </div>
       )}
+      </div> {/* ── End of Screen Interactive Interface (print:hidden) ── */}
 
-      {/* Print-only signature block */}
-      <div className="hidden print:grid grid-cols-2 gap-12 mt-12 pt-8 border-t border-slate-300 text-sm">
-        <div>
-          <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Prepared By:</p>
-          <div className="mt-8 border-b border-slate-400 w-56 h-5"></div>
-          <p className="text-xs font-semibold text-slate-800 mt-1">Election Committee Chairman</p>
-        </div>
-        <div className="text-right flex flex-col items-end">
-          <p className="text-slate-500 text-xs uppercase tracking-wide font-semibold">Attested By:</p>
-          <div className="mt-8 border-b border-slate-400 w-56 h-5"></div>
-          <p className="text-xs font-semibold text-slate-800 mt-1">School Principal / Admin Representative</p>
-        </div>
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ── DEDICATED OFFICIAL PRINT DOCUMENTS (NATURAL COMPACT 2-COLUMN FLOW) ── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <div className="hidden print:block print-document-root">
+        {(() => {
+          const renderFullHeader = (docTitle) => (
+            <div className="flex items-center justify-between border-b-2 border-black pb-2 mb-2.5">
+              <div className="flex items-center gap-2.5">
+                <img src={schoolSeal} alt={schoolTitle} className="w-12 h-12 rounded-full object-cover border border-black" />
+                <div>
+                  <p className="text-[7pt] uppercase tracking-wider text-slate-700 leading-tight">Republic of the Philippines · Department of Education</p>
+                  <h2 className="text-[11.5pt] font-bold text-black uppercase leading-tight tracking-wide">{schoolTitle}</h2>
+                  <p className="text-[7.5pt] text-slate-700 leading-tight">{schoolLocation}</p>
+                  <p className="text-[7pt] font-semibold text-slate-900 mt-0.5 uppercase tracking-wide">
+                    Supreme Student Learner Government (SSLG) Commission on Elections
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="inline-block text-[8.5pt] font-bold uppercase tracking-wider px-2 py-0.5 border border-black bg-slate-100 text-black mb-0.5">
+                  {docTitle}
+                </span>
+                <p className="text-[7.5pt] text-slate-800 leading-tight">
+                  <strong>Election:</strong> {activeTab === "history" && selectedElection ? selectedElection.election_name : electionName}
+                </p>
+                <p className="text-[7.5pt] text-slate-800 leading-tight">
+                  <strong>School Year:</strong> {activeTab === "history" && selectedElection ? selectedElection.school_year : (settings?.school_year || "S.Y. 2025-2026")}
+                </p>
+                <p className="text-[7pt] text-slate-600 leading-tight">
+                  Date: {new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })}
+                </p>
+              </div>
+            </div>
+          );
+
+          const renderSignaturesBlock = () => (
+            <div className="grid grid-cols-2 gap-8 mt-5 pt-3 border-t-2 border-black text-[7.5pt] break-inside-avoid page-break-inside-avoid">
+              <div>
+                <p className="text-slate-600 uppercase font-semibold text-[6.5pt] tracking-wider mb-6">Prepared &amp; Certified By:</p>
+                <div className="border-b border-black w-48 mb-0.5"></div>
+                <p className="font-bold text-black uppercase text-[8pt]">Election Committee Chairman</p>
+                <p className="text-[6.5pt] text-slate-600">SSLG Commission on Elections</p>
+              </div>
+              <div className="text-right flex flex-col items-end">
+                <p className="text-slate-600 uppercase font-semibold text-[6.5pt] tracking-wider mb-6">Attested &amp; Approved By:</p>
+                <div className="border-b border-black w-48 mb-0.5"></div>
+                <p className="font-bold text-black uppercase text-[8pt]">School Principal / Administrator</p>
+                <p className="text-[6.5pt] text-slate-600">{schoolTitle}</p>
+              </div>
+            </div>
+          );
+
+          return (
+            <>
+              {/* ── CHOICE 1: ONLY CANDIDATES ── */}
+              {printMode === "candidates" && (
+                <div>
+                  {renderFullHeader("Official List of Candidates")}
+
+                  <div className="mb-2 pb-1 border-b border-slate-300">
+                    <h3 className="text-[9pt] font-bold text-black uppercase tracking-wider">
+                      Certified Official Roster of Candidates
+                    </h3>
+                    <p className="text-[7pt] text-slate-600">
+                      Official list of qualified candidates running for SSLG elective positions and their party affiliations (strictly candidate names &amp; party-lists only):
+                    </p>
+                  </div>
+
+                  {/* Continuous 2-Column Grid — Fills Page Naturally without artificial empty spaces */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {printCandidatesData.map((posGroup, idx) => (
+                      <div key={posGroup.title || idx} className="border border-black break-inside-avoid page-break-inside-avoid text-[7.5pt]">
+                        {/* Position Header */}
+                        <div className="bg-slate-100 px-2.5 py-1 border-b border-black flex justify-between items-center">
+                          <span className="font-bold text-[8.5pt] text-black uppercase tracking-tight">
+                            Position: {posGroup.title}
+                          </span>
+                          <span className="text-[6.5pt] font-medium text-slate-600 uppercase">
+                            {posGroup.candidates.length} Candidate{posGroup.candidates.length !== 1 ? "s" : ""}
+                          </span>
+                        </div>
+
+                        {/* Candidates List — STRICTLY NO NUMBERS */}
+                        {posGroup.candidates.length === 0 ? (
+                          <div className="p-1.5 text-[7pt] text-slate-500 italic">No candidates registered.</div>
+                        ) : (
+                          <table className="w-full text-left border-collapse text-[7.5pt]">
+                            <thead>
+                              <tr className="border-b border-slate-300 bg-slate-50/50 text-[6.5pt] text-slate-600 uppercase">
+                                <th className="py-0.5 px-2 w-1/2 font-semibold">Candidate Name</th>
+                                <th className="py-0.5 px-2 w-1/2 font-semibold">Party-List</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-200">
+                              {posGroup.candidates.map((c, ci) => (
+                                <tr key={`${c.name}-${ci}`}>
+                                  <td className="py-1 px-2">
+                                    <p className="font-bold text-[8pt] text-black uppercase leading-tight">{c.name}</p>
+                                    {(c.grade || c.section) && (
+                                      <p className="text-[6.5pt] text-slate-600 font-normal">
+                                        {[c.grade, c.section].filter(Boolean).join(" - ")}
+                                      </p>
+                                    )}
+                                  </td>
+                                  <td className="py-1 px-2 text-[7.5pt] text-slate-800 uppercase font-medium">
+                                    {c.party || "INDEPENDENT"}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {renderSignaturesBlock()}
+                </div>
+              )}
+
+              {/* ── CHOICE 2: ONLY CANDIDATES WINNERS ── */}
+              {printMode === "winners" && (
+                <div>
+                  {renderFullHeader("Official Proclamation of Winners")}
+
+                  <div className="mb-2 pb-1 border-b border-slate-300">
+                    <h3 className="text-[9pt] font-bold text-black uppercase tracking-wider">
+                      Official Proclamation of Winners
+                    </h3>
+                    <p className="text-[7pt] text-slate-600">
+                      This certifies that the following candidates garnered the winning votes in their respective positions and are hereby proclaimed as the duly elected SSLG Officers:
+                    </p>
+                  </div>
+
+                  <table className="w-full text-left border-collapse border border-black text-[7.5pt]">
+                    <thead>
+                      <tr className="bg-slate-100 border-b border-black text-[7pt] text-black uppercase font-bold">
+                        <th className="py-1.5 px-2.5 border-r border-black w-[28%]">Position</th>
+                        <th className="py-1.5 px-2.5 border-r border-black w-[34%]">Proclaimed Winner</th>
+                        <th className="py-1.5 px-2.5 border-r border-black w-[23%]">Party-List</th>
+                        <th className="py-1.5 px-2.5 text-right w-[15%]">Total Votes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black text-[7.5pt]">
+                      {printWinnersData.map((pw, pwi) => {
+                        if (pw.isTie) {
+                          return (
+                            <tr key={pw.title || pwi} className="bg-amber-50/40">
+                              <td className="py-1.5 px-2.5 border-r border-black font-bold uppercase text-[8pt]">
+                                {pw.title}
+                              </td>
+                              <td colSpan={3} className="py-1.5 px-2.5 text-amber-900 font-semibold text-[7pt]">
+                                TIE PENDING RESOLUTION: {pw.tiedCandidates?.map(t => `${t.candidate_name} (${t.vote_count} votes)`).join(" vs ")}
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        if (!pw.winners || pw.winners.length === 0) {
+                          return (
+                            <tr key={pw.title || pwi}>
+                              <td className="py-1.5 px-2.5 border-r border-black font-bold uppercase text-[8pt]">
+                                {pw.title}
+                              </td>
+                              <td colSpan={3} className="py-1.5 px-2.5 text-slate-500 italic text-[7pt]">
+                                No votes recorded yet / Pending
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        return pw.winners.map((winner, wi) => (
+                          <tr key={`${pw.title}-${winner.name}-${wi}`} className={wi % 2 === 1 ? "bg-slate-50" : "bg-white"}>
+                            <td className="py-1.5 px-2.5 border-r border-black font-bold uppercase text-[8pt] align-top">
+                              {wi === 0 ? pw.title : ""}
+                            </td>
+                            <td className="py-1.5 px-2.5 border-r border-black font-bold uppercase text-[8.5pt] text-black">
+                              {winner.name}
+                              {winner.isDeclaredWinner && (
+                                <span className="block text-[6.5pt] text-emerald-700 font-semibold">
+                                  (Declared Winner via Official Resolution)
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-1.5 px-2.5 border-r border-black uppercase text-[7.5pt] text-slate-800">
+                              {winner.party}
+                            </td>
+                            <td className="py-1.5 px-2.5 text-right font-bold text-[8.5pt] text-black">
+                              {(winner.voteCount ?? winner.votes ?? 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        ));
+                      })}
+                    </tbody>
+                  </table>
+
+                  {renderSignaturesBlock()}
+                </div>
+              )}
+
+              {/* ── CHOICE 3: FINAL RESULTS ── */}
+              {printMode === "final" && (
+                <div>
+                  {renderFullHeader("Official Final Results Tally")}
+
+                  {/* Continuous 2-Column Grid — Fills Page Naturally without artificial empty spaces */}
+                  <div className="grid grid-cols-2 gap-2">
+                    {printFinalResultsData.map((group, gi) => (
+                      <div key={group.title || gi} className="border border-black break-inside-avoid page-break-inside-avoid text-[7.5pt]">
+                        {/* Position Header */}
+                        <div className="bg-slate-100 px-2.5 py-1 border-b border-black flex justify-between items-center">
+                          <span className="font-bold text-[8.5pt] text-black uppercase tracking-tight">
+                            {group.title}
+                          </span>
+                          <span className="text-[7pt] font-semibold text-slate-700">
+                            Total: {(group.totalVotes ?? 0).toLocaleString()} votes
+                          </span>
+                        </div>
+
+                        {/* Candidates Table */}
+                        <table className="w-full text-left border-collapse text-[7.5pt]">
+                          <thead>
+                            <tr className="border-b border-slate-300 bg-slate-50/50 text-[6.5pt] text-slate-600 uppercase">
+                              <th className="py-0.5 px-1.5 w-8 text-center">Rank</th>
+                              <th className="py-0.5 px-2">Candidate Name</th>
+                              <th className="py-0.5 px-2">Party-List</th>
+                              <th className="py-0.5 px-2 text-right">Votes</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-200">
+                            {group.candidates.length === 0 ? (
+                              <tr>
+                                <td colSpan={4} className="py-1.5 px-2 text-[7pt] text-slate-500 italic">No candidates registered.</td>
+                              </tr>
+                            ) : (
+                              group.candidates.map((c, ci) => (
+                                <tr key={`${c.name}-${ci}`} className={c.isWinner ? "bg-amber-50/20" : ""}>
+                                  <td className="py-1 px-1.5 text-center">
+                                    <span className="inline-block w-3.5 h-3.5 rounded-full border border-black text-[6.5pt] font-bold leading-3.5 text-center">
+                                      {c.rank || ci + 1}
+                                    </span>
+                                  </td>
+                                  <td className="py-1 px-2">
+                                    <div className="flex items-center gap-1 flex-wrap">
+                                      <span className="font-bold text-[8pt] text-black uppercase leading-tight">{c.name}</span>
+                                      {c.isDeclared ? (
+                                        <span className="text-[6pt] font-bold px-1 py-0.2 rounded border border-emerald-700 text-emerald-800 bg-emerald-50">
+                                          Declared Winner
+                                        </span>
+                                      ) : c.isWinner ? (
+                                        <span className="text-[6pt] font-bold px-1 py-0.2 rounded border border-black bg-slate-100 text-black">
+                                          Winner
+                                        </span>
+                                      ) : c.isTied ? (
+                                        <span className="text-[6pt] font-bold px-1 py-0.2 rounded border border-amber-600 text-amber-700 bg-amber-50">
+                                          Tie
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    {(c.grade || c.section) && (
+                                      <p className="text-[6.5pt] text-slate-500">
+                                        {[c.grade, c.section].filter(Boolean).join(" - ")}
+                                      </p>
+                                    )}
+                                  </td>
+                                  <td className="py-1 px-2 text-[7pt] text-slate-700 uppercase">
+                                    {c.party || "INDEPENDENT"}
+                                  </td>
+                                  <td className="py-1 px-2 text-right font-bold text-[8pt] text-black">
+                                    {(c.voteCount ?? 0).toLocaleString()}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+
+                        {/* Verification note if present */}
+                        {group.verification && (
+                          <div className="p-1 bg-slate-50 border-t border-slate-300 text-[6.5pt] text-slate-700 leading-tight">
+                            <strong>Audit:</strong> {group.verification.decision_type || "Verified"}
+                            {group.verification.resolved_winner_name && ` — Winner: ${group.verification.resolved_winner_name}`}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  {renderSignaturesBlock()}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* ── PRINT OPTION SELECTION MODAL ── */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {showPrintModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 print:hidden animate-fade-in"
+          onClick={() => setShowPrintModal(false)}
+        >
+          <div 
+            className="bg-card border border-border rounded-2xl shadow-2xl max-w-xl w-full p-6 text-foreground animate-scale-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-4 border-b border-border">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gold/15 flex items-center justify-center text-gold">
+                  <Printer className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-lg text-foreground">Print Election Documents</h3>
+                  <p className="text-xs text-muted-foreground">Select which official report layout you want to print:</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowPrintModal(false)}
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                title="Close"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Choices */}
+            <div className="space-y-3 my-5">
+              {/* Choice 1: ONLY CANDIDATES */}
+              <button
+                type="button"
+                onClick={() => handleTriggerPrint("candidates")}
+                className="w-full text-left p-4 rounded-xl border border-border hover:border-sky-500/60 bg-muted/30 hover:bg-sky-500/5 transition-all group relative flex items-start gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-sky-500/15 text-sky-500 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                  <Users className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-sm text-foreground group-hover:text-sky-500 transition-colors">
+                      1. ONLY CANDIDATES
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-600 dark:text-sky-400">
+                      Roster Only
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Prints candidates only (no numbers) in a continuous 2-column layout that naturally fills the pages without wasted space (~2 pages).
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-sky-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-3" />
+              </button>
+
+              {/* Choice 2: ONLY CANDIDATES WINNERS */}
+              <button
+                type="button"
+                onClick={() => handleTriggerPrint("winners")}
+                className="w-full text-left p-4 rounded-xl border border-border hover:border-gold bg-muted/30 hover:bg-gold/5 transition-all group relative flex items-start gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-gold/15 text-gold flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                  <Trophy className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-sm text-foreground group-hover:text-gold transition-colors">
+                      2. ONLY CANDIDATES WINNERS
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gold/15 text-gold">
+                      1 Page
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Prints <strong>exclusively the winning candidates</strong> for each position in an official proclamation sheet (1 page).
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-gold group-hover:translate-x-0.5 transition-all shrink-0 mt-3" />
+              </button>
+
+              {/* Choice 3: FINAL RESULTS */}
+              <button
+                type="button"
+                onClick={() => handleTriggerPrint("final")}
+                className="w-full text-left p-4 rounded-xl border border-border hover:border-emerald-500/60 bg-muted/30 hover:bg-emerald-500/5 transition-all group relative flex items-start gap-4"
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 text-emerald-500 flex items-center justify-center shrink-0 mt-0.5 group-hover:scale-105 transition-transform">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-bold text-sm text-foreground group-hover:text-emerald-500 transition-colors">
+                      3. FINAL RESULTS
+                    </span>
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400">
+                      Full Tally
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Prints the complete system results with all votes and rankings in a continuous 2-column layout that naturally fills the pages without wasted space (~2 pages).
+                  </p>
+                </div>
+                <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-3" />
+              </button>
+            </div>
+
+            {/* Quick Paper Size selector bar */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50 border border-border text-xs mb-4">
+              <span className="text-muted-foreground font-medium flex items-center gap-1.5">
+                <Printer className="w-3.5 h-3.5 text-gold" /> Selected Paper Size:
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => handlePaperSizeChange("short")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    paperSize === "short"
+                      ? "bg-card text-foreground shadow-sm border border-gold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Short (8.5×11″)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handlePaperSizeChange("long")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
+                    paperSize === "long"
+                      ? "bg-card text-foreground shadow-sm border border-gold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Long (8.5×13″)
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <button
+                type="button"
+                onClick={() => setShowPrintModal(false)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
